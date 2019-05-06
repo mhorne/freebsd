@@ -133,15 +133,14 @@ g_dev_fini(struct g_class *mp)
 }
 
 static int
-g_dev_setdumpdev(struct cdev *dev, struct diocskerneldump_arg *kda,
-    struct thread *td)
+g_dev_setdumpdev(struct cdev *dev, struct diocskerneldump_arg *kda)
 {
 	struct g_kerneldump kd;
 	struct g_consumer *cp;
 	int error, len;
 
-	if (dev == NULL || kda == NULL)
-		return (clear_dumper(td));
+	MPASS(dev != NULL && kda != NULL);
+	MPASS(kda->kda_index != KDA_REMOVE);
 
 	cp = dev->si_drv2;
 	len = sizeof(kd);
@@ -152,9 +151,7 @@ g_dev_setdumpdev(struct cdev *dev, struct diocskerneldump_arg *kda,
 	if (error != 0)
 		return (error);
 
-	error = set_dumper(&kd.di, devtoname(dev), td, kda->kda_compression,
-	    kda->kda_encryption, kda->kda_key, kda->kda_encryptedkeysize,
-	    kda->kda_encryptedkey);
+	error = dumper_insert(&kd.di, devtoname(dev), kda);
 	if (error == 0)
 		dev->si_flags |= SI_DUMPDEV;
 
@@ -171,7 +168,7 @@ init_dumpdev(struct cdev *dev)
 	size_t len;
 
 	bzero(&kda, sizeof(kda));
-	kda.kda_enable = 1;
+	kda.kda_index = KDA_APPEND;
 
 	if (dumpdev == NULL)
 		return (0);
@@ -188,7 +185,7 @@ init_dumpdev(struct cdev *dev)
 	if (error != 0)
 		return (error);
 
-	error = g_dev_setdumpdev(dev, &kda, curthread);
+	error = g_dev_setdumpdev(dev, &kda);
 	if (error == 0) {
 		freeenv(dumpdev);
 		dumpdev = NULL;
@@ -540,13 +537,15 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 	    {
 		struct diocskerneldump_arg kda;
 
+		gone_in(13, "FreeBSD 11.x ABI compat");
+
 		bzero(&kda, sizeof(kda));
 		kda.kda_encryption = KERNELDUMP_ENC_NONE;
-		kda.kda_enable = (uint8_t)*(u_int *)data;
-		if (kda.kda_enable == 0)
-			error = g_dev_setdumpdev(NULL, NULL, td);
+		kda.kda_index = (*(u_int *)data ? 0 : KDA_REMOVE_ALL);
+		if (kda.kda_index == KDA_REMOVE_ALL)
+			error = dumper_remove(devtoname(dev), &kda);
 		else
-			error = g_dev_setdumpdev(dev, &kda, td);
+			error = g_dev_setdumpdev(dev, &kda);
 		break;
 	    }
 #endif
@@ -556,15 +555,19 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 		uint8_t *encryptedkey;
 
 		kda = (struct diocskerneldump_arg *)data;
-		if (kda->kda_enable == 0) {
-			error = g_dev_setdumpdev(NULL, NULL, td);
+		if (kda->kda_index == KDA_REMOVE_ALL ||
+		    kda->kda_index == KDA_REMOVE_DEV ||
+		    kda->kda_index == KDA_REMOVE) {
+			error = dumper_remove(devtoname(dev), kda);
+			explicit_bzero(kda, sizeof(*kda));
 			break;
 		}
 
 		if (kda->kda_encryption != KERNELDUMP_ENC_NONE) {
-			if (kda->kda_encryptedkeysize <= 0 ||
+			if (kda->kda_encryptedkeysize == 0 ||
 			    kda->kda_encryptedkeysize >
 			    KERNELDUMP_ENCKEY_MAX_SIZE) {
+				explicit_bzero(kda, sizeof(*kda));
 				return (EINVAL);
 			}
 			encryptedkey = malloc(kda->kda_encryptedkeysize, M_TEMP,
@@ -576,7 +579,7 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 		}
 		if (error == 0) {
 			kda->kda_encryptedkey = encryptedkey;
-			error = g_dev_setdumpdev(dev, kda, td);
+			error = g_dev_setdumpdev(dev, kda);
 		}
 		if (encryptedkey != NULL) {
 			explicit_bzero(encryptedkey, kda->kda_encryptedkeysize);
@@ -834,8 +837,13 @@ g_dev_orphan(struct g_consumer *cp)
 	g_trace(G_T_TOPOLOGY, "g_dev_orphan(%p(%s))", cp, cp->geom->name);
 
 	/* Reset any dump-area set on this device */
-	if (dev->si_flags & SI_DUMPDEV)
-		(void)clear_dumper(curthread);
+	if (dev->si_flags & SI_DUMPDEV) {
+		struct diocskerneldump_arg kda;
+
+		bzero(&kda, sizeof(kda));
+		kda.kda_index = KDA_REMOVE_DEV;
+		(void)dumper_remove(devtoname(dev), &kda);
+	}
 
 	/* Destroy the struct cdev *so we get no more requests */
 	delist_dev(dev);
