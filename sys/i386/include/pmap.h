@@ -362,8 +362,6 @@ struct pv_chunk {
 
 extern caddr_t CADDR3;
 extern pt_entry_t *CMAP3;
-extern vm_paddr_t phys_avail[];
-extern vm_paddr_t dump_avail[];
 extern char *ptvmmap;		/* poor name! */
 extern vm_offset_t virtual_avail;
 extern vm_offset_t virtual_end;

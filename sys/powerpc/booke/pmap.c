@@ -1855,6 +1855,10 @@ mmu_booke_bootstrap(mmu_t mmu, vm_offset_t start, vm_offset_t kernelend)
 	/* Retrieve phys/avail mem regions */
 	mem_regions(&physmem_regions, &physmem_regions_sz,
 	    &availmem_regions, &availmem_regions_sz);
+
+	if (PHYS_AVAIL_ENTRIES < availmem_regions_sz)
+		panic("mmu_booke_bootstrap: phys_avail too small");
+
 	sz = 0;
 	cnt = availmem_regions_sz;
 	debugf("processing avail regions:\n");
