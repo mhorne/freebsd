@@ -88,6 +88,9 @@ fence_i(void)
 	__asm __volatile("fence.i" ::: "memory");
 }
 
+/*
+ * Invalidate the entire local TLB. This includes global mappings.
+ */
 static __inline void
 sfence_vma(void)
 {
@@ -95,11 +98,38 @@ sfence_vma(void)
 	__asm __volatile("sfence.vma" ::: "memory");
 }
 
+/*
+ * Invalidate all mappings for the context denoted by asid. An asid value of
+ * zero (not x0) will invalidate all non-global mappings.
+ */
+static __inline void
+sfence_vma_asid(int asid)
+{
+
+	__asm __volatile("sfence.vma x0, %0" :: "r" (asid) : "memory");
+}
+
+/*
+ * Invalidate any leaf PTEs corresponding to addr, including global mappings.
+ */
 static __inline void
 sfence_vma_page(uintptr_t addr)
 {
 
 	__asm __volatile("sfence.vma %0" :: "r" (addr) : "memory");
+}
+
+/*
+ * Invalidate the leaf PTE corresponding to addr, in the address space denoted
+ * by asid. Global mappings are not affected.
+ */
+static __inline void
+sfence_vma_page_asid(uintptr_t addr, int asid)
+{
+
+	__asm __volatile("sfence.vma %0, %1"
+			:: "r" (addr), "r" (asid)
+			: "memory");
 }
 
 #define	rdcycle()			csr_read64(cycle)
