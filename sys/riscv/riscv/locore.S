@@ -123,8 +123,8 @@ _start:
 	 * a 1GB map of KERNBASE -> kernstart using 2MB superpages. We also
 	 * use an L1 entry to create a 1GB identity map. This is useful for two
 	 * reasons:
-	 *  - handling the DTB pointer passed from SBI firmware
-	 *  - simpler construction of pagetables in pmap_bootstrap().
+	 *  1. handling the DTB pointer passed from SBI firmware
+	 *  2. simplify the construction of pagetables in pmap_bootstrap()
 	 */
 pagetables:
 	/* Get the kernel's load address */
