@@ -211,6 +211,9 @@
 #define	PS_STRINGS_SV39		(USRSTACK_SV39 - sizeof(struct ps_strings))
 #define	PS_STRINGS_SV48		(USRSTACK_SV48 - sizeof(struct ps_strings))
 
+#define	EARLY_DEVMAP_SIZE	(2 * L2_SIZE)
+#define	VM_DEVMAP_ADDRESS	(VM_MAX_KERNEL_ADDRESS - EARLY_DEVMAP_SIZE)
+
 /*
  * How many physical pages per kmem arena virtual page.
  */
@@ -241,7 +244,6 @@ extern vm_paddr_t dmap_phys_base;
 extern vm_paddr_t dmap_phys_max;
 extern vm_offset_t dmap_max_addr;
 extern vm_offset_t vm_max_kernel_address;
-extern vm_offset_t init_pt_va;
 #endif
 
 #define	ZERO_REGION_SIZE	(64 * 1024)	/* 64KB */

@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2015-2018 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
+ * Copyright (c) 2019-2020 Mitchell Horne <mhorne@FreeBSD.org>
  *
  * Portions of this software were developed by SRI International and the
  * University of Cambridge Computer Laboratory under DARPA/AFRL contract
@@ -114,15 +115,23 @@ _start:
 	 * initially and will optionally enable SV48 mode during kernel pmap
 	 * initialization.
 	 *
+	 * Bootstrap page table setup
 	 *  a0 - modulep or zero
 	 *  a1 - zero or dtbp
+	 *
+	 * Our goal is to set up only what is required to bootstrap. We create
+	 * a 1GB map of KERNBASE -> kernstart using 2MB superpages. We also
+	 * use an L1 entry to create a 1GB identity map. This is useful for two
+	 * reasons:
+	 *  - handling the DTB pointer passed from SBI firmware
+	 *  - simpler construction of pagetables in pmap_bootstrap().
 	 */
 pagetables:
 	/* Get the kernel's load address */
 	jal	get_physmem
 
 	/* Construct 1GB Identity Map (1:1 PA->VA) */
-	lla	s1, pagetable_l1
+	lla	s1, bootstrap_pt_l1
 	mv	s2, s9			/* kernstart */
 	srli	s2, s2, L1_SHIFT
 
@@ -142,8 +151,8 @@ pagetables:
 	/* Construct the virtual address space */
 
 	/* Add L1 entry for kernel */
-	lla	s1, pagetable_l1
-	lla	s2, pagetable_l2	/* Link to next level PN */
+	lla	s1, bootstrap_pt_l1
+	lla	s2, bootstrap_pt_l2	/* Link to next level PN */
 	srli	s2, s2, PAGE_SHIFT
 
 	li	a5, KERNBASE
@@ -160,9 +169,9 @@ pagetables:
 	sd	t6, (t0)
 
 	/* Level 2 superpages (512 x 2MiB) */
-	lla	s1, pagetable_l2
+	lla	s1, bootstrap_pt_l2
 	srli	t4, s9, L2_SHIFT	/* Div physmem base by 2 MiB */
-	li	t2, 512			/* Build 512 entries */
+	li	t2, Ln_ENTRIES		/* Build 512 entries */
 	add	t3, t4, t2
 	li	t0, (PTE_KERN | PTE_X)
 1:
@@ -174,24 +183,6 @@ pagetables:
 	addi	t4, t4, 1
 	bltu	t4, t3, 1b
 
-	/* Create an L1 table entry for early devmap */
-	lla	s1, pagetable_l1
-	lla	s2, pagetable_l2_devmap	/* Link to next level PN */
-	srli	s2, s2, PAGE_SHIFT
-
-	li	a5, (VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE)
-	srli	a5, a5, L1_SHIFT	/* >> L1_SHIFT */
-	andi	a5, a5, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
-	li	t4, PTE_V
-	slli	t5, s2, PTE_PPN0_S	/* (s2 << PTE_PPN0_S) */
-	or	t6, t4, t5
-
-	/* Store the L1 table entry */
-	li	a6, PTE_SIZE
-	mulw	a5, a5, a6
-	add	t0, s1, a5
-	sd	t6, (t0)
-
 	/* Page tables END */
 
 	/* Setup supervisor trap vector */
@@ -202,7 +193,7 @@ pagetables:
 	csrw	stvec, t0
 
 	/* Set page tables base register */
-	lla	s2, pagetable_l1
+	lla	s2, bootstrap_pt_l1
 	srli	s2, s2, PAGE_SHIFT
 	li	t0, SATP_MODE_SV39
 	or	s2, s2, t0
@@ -243,8 +234,6 @@ va:
 	bltu	t0, t1, 1b
 
 	/* Fill riscv_bootparams */
-	la	t0, pagetable_l1
-	sd	t0, RISCV_BOOTPARAMS_KERN_L1PT(sp)
 	sd	s9, RISCV_BOOTPARAMS_KERN_PHYS(sp)
 
 	la	t0, initstack
@@ -277,12 +266,12 @@ initstack:
 	.space  (PAGE_SIZE * KSTACK_PAGES)
 initstack_end:
 
-	.align	12
-pagetable_l1:
+	.balign	PAGE_SIZE
+	//.globl bootstrap_pt_l1
+bootstrap_pt_l1:
 	.space	PAGE_SIZE
-pagetable_l2:
-	.space	PAGE_SIZE
-pagetable_l2_devmap:
+	//.globl bootstrap_pt_l2
+bootstrap_pt_l2:
 	.space	PAGE_SIZE
 
 	.align 3
@@ -290,10 +279,6 @@ virt_map:
 	.quad   virt_map
 hart_lottery:
 	.space	4
-
-	.globl init_pt_va
-init_pt_va:
-	.quad pagetable_l2	/* XXX: Keep page tables VA */
 
 #ifndef SMP
 ENTRY(mpentry)
@@ -338,7 +323,8 @@ ENTRY(mpentry)
 	csrw	stvec, t0
 
 	/* Set page tables base register */
-	lla	s2, pagetable_l1
+	lla	s2, root_pt_phys
+	ld	s2, 0(s2)
 	srli	s2, s2, PAGE_SHIFT
 	li	t0, SATP_MODE_SV39
 	or	s2, s2, t0
