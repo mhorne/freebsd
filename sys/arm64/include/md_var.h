@@ -36,15 +36,11 @@
 extern long Maxmem;
 extern char sigcode[];
 extern int szsigcode;
-extern uint64_t *vm_page_dump;
-extern int vm_page_dump_size;
 
 struct dumperinfo;
 
 extern int busdma_swi_pending;
 void busdma_swi(void);
-void dump_add_page(vm_paddr_t);
-void dump_drop_page(vm_paddr_t);
 int minidumpsys(struct dumperinfo *);
 
 #endif /* !_MACHINE_MD_VAR_H_ */

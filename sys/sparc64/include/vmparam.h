@@ -245,4 +245,9 @@ extern vm_offset_t vm_max_kernel_address;
 #define	PMAP_HAS_DMAP	dcache_color_ignore
 #define	PHYS_TO_DMAP(x)	(TLB_PHYS_TO_DIRECT(x))
 
+/*
+ * No minidumps on sparc64.
+ */
+#define MINIDUMP_PAGE_TRACKING	0
+
 #endif /* !_MACHINE_VMPARAM_H_ */

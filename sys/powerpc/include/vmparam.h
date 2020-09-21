@@ -258,6 +258,11 @@ struct pmap_physseg {
 #endif
 #endif
 
+/*
+ * No minidumps on powerpc.
+ */
+#define MINIDUMP_PAGE_TRACKING	0
+
 #define	PMAP_HAS_DMAP	(hw_direct_map)
 #define PHYS_TO_DMAP(x) ({						\
 	KASSERT(hw_direct_map, ("Direct map not provided by PMAP"));	\
