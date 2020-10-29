@@ -102,7 +102,8 @@ __FBSDID("$FreeBSD$");
 
 static cap_channel_t *capsyslog;
 static fileargs_t *capfa;
-static int checkfor, compress, clear, force, keep, verbose;	/* flags */
+static bool checkfor, compress, clear, force, keep;	/* flags */
+static int verbose;
 static int nfound, nsaved, nerr;			/* statistics */
 static int maxdumps;
 
@@ -671,7 +672,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 			    dtoh32(kdhl.version), device);
 
 			status = STATUS_BAD;
-			if (force == 0)
+			if (force == false)
 				goto closefd;
 		}
 	} else if (compare_magic(&kdhl, KERNELDUMPMAGIC)) {
@@ -681,7 +682,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 			    dtoh32(kdhl.version), device);
 
 			status = STATUS_BAD;
-			if (force == 0)
+			if (force == false)
 				goto closefd;
 		}
 		switch (kdhl.compression) {
@@ -705,7 +706,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 			    device);
 
 		status = STATUS_BAD;
-		if (force == 0)
+		if (force == false)
 			goto closefd;
 
 		if (compare_magic(&kdhl, KERNELDUMPMAGIC_CLEARED)) {
@@ -722,7 +723,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 			    dtoh32(kdhl.version), device);
 
 			status = STATUS_BAD;
-			if (force == 0)
+			if (force == false)
 				goto closefd;
 		}
 	}
@@ -736,7 +737,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 		    "parity error on last dump header on %s", device);
 		nerr++;
 		status = STATUS_BAD;
-		if (force == 0)
+		if (force == false)
 			goto closefd;
 	}
 	dumpextent = dtoh64(kdhl.dumpextent);
@@ -767,7 +768,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 		    "first and last dump headers disagree on %s", device);
 		nerr++;
 		status = STATUS_BAD;
-		if (force == 0)
+		if (force == false)
 			goto closefd;
 	} else {
 		status = STATUS_GOOD;
@@ -1105,7 +1106,8 @@ main(int argc, char **argv)
 	char **devs;
 	int i, ch, error, savedirfd;
 
-	checkfor = compress = clear = force = keep = verbose = 0;
+	checkfor = compress = clear = force = keep = false;
+	verbose = 0;
 	nfound = nsaved = nerr = 0;
 	savedir = ".";
 
@@ -1119,16 +1121,16 @@ main(int argc, char **argv)
 	while ((ch = getopt(argc, argv, "Ccfkm:vz")) != -1)
 		switch(ch) {
 		case 'C':
-			checkfor = 1;
+			checkfor = true;
 			break;
 		case 'c':
-			clear = 1;
+			clear = true;
 			break;
 		case 'f':
-			force = 1;
+			force = true;
 			break;
 		case 'k':
-			keep = 1;
+			keep = true;
 			break;
 		case 'm':
 			maxdumps = atoi(optarg);
