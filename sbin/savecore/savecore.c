@@ -672,7 +672,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 			    dtoh32(kdhl.version), device);
 
 			status = STATUS_BAD;
-			if (force == false)
+			if (!force)
 				goto closefd;
 		}
 	} else if (compare_magic(&kdhl, KERNELDUMPMAGIC)) {
@@ -682,7 +682,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 			    dtoh32(kdhl.version), device);
 
 			status = STATUS_BAD;
-			if (force == false)
+			if (!force)
 				goto closefd;
 		}
 		switch (kdhl.compression) {
@@ -706,7 +706,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 			    device);
 
 		status = STATUS_BAD;
-		if (force == false)
+		if (!force)
 			goto closefd;
 
 		if (compare_magic(&kdhl, KERNELDUMPMAGIC_CLEARED)) {
@@ -723,7 +723,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 			    dtoh32(kdhl.version), device);
 
 			status = STATUS_BAD;
-			if (force == false)
+			if (!force)
 				goto closefd;
 		}
 	}
@@ -737,7 +737,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 		    "parity error on last dump header on %s", device);
 		nerr++;
 		status = STATUS_BAD;
-		if (force == false)
+		if (!force)
 			goto closefd;
 	}
 	dumpextent = dtoh64(kdhl.dumpextent);
@@ -768,7 +768,7 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 		    "first and last dump headers disagree on %s", device);
 		nerr++;
 		status = STATUS_BAD;
-		if (force == false)
+		if (!force)
 			goto closefd;
 	} else {
 		status = STATUS_GOOD;
@@ -1143,7 +1143,7 @@ main(int argc, char **argv)
 			verbose++;
 			break;
 		case 'z':
-			compress = 1;
+			compress = true;
 			break;
 		case '?':
 		default:
