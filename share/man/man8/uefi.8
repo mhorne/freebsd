@@ -37,7 +37,7 @@ Unified Extensible Firmware Interface provides boot- and run-time services
 to operating systems.
 .Nm
 is a replacement for the legacy BIOS on the i386 and amd64 CPU architectures,
-and is also used on arm, arm64 and ia64.
+and is also used on arm, arm64 and riscv.
 .Pp
 The UEFI specification is the successor to the Extensible Firmware Interface
 (EFI) specification.
@@ -71,6 +71,7 @@ If not set, an architecture-specific default is used.
 .It amd64 Ta Pa /EFI/BOOT/BOOTX64.EFI
 .It arm Ta Pa /EFI/BOOT/BOOTARM.EFI
 .It arm64 Ta Pa /EFI/BOOT/BOOTAA64.EFI
+.It riscv Ta Pa /EFI/BOOT/BOOTRISCV64.EFI
 .El
 .Pp
 The default
@@ -136,8 +137,6 @@ typical non-default kernel (optional)
 .Xr gpart 8 ,
 .Xr uefisign 8
 .Sh HISTORY
-EFI boot support for the ia64 architecture first appeared in
-.Fx 5.0 .
 .Nm
 boot support for amd64 first appeared in
 .Fx 10.1 ;
