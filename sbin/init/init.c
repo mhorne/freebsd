@@ -47,13 +47,15 @@ static const char rcsid[] =
 #endif /* not lint */
 
 #include <sys/param.h>
+#include <sys/boottrace.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
-#include <sys/sysctl.h>
-#include <sys/wait.h>
+#include <sys/reboot.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
 #include <sys/uio.h>
+#include <sys/wait.h>
 
 #include <db.h>
 #include <errno.h>
@@ -69,7 +71,6 @@ static const char rcsid[] =
 #include <time.h>
 #include <ttyent.h>
 #include <unistd.h>
-#include <sys/reboot.h>
 #include <err.h>
 
 #include <stdarg.h>
@@ -212,6 +213,8 @@ main(int argc, char *argv[])
 	/* Dispose of random users. */
 	if (getuid() != 0)
 		errx(1, "%s", strerror(EPERM));
+
+	BOOTTRACE("init(8) starting...");
 
 	/* System V users like to reexec init. */
 	if (getpid() != 1) {
@@ -876,6 +879,7 @@ single_user(void)
 
 	if (Reboot) {
 		/* Instead of going single user, let's reboot the machine */
+		BOOTTRACE("shutting down the system");
 		sync();
 		/* Run scripts after all processes have been terminated. */
 		runfinal();
@@ -887,6 +891,7 @@ single_user(void)
 		_exit(0); /* panic as well */
 	}
 
+	BOOTTRACE("going to single user mode");
 	shell = get_shell();
 
 	if ((pid = fork()) == 0) {
@@ -1028,8 +1033,10 @@ runcom(void)
 {
 	state_func_t next_transition;
 
+	BOOTTRACE("/etc/rc starting...");
 	if ((next_transition = run_script(_PATH_RUNCOM)) != NULL)
 		return next_transition;
+	BOOTTRACE("/etc/rc finished");
 
 	runcom_mode = AUTOBOOT;		/* the default */
 	return (state_func_t) read_ttys;
@@ -1598,6 +1605,59 @@ collect_child(pid_t pid)
 	add_session(sp);
 }
 
+static const char *
+get_current_state(void)
+{
+
+	if (current_state == single_user)
+		return "single-user";
+	if (current_state == runcom)
+		return "runcom";
+	if (current_state == read_ttys)
+		return "read-ttys";
+	if (current_state == multi_user)
+		return "multi-user";
+	if (current_state == clean_ttys)
+		return "clean-ttys";
+	if (current_state == catatonia)
+		return "catatonia";
+	if (current_state == death)
+		return "death";
+	if (current_state == death_single)
+		return "death-single";
+	return "unknown";
+}
+
+static void
+boottrace_transition(int sig)
+{
+	const char *action;
+
+	switch (sig) {
+	case SIGUSR2:
+		action = "halt & poweroff";
+		break;
+	case SIGUSR1:
+		action = "halt";
+		break;
+	case SIGINT:
+		action = "reboot";
+		break;
+	case SIGWINCH:
+		action = "powercycle";
+		break;
+	case SIGTERM:
+		action = Reboot ? "reboot" : "single-user";
+		break;
+	default:
+		BOOTTRACE("signal %d from %s", sig, get_current_state());
+		return;
+	}
+
+	/* Trace the shutdown reason. */
+	SHUTTRACE("%s from %s", action, get_current_state());
+}
+
 /*
  * Catch a signal and request a state transition.
  */
@@ -1605,6 +1665,7 @@ static void
 transition_handler(int sig)
 {
 
+	boottrace_transition(sig);
 	switch (sig) {
 	case SIGHUP:
 		if (current_state == read_ttys || current_state == multi_user ||
@@ -1677,6 +1738,11 @@ multi_user(void)
 		add_session(sp);
 	}
 
+	static int inmultiuser = 0;
+	if (!requested_transition && !inmultiuser) {
+		inmultiuser = 1;
+		RUNTRACE("multi-user start");
+	}
 	while (!requested_transition)
 		if ((pid = waitpid(-1, (int *) 0, 0)) != -1)
 			collect_child(pid);
@@ -1819,6 +1885,8 @@ death(void)
 	 */
 	revoke_ttys();
 
+	BOOTTRACE("init(8): start rc.shutdown");
+
 	/* Try to run the rc.shutdown script within a period of time */
 	runshutdown();
 
@@ -1843,6 +1911,7 @@ death_single(void)
 
 	revoke(_PATH_CONSOLE);
 
+	BOOTTRACE("start killing user processes");
 	for (i = 0; i < 2; ++i) {
 		if (kill(-1, death_sigs[i]) == -1 && errno == ESRCH)
 			return (state_func_t) single_user;
@@ -1858,6 +1927,8 @@ death_single(void)
 			return (state_func_t) single_user;
 	}
 
+	/* We reboot by default in single user mode. */
+	BOOTTRACE("some processes would not die");
 	warning("some processes would not die; ps axl advised");
 
 	return (state_func_t) single_user;
@@ -1944,6 +2015,8 @@ runshutdown(void)
 			kill(wpid, SIGTERM);
 			warning("timeout expired for %s: %m; going to "
 			    "single user mode", _PATH_RUNDOWN);
+			BOOTTRACE("rc.shutdown's %d sec timeout expired",
+				  shutdowntimeout);
 			return -1;
 		}
 		if (wpid == -1) {
