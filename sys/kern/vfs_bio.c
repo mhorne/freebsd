@@ -52,9 +52,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/asan.h>
 #include <sys/bio.h>
 #include <sys/bitset.h>
+#include <sys/boottrace.h>
+#include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/counter.h>
-#include <sys/buf.h>
 #include <sys/devicestat.h>
 #include <sys/eventhandler.h>
 #include <sys/fail.h>
@@ -1450,9 +1451,11 @@ bufshutdown(int show_busybufs)
 		 * Failed to sync all blocks. Indicate this and don't
 		 * unmount filesystems (thus forcing an fsck on reboot).
 		 */
+		BOOTTRACE("shutdown failed to sync buffers");
 		printf("Giving up on %d buffers\n", nbusy);
 		DELAY(5000000);	/* 5 seconds */
 	} else {
+		BOOTTRACE("shutdown sync complete");
 		if (!first_buf_printf)
 			printf("Final sync complete\n");
 		/*
@@ -1460,6 +1463,7 @@ bufshutdown(int show_busybufs)
 		 */
 		if (!KERNEL_PANICKED())
 			vfs_unmountall();
+		BOOTTRACE("shutdown unmounted all filesystems");
 	}
 	swapoff_all();
 	DELAY(100000);		/* wait for console output to finish */
