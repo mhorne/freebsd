@@ -111,6 +111,83 @@ static int  runshutdown(void);
 static char *strk(char *);
 
 /*
+ * Code to panic the system
+ */
+//static void
+//panic(const char *str)
+//{
+//	size_t buflen;
+//	char buf[64] = {0};
+//
+//	strncpy(buf, str, sizeof(buf) - 1);
+//	buflen = strlen(buf) + 1;
+//	if (sysctlbyname("debug.kdb.panic_str", NULL, NULL, buf, buflen) == -1)
+//		warning("sysctl debug.kdb.panic_str failed: %m");
+//}
+
+static void
+boottrace(const char *message, ...)
+{
+	int len;
+	va_list ap;
+	char msg[64];
+
+	len = snprintf(msg, sizeof(msg), "init(8):");
+	va_start(ap, message);
+	vsnprintf(&msg[len], sizeof(msg) - len, message, ap);
+	va_end(ap);
+
+	sysctlbyname("kern.boottrace.boottimes", NULL, NULL, msg, sizeof(msg));
+}
+
+static void
+runtrace(const char *message, ...)
+{
+	int len;
+	va_list ap;
+	char msg[64];
+
+	len = snprintf(msg, sizeof(msg), "init(8):");
+	va_start(ap, message);
+	vsnprintf(&msg[len], sizeof(msg) - len, message, ap);
+	va_end(ap);
+
+	sysctlbyname("kern.boottrace.runtimes", NULL, NULL, msg, sizeof(msg));
+}
+
+static void
+shuttrace(const char *message, ...)
+{
+	int len;
+	va_list ap;
+	char msg[64];
+
+	len = snprintf(msg, sizeof(msg), "init(8):");
+	va_start(ap, message);
+	vsnprintf(&msg[len], sizeof(msg) - len, message, ap);
+	va_end(ap);
+
+	sysctlbyname("kern.boottrace.shuttimes", NULL, NULL, msg, sizeof(msg));
+}
+
+/*
+ * Signal we are shutting down.
+ */
+static void
+shutdown_starting(void)
+{
+	int init_stopping = 1;
+
+	if (sysctlbyname("kern.init_stopping", NULL, NULL, &init_stopping,
+			 sizeof(init_stopping)) != 0) {
+		/*
+		 * if we can not signal this, we need a core
+		 */
+		//panic("init(8): could not signal shutdown start");
+	}
+}
+
+/*
  * We really need a recursive typedef...
  * The following at least guarantees that the return type of (*state_t)()
  * is sufficiently wide to hold a function pointer.
@@ -211,6 +288,8 @@ main(int argc, char *argv[])
 	/* Dispose of random users. */
 	if (getuid() != 0)
 		errx(1, "%s", strerror(EPERM));
+
+	boottrace("init(8) starting...");
 
 	/* System V users like to reexec init. */
 	if (getpid() != 1) {
@@ -862,6 +941,7 @@ single_user(void)
 	const char *shell;
 	char *argv[2];
 	struct timeval tv, tn;
+	time_t sync_secs;
 #ifdef SECURE
 	struct ttyent *typ;
 	struct passwd *pp;
@@ -875,7 +955,19 @@ single_user(void)
 
 	if (Reboot) {
 		/* Instead of going single user, let's reboot the machine */
+		boottrace("shutting down the system");
+		int init_rc_start_done = 1;
+		if (sysctlbyname("kern.init_rc_start_done", NULL, NULL,
+				 &init_rc_start_done,  sizeof(init_rc_start_done)) != 0) {
+			warning("sysctlbyname(kern.init_rc_start_done) setting failed: %m");
+		}
+
+		sync_secs = time(NULL);
 		sync();
+		sync_secs = time(NULL) - sync_secs;
+
+		if (sync_secs > 60)
+			warning("sync(2) took %ld secs", (long)sync_secs);
 		if (reboot(howto) == -1) {
 			emergency("reboot(%#x) failed, %m", howto);
 			_exit(1); /* panic and reboot */
@@ -884,6 +976,7 @@ single_user(void)
 		_exit(0); /* panic as well */
 	}
 
+	boottrace("going to single user mode");
 	shell = get_shell();
 
 	if ((pid = fork()) == 0) {
@@ -1025,8 +1118,15 @@ runcom(void)
 {
 	state_func_t next_transition;
 
+	boottrace("/etc/rc starting...");
 	if ((next_transition = run_script(_PATH_RUNCOM)) != NULL)
 		return next_transition;
+	boottrace("/etc/rc finished");
+	int init_rc_start_done = 1;
+	if (sysctlbyname("kern.init_rc_start_done", NULL, NULL,
+			 &init_rc_start_done,  sizeof(init_rc_start_done)) != 0) {
+		warning("sysctlbyname(kern.init_rc_start_done) setting failed: %m");
+	}
 
 	runcom_mode = AUTOBOOT;		/* the default */
 	return (state_func_t) read_ttys;
@@ -1595,6 +1695,53 @@ collect_child(pid_t pid)
 	add_session(sp);
 }
 
+static const char *
+get_current_state(void)
+{
+
+	if (current_state == single_user)
+		return "single-user";
+	if (current_state == runcom)
+		return "runcom";
+	if (current_state == read_ttys)
+		return "read-ttys";
+	if (current_state == multi_user)
+		return "multi-user";
+	if (current_state == clean_ttys)
+		return "clean-ttys";
+	if (current_state == catatonia)
+		return "catatonia";
+	if (current_state == death)
+		return "death";
+	if (current_state == death_single)
+		return "death-single";
+	return "unknown";
+}
+
+static void
+boottrace_transition(int sig)
+{
+	switch (sig) {
+	case SIGUSR2:
+		shuttrace("halt & poweroff from %s", get_current_state());
+		break;
+	case SIGUSR1:
+		shuttrace("halt from %s", get_current_state());
+		break;
+	case SIGINT:
+		shuttrace("reboot from %s", get_current_state());
+		break;
+	case SIGTERM:
+		if (Reboot)
+			shuttrace("reboot from %s", get_current_state());
+		else
+			boottrace("single-user from %s", get_current_state());
+		break;
+	default:
+		boottrace("signal %d from %s", sig, get_current_state());
+	}
+}
+
 /*
  * Catch a signal and request a state transition.
  */
@@ -1602,6 +1749,7 @@ static void
 transition_handler(int sig)
 {
 
+	boottrace_transition(sig);
 	switch (sig) {
 	case SIGHUP:
 		if (current_state == read_ttys || current_state == multi_user ||
@@ -1636,6 +1784,10 @@ transition_handler(int sig)
 	default:
 		requested_transition = 0;
 		break;
+	}
+
+	if (requested_transition == death) {
+		shutdown_starting();
 	}
 }
 
@@ -1674,6 +1826,11 @@ multi_user(void)
 		add_session(sp);
 	}
 
+	static int inmultiuser = 0;
+	if (!requested_transition && !inmultiuser) {
+		inmultiuser = 1;
+		runtrace("multi-user start");
+	}
 	while (!requested_transition)
 		if ((pid = waitpid(-1, (int *) 0, 0)) != -1)
 			collect_child(pid);
@@ -1816,6 +1973,8 @@ death(void)
 	 */
 	revoke_ttys();
 
+	boottrace("start rc.shutdown");
+
 	/* Try to run the rc.shutdown script within a period of time */
 	runshutdown();
 
@@ -1840,6 +1999,7 @@ death_single(void)
 
 	revoke(_PATH_CONSOLE);
 
+	boottrace("start killing user processes");
 	for (i = 0; i < 2; ++i) {
 		if (kill(-1, death_sigs[i]) == -1 && errno == ESRCH)
 			return (state_func_t) single_user;
@@ -1855,6 +2015,8 @@ death_single(void)
 			return (state_func_t) single_user;
 	}
 
+	/* We reboot by default in single user mode. */
+	boottrace("some processes would not die");
 	warning("some processes would not die; ps axl advised");
 
 	return (state_func_t) single_user;
@@ -1941,6 +2103,8 @@ runshutdown(void)
 			kill(wpid, SIGTERM);
 			warning("timeout expired for %s: %m; going to "
 			    "single user mode", _PATH_RUNDOWN);
+			boottrace("rc.shutdown's %d sec timeout expired",
+				  shutdowntimeout);
 			return -1;
 		}
 		if (wpid == -1) {

@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <fcntl.h>
 #include <pwd.h>
 #include <syslog.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,6 +64,21 @@ static void usage(void);
 static u_int get_pageins(void);
 
 static int dohalt;
+
+static void
+boottrace(const char *message, ...)
+{
+	int len;
+	va_list ap;
+	char msg[64];
+
+	len = snprintf(msg, sizeof(msg), "reboot(8):");
+	va_start(ap, message);
+	vsnprintf(&msg[len], sizeof(msg) - len, message, ap);
+	va_end(ap);
+
+	sysctlbyname("kern.boottrace.shuttimes", NULL, NULL, msg, sizeof(msg));
+}
 
 int
 main(int argc, char *argv[])
@@ -210,10 +226,12 @@ main(int argc, char *argv[])
 	}
 
 	/* Just stop init -- if we fail, we'll restart it. */
+	boottrace("SIGTSTP to init(8)...");
 	if (kill(1, SIGTSTP) == -1)
 		err(1, "SIGTSTP init");
 
 	/* Send a SIGTERM first, a chance to save the buffers. */
+	boottrace("SIGTERM to all other processes...");
 	if (kill(-1, SIGTERM) == -1 && errno != ESRCH)
 		err(1, "SIGTERM processes");
 
@@ -235,6 +253,7 @@ main(int argc, char *argv[])
 	}
 
 	for (i = 1;; ++i) {
+		boottrace("SIGKILL to all other processes(%d)...", i);
 		if (kill(-1, SIGKILL) == -1) {
 			if (errno == ESRCH)
 				break;
@@ -252,6 +271,7 @@ main(int argc, char *argv[])
 	/* FALLTHROUGH */
 
 restart:
+	boottrace("SIGHUP to init(8)...");
 	sverrno = errno;
 	errx(1, "%s%s", kill(1, SIGHUP) == -1 ? "(can't restart init): " : "",
 	    strerror(sverrno));
