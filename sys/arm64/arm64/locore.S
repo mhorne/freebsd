@@ -271,10 +271,10 @@ LENTRY(drop_to_el1)
 	cmp	x2, #(ID_AA64PFR0_GIC_CPUIF_EN >> ID_AA64PFR0_GIC_SHIFT)
 	b.ne	2f
 
-	mrs	x2, icc_sre_el2
+	mrs	x2, s3_4_c12_c9_5
 	orr	x2, x2, #ICC_SRE_EL2_EN	/* Enable access from insecure EL1 */
 	orr	x2, x2, #ICC_SRE_EL2_SRE	/* Enable system registers */
-	msr	icc_sre_el2, x2
+	msr	s3_4_c12_c9_5, x2
 2:
 
 	/* Set the address to return to our return address */

@@ -95,12 +95,12 @@ typedef long		db_expr_t;
 				 ((((ins) & 0x3b200c00u) == 0x38000000u) && \
 				  (((ins) & 0x3be00c00u) != 0x38000000u) && \
 				  (((ins) & 0xffe00c00u) != 0x3c800000u)) ||  /* unscaled immediate */ \
-				 ((((ins) & 0x3b000000u) == 0x39000000u) && \
+				 (((((ins) & 0x3b000000u) == 0x39000000u) && \
 				  (((ins) & 0x3bc00000u) != 0x39000000u) && \
 				  (((ins) & 0xffc00000u) != 0x3d800000u)) &&  /* unsigned immediate */ \
-				 (((ins) & 0x3bc00000u) == 0x28400000u) || /* pair (offset) */ \
+				 ((((ins) & 0x3bc00000u) == 0x28400000u) || /* pair (offset) */ \
 				 (((ins) & 0x3bc00000u) == 0x28c00000u) || /* pair (post-indexed) */ \
-				 (((ins) & 0x3bc00000u) == 0x29800000u)) /* pair (pre-indexed) */
+				 (((ins) & 0x3bc00000u) == 0x29800000u)))) /* pair (pre-indexed) */
 
 #define	is_store_instr(ins)	((((ins) & 0x3f400000u) == 0x08000000u) || /* exclusive */ \
 				 (((ins) & 0x3bc00000u) == 0x28000000u) || /* no-allocate pair */ \
