@@ -331,6 +331,7 @@ generic_pcie_translate_resource(device_t dev, int type, rman_res_t start,
 	uint64_t phys_base;
 	uint64_t pci_base;
 	uint64_t size;
+	rman_res_t tmpstart, tmpend;
 	int i, space;
 	bool found;
 
@@ -345,7 +346,14 @@ generic_pcie_translate_resource(device_t dev, int type, rman_res_t start,
 			phys_base = sc->ranges[i].phys_base;
 			size = sc->ranges[i].size;
 
-			if (start < pci_base || start >= pci_base + size)
+			if (RMAN_IS_DEFAULT_RANGE(start, end)) {
+				tmpstart = pci_base;
+				tmpend = pci_base + size;
+			} else {
+				tmpstart = start;
+				tmpend = end;
+			}
+			if (tmpstart < pci_base || tmpstart >= pci_base + size)
 				continue;
 
 			switch (FLAG_TYPE(sc->ranges[i].flags)) {
@@ -362,8 +370,8 @@ generic_pcie_translate_resource(device_t dev, int type, rman_res_t start,
 			}
 
 			if (type == space) {
-				*new_start = start - pci_base + phys_base;
-				*new_end = end - pci_base + phys_base;
+				*new_start = tmpstart - pci_base + phys_base;
+				*new_end = tmpend - pci_base + phys_base;
 				found = true;
 				break;
 			}

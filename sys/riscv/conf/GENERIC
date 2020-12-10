@@ -118,6 +118,8 @@ device		cgem		# Cadence GEM Gigabit Ethernet device
 device		miibus		# MII bus support
 device		xae		# Xilinx AXI Ethernet MAC
 
+# Block devices
+
 # DMA support
 device		xdma		# DMA interface
 device		axidma		# Xilinx AXI DMA Controller
