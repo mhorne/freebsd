@@ -98,7 +98,9 @@ files=`rcorder ${skip} ${skip_firstboot} /etc/rc.d/* 2>/dev/null`
 
 _rc_elem_done=' '
 for _rc_elem in ${files}; do
+	#boottrace "${_rc_elem} start"
 	run_rc_script ${_rc_elem} ${_boot}
+	#boottrace "${_rc_elem} end"
 	_rc_elem_done="${_rc_elem_done}${_rc_elem} "
 
 	case "$_rc_elem" in
@@ -128,7 +130,9 @@ for _rc_elem in ${files}; do
 	*" $_rc_elem "*)	continue ;;
 	esac
 
+	#boottrace "${_rc_elem} start"
 	run_rc_script ${_rc_elem} ${_boot}
+	#boottrace "${_rc_elem} end"
 done
 
 # Remove the firstboot sentinel, and reboot if it was requested.

@@ -1386,6 +1386,7 @@ run_rc_script()
 {
 	_file=$1
 	_arg=$2
+	boottrace_cmd=boottrace
 	if [ -z "$_file" -o -z "$_arg" ]; then
 		err 3 'USAGE: run_rc_script file arg'
 	fi
@@ -1406,13 +1407,16 @@ run_rc_script()
 		;;
 	*)				# run in subshell
 		if [ -x $_file ]; then
+			echo "Executing ${_file}, ${_arg}"
 			if [ -n "$rc_fast_and_loose" ]; then
-				set $_arg; . $_file
+				#set $_arg; . $_file
+				${boottrace_cmd} "$_file" "$_arg"
 			else
 				( trap "echo Script $_file interrupted >&2 ; kill -QUIT $$" 3
 				  trap "echo Script $_file interrupted >&2 ; exit 1" 2
 				  trap "echo Script $_file running >&2" 29
-				  set $_arg; . $_file )
+				  #set $_arg; . $_file )
+				${boottrace_cmd} "$_file" "$_arg" )
 			fi
 		fi
 		;;
@@ -2183,6 +2187,13 @@ _echoonce()
 	*)	[ -z "$_var" ] && echo -n "$_msg" && eval "$1=finished" ;;
 	esac
 }
+
+#boottrace()
+#{
+#	if [ -n "$1" ]; then
+#		$SYSCTL_N sysvar.boottimes.boottimes="$1" > /dev/null 2>&1
+#	fi
+#}
 
 # If the loader env variable rc.debug is set, turn on debugging. rc.conf will
 # still override this, but /etc/defaults/rc.conf can't unconditionally set this

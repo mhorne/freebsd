@@ -100,7 +100,9 @@ files=`rcorder ${rcorder_opts} /etc/rc.d/* ${local_rc} 2>/dev/null`
 
 for _rc_elem in `reverse_list $files`; do
 	debug "run_rc_script $_rc_elem faststop"
+	#boottrace "rc.shutdown:${_rc_elem} start"
 	run_rc_script $_rc_elem faststop
+	#boottrace "rc.shutdown:${_rc_elem} end"
 done
 
 # Terminate the background watchdog timer (if it is running)
