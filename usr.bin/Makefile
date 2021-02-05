@@ -10,6 +10,7 @@ SUBDIR=	alias \
 	backlight \
 	banner \
 	basename \
+	boottrace \
 	brandelf \
 	bsdcat \
 	bsdiff \
