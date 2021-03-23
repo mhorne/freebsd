@@ -31,16 +31,23 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/cons.h>
+#include <sys/fcntl.h>
 #include <sys/kernel.h>
-#include <sys/proc.h>
 #include <sys/kerneldump.h>
+#include <sys/namei.h>
+#include <sys/proc.h>
+#include <sys/stat.h>
+#include <sys/sysctl.h>
+#include <sys/vnode.h>
 #include <sys/watchdog.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_page.h>
 #include <vm/vm_phys.h>
 #include <vm/vm_dumpset.h>
 #include <vm/pmap.h>
+
 #include <machine/dump.h>
 #include <machine/elf.h>
 #include <machine/md_var.h>
@@ -54,6 +61,125 @@ CTASSERT(sizeof(struct kerneldumpheader) == 512);
 static size_t fragsz;
 
 struct dump_pa dump_map[DUMPSYS_MD_PA_NPAIRS];
+
+static dumper_t vnode_dump;
+static dumper_start_t vnode_dumper_start;
+static dumper_hdr_t vnode_write_headers;
+
+static int
+sysctl_live_dump(SYSCTL_HANDLER_ARGS)
+{
+	struct dumperinfo di;
+	char path[PATH_MAX];
+	int error;
+
+	if (req->newptr == NULL)
+		return (EINVAL);
+	if (req->newlen == 0)
+		return (EINVAL);
+	if (req->newlen > sizeof(path))
+		return (ENAMETOOLONG);
+
+	error = SYSCTL_IN(req, path, req->newlen);
+	if (error != 0)
+		return (error);
+
+	/* Set up dumper */
+	bzero(&di, sizeof(di));
+	di.dumper_start = vnode_dumper_start;
+	di.dumper = vnode_dump;
+	di.dumper_hdr = vnode_write_headers;
+	di.priv = path;
+
+	/* do stuff */
+	error = minidumpsys(&di, true);
+
+	VOP_UNLOCK((struct vnode *)di.priv);
+	return (error);
+}
+
+SYSCTL_PROC(_kern, OID_AUTO, livedump,
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE, NULL, 0,
+    sysctl_live_dump, "A",
+    "Start live dump of system");
+
+int
+vnode_dumper_start(struct dumperinfo *di)
+{
+	struct nameidata nd;
+	char *path;
+	int flags, oflags;
+	int cmode;
+	int error;
+
+	printf("%s start", __func__);
+
+	/* Lookup vnode */
+	path = di->priv;
+	MPASS(path != NULL);
+
+	/* Instantiate a vnode for provided path */
+	    /* TODO: validate flags chosen here */
+	cmode = S_IRUSR | S_IWUSR;
+	flags = FWRITE | O_NOFOLLOW | O_CREAT;
+	oflags = VN_OPEN_NOAUDIT | VN_OPEN_NAMECACHE;
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, path, curthread);
+	
+	error = vn_open_cred(&nd, &flags, cmode, oflags, curthread->td_ucred,
+	    NULL);
+	if (error != 0)
+		return (error);
+
+	/* XXX: replace priv with the vnode pointer, now that we've obtained it */
+	di->priv = (void *)nd.ni_vp;
+	di->dumpoff = 0; /* TODO needed? */
+	di->blocksize = 512; /* TODO blocksize */
+	di->mediasize = 256 * 1024 * 1024;
+
+	return (0);
+}
+
+int
+vnode_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t length)
+{
+	struct vnode *vp;
+	int error = 0;
+
+	vp = arg;
+	MPASS(vp != NULL);
+	ASSERT_VOP_LOCKED(vp, __func__);
+
+	error = vn_rdwr(UIO_WRITE, vp, virtual, length, offset, UIO_SYSSPACE, IO_NODELOCKED,
+	    curthread->td_ucred, NOCRED, NULL, curthread);
+	if (error != 0)
+		printf("vnode_dump error writing to vnode %p\n", vp);
+
+	return (error);
+}
+
+int
+vnode_write_headers(struct dumperinfo *di, struct kerneldumpheader *kdh,
+    void *key, uint32_t keysize)
+{
+	struct vnode *vp;
+	int error;
+
+	vp = di->priv;
+	MPASS(vp != NULL);
+	ASSERT_VOP_LOCKED(vp, __func__);
+
+	/* Write the kernel dump header to the end of the file. */
+	error = vn_rdwr(UIO_WRITE, vp, kdh, sizeof(*kdh), di->dumpoff, UIO_SYSSPACE, IO_NODELOCKED,
+	    curthread->td_ucred, NOCRED, NULL, curthread);
+	if (error != 0)
+		printf("vnode_write_headers error writing to vnode %p: %d\n", vp, error);
+
+	if (keysize > 0) {
+		/* TODO */
+	}
+
+	return (0);
+}
 
 #if !defined(__powerpc__)
 void
