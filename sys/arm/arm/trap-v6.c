@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 
+#include "opt_hwpmc_hooks.h"
 #include "opt_ktrace.h"
 
 #include <sys/cdefs.h>
@@ -66,6 +67,13 @@ __FBSDID("$FreeBSD$");
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
+#endif
+
+#ifdef HWPMC_HOOKS
+#include <sys/pmckern.h>
+PMC_SOFT_DEFINE( , , page_fault, all);
+PMC_SOFT_DEFINE( , , page_fault, read);
+PMC_SOFT_DEFINE( , , page_fault, write);
 #endif
 
 extern char cachebailout[];
@@ -513,8 +521,12 @@ abort_handler(struct trapframe *tf, int prefetch)
 	pcb->pcb_onfault = onfault;
 #endif
 
-	if (__predict_true(rv == KERN_SUCCESS))
+	if (__predict_true(rv == KERN_SUCCESS)) {
+#ifdef HWPMC_HOOKS
+		pmc_soft_page_fault(ftype, tf);
+#endif
 		goto out;
+	}
 nogo:
 	if (!usermode) {
 		if (td->td_intr_nesting_level == 0 &&

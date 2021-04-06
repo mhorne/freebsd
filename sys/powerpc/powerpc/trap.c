@@ -34,6 +34,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_hwpmc_hooks.h"
+
 #include <sys/param.h>
 #include <sys/kdb.h>
 #include <sys/proc.h>
@@ -72,6 +74,13 @@ __FBSDID("$FreeBSD$");
 #include <machine/spr.h>
 #include <machine/sr.h>
 #include <machine/trap.h>
+
+#ifdef HWPMC_HOOKS
+#include <sys/pmckern.h>
+PMC_SOFT_DEFINE( , , page_fault, all);
+PMC_SOFT_DEFINE( , , page_fault, read);
+PMC_SOFT_DEFINE( , , page_fault, write);
+#endif
 
 /* Below matches setjmp.S */
 #define	FAULTBUF_LR	21
@@ -837,8 +846,12 @@ trap_pfault(struct trapframe *frame, bool user, int *signo, int *ucode)
 	 * XXXDTRACE: add dtrace_doubletrap_func here?
 	 */
 
-	if (rv == KERN_SUCCESS)
+	if (rv == KERN_SUCCESS) {
+#ifdef HWPMC_HOOKS
+		pmc_soft_page_fault(ftype, frame);
+#endif
 		return (true);
+	}
 
 	if (!user && handle_onfault(frame))
 		return (true);

@@ -28,6 +28,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_hwpmc_hooks.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -57,6 +59,13 @@ __FBSDID("$FreeBSD$");
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
+#endif
+
+#ifdef HWPMC_HOOKS
+#include <sys/pmckern.h>
+PMC_SOFT_DEFINE( , , page_fault, all);
+PMC_SOFT_DEFINE( , , page_fault, read);
+PMC_SOFT_DEFINE( , , page_fault, write);
 #endif
 
 #ifdef VFP
@@ -307,7 +316,11 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 
 	/* Fault in the page. */
 	error = vm_fault_trap(map, far, ftype, VM_FAULT_NORMAL, &sig, &ucode);
-	if (error != KERN_SUCCESS) {
+	if (error == KERN_SUCCESS) {
+#ifdef HWPMC_HOOKS
+		pmc_soft_page_fault(ftype, frame);
+#endif
+	} else {
 		if (lower) {
 			call_trapsignal(td, sig, ucode, (void *)far,
 			    ESR_ELx_EXCEPTION(esr));

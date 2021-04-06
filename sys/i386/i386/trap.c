@@ -71,12 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/uio.h>
 #include <sys/vmmeter.h>
-#ifdef HWPMC_HOOKS
-#include <sys/pmckern.h>
-PMC_SOFT_DEFINE( , , page_fault, all);
-PMC_SOFT_DEFINE( , , page_fault, read);
-PMC_SOFT_DEFINE( , , page_fault, write);
-#endif
+
 #include <security/audit/audit.h>
 
 #include <vm/vm.h>
@@ -107,6 +102,13 @@ PMC_SOFT_DEFINE( , , page_fault, write);
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
+#endif
+
+#ifdef HWPMC_HOOKS
+#include <sys/pmckern.h>
+PMC_SOFT_DEFINE( , , page_fault, all);
+PMC_SOFT_DEFINE( , , page_fault, read);
+PMC_SOFT_DEFINE( , , page_fault, write);
 #endif
 
 void trap(struct trapframe *frame);
@@ -851,15 +853,7 @@ trap_pfault(struct trapframe *frame, bool usermode, vm_offset_t eva,
 	rv = vm_fault_trap(map, eva, ftype, VM_FAULT_NORMAL, signo, ucode);
 	if (rv == KERN_SUCCESS) {
 #ifdef HWPMC_HOOKS
-		if (ftype == VM_PROT_READ || ftype == VM_PROT_WRITE) {
-			PMC_SOFT_CALL_TF( , , page_fault, all, frame);
-			if (ftype == VM_PROT_READ)
-				PMC_SOFT_CALL_TF( , , page_fault, read,
-				    frame);
-			else
-				PMC_SOFT_CALL_TF( , , page_fault, write,
-				    frame);
-		}
+		pmc_soft_page_fault(ftype, frame);
 #endif
 		return (0);
 	}

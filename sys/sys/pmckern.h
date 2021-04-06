@@ -269,4 +269,28 @@ void pmc_soft_ev_deregister(struct pmc_soft *ps);
 struct pmc_soft *pmc_soft_ev_acquire(enum pmc_event ev);
 void pmc_soft_ev_release(struct pmc_soft *ps);
 
+#ifdef VM_H
+/* Page fault events */
+PMC_SOFT_DECLARE( , , page_fault, all);
+PMC_SOFT_DECLARE( , , page_fault, read);
+PMC_SOFT_DECLARE( , , page_fault, write);
+
+/*
+ * Helper function for the page fault soft events. To be called from the MD
+ * trap handler.
+ */
+static __inline void
+pmc_soft_page_fault(vm_prot_t ftype, struct trapframe *tf)
+{
+	if (ftype != VM_PROT_READ && ftype != VM_PROT_WRITE)
+		return;
+
+	PMC_SOFT_CALL_TF( , , page_fault, all, tf);
+	if (ftype == VM_PROT_READ)
+		PMC_SOFT_CALL_TF( , , page_fault, read, tf);
+	else
+		PMC_SOFT_CALL_TF( , , page_fault, write, tf);
+}
+#endif
+
 #endif /* _SYS_PMCKERN_H_ */
