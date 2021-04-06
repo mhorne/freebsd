@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
+#include "opt_hwpmc_hooks.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -94,6 +95,13 @@ __FBSDID("$FreeBSD$");
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
+#endif
+
+#ifdef HWPMC_HOOKS
+#include <sys/pmckern.h>
+PMC_SOFT_DEFINE( , , page_fault, all);
+PMC_SOFT_DEFINE( , , page_fault, read);
+PMC_SOFT_DEFINE( , , page_fault, write);
 #endif
 
 #ifdef TRAP_DEBUG
@@ -672,8 +680,12 @@ trap(struct trapframe *trapframe)
 			va = (vm_offset_t)trapframe->badvaddr;
 			rv = vm_fault_trap(kernel_map, va, ftype,
 			    VM_FAULT_NORMAL, NULL, NULL);
-			if (rv == KERN_SUCCESS)
+			if (rv == KERN_SUCCESS) {
+#ifdef HWPMC_HOOKS
+				pmc_soft_page_fault(ftype, trapframe);
+#endif
 				return (trapframe->pc);
+			}
 			if (td->td_pcb->pcb_onfault != NULL) {
 				pc = (register_t)(intptr_t)td->td_pcb->pcb_onfault;
 				td->td_pcb->pcb_onfault = NULL;
@@ -727,6 +739,9 @@ dofault:
 #endif
 
 			if (rv == KERN_SUCCESS) {
+#ifdef HWPMC_HOOKS
+				pmc_soft_page_fault(ftype, trapframe);
+#endif
 				if (!usermode) {
 					return (trapframe->pc);
 				}

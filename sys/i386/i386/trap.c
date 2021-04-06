@@ -851,15 +851,7 @@ trap_pfault(struct trapframe *frame, bool usermode, vm_offset_t eva,
 	rv = vm_fault_trap(map, eva, ftype, VM_FAULT_NORMAL, signo, ucode);
 	if (rv == KERN_SUCCESS) {
 #ifdef HWPMC_HOOKS
-		if (ftype == VM_PROT_READ || ftype == VM_PROT_WRITE) {
-			PMC_SOFT_CALL_TF( , , page_fault, all, frame);
-			if (ftype == VM_PROT_READ)
-				PMC_SOFT_CALL_TF( , , page_fault, read,
-				    frame);
-			else
-				PMC_SOFT_CALL_TF( , , page_fault, write,
-				    frame);
-		}
+		pmc_soft_page_fault(ftype, frame);
 #endif
 		return (0);
 	}
