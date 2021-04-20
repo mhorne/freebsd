@@ -105,7 +105,7 @@ __FBSDID("$FreeBSD$");
 
 static cap_channel_t *capsyslog;
 static fileargs_t *capfa;
-static bool checkfor, compress, uncompress, clear, force, keep;	/* flags */
+static bool checkfor, compress, uncompress, clear, force, keep, livecore;	/* flags */
 static int verbose;
 static int nfound, nsaved, nerr;			/* statistics */
 static int maxdumps;
@@ -733,12 +733,31 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 	}
 
 	if (verbose)
-		printf("checking for kernel dump on device %s\n", device);
+		printf("checking for kernel dump on %s: %s\n",
+		    !livecore ? "device" : "file", device);
 
 	fddev = fileargs_open(capfa, device);
 	if (fddev < 0) {
+		printf("fileargs_open(%s) failed!\n", device);
 		logmsg(LOG_ERR, "%s: %m", device);
 		return;
+	}
+
+	printf("livecore read!\n");
+	if (livecore) {
+		/* Seek to the end of the file, minus the size of the header. */
+		lasthd = lseek(fddev, -sizeof(kdhl), SEEK_END);
+		if (lasthd == -1) {
+			printf("lseek failed!\n");
+			exit(1);
+		}
+
+		if (read(fddev, &kdhl, sizeof(kdhl)) != sizeof(kdhl)) {
+			printf("failed to read enough!\n");
+			logmsg(LOG_ERR, "Failed to read kernel dump header");
+			goto closefd;
+		}
+		goto validate;
 	}
 
 	error = ioctl(fddev, DIOCGMEDIASIZE, &mediasize);
@@ -776,6 +795,9 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 		goto closefd;
 	}
 	memcpy(&kdhl, temp, sizeof(kdhl));
+
+validate:
+	printf("validate!\n");
 	iscompressed = istextdump = false;
 	if (compare_magic(&kdhl, TEXTDUMPMAGIC)) {
 		if (verbose)
@@ -862,6 +884,11 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 	dumpextent = dtoh64(kdhl.dumpextent);
 	dumplength = dtoh64(kdhl.dumplength);
 	dumpkeysize = dtoh32(kdhl.dumpkeysize);
+	printf("dumpextent: %lx\n", dumpextent);
+	printf("dumplength: %lx\n", dumplength);
+	printf("dumpkeysize: %x\n", dumpkeysize);
+	exit(0);
+
 	firsthd = lasthd - dumpextent - sectorsize - dumpkeysize;
 	if (lseek(fddev, firsthd, SEEK_SET) != firsthd ||
 	    read(fddev, temp, sectorsize) != (ssize_t)sectorsize) {
@@ -1226,7 +1253,7 @@ main(int argc, char **argv)
 	char **devs;
 	int i, ch, error, savedirfd;
 
-	checkfor = compress = clear = force = keep = false;
+	checkfor = compress = clear = force = keep = livecore = false;
 	verbose = 0;
 	nfound = nsaved = nerr = 0;
 	savedir = ".";
@@ -1238,7 +1265,7 @@ main(int argc, char **argv)
 	if (argc < 0)
 		exit(1);
 
-	while ((ch = getopt(argc, argv, "Ccfkm:uvz")) != -1)
+	while ((ch = getopt(argc, argv, "CcfkL:m:uvz")) != -1)
 		switch(ch) {
 		case 'C':
 			checkfor = true;
@@ -1251,6 +1278,13 @@ main(int argc, char **argv)
 			break;
 		case 'k':
 			keep = true;
+			break;
+		case 'L':
+			livecore = true;
+			if (optarg == NULL)
+				usage();
+			devs = malloc(sizeof(char *));
+			devs[0] = optarg;
 			break;
 		case 'm':
 			maxdumps = atoi(optarg);
@@ -1292,10 +1326,18 @@ main(int argc, char **argv)
 		argc--;
 		argv++;
 	}
-	if (argc == 0)
+	if (livecore) {
+		printf("devs[0]: %s\n", devs[0]);
+		argc++;
+	} else if (argc == 0)
 		devs = enum_dumpdevs(&argc);
 	else
 		devs = devify(argc, argv);
+
+	if (open(devs[0], O_RDWR | O_CREAT) < 0) {
+		logmsg(LOG_ERR, "failed to open(%s): %m", devs[0]);
+		exit(1);
+	}
 
 	savedirfd = open(savedir, O_RDONLY | O_DIRECTORY);
 	if (savedirfd < 0) {
@@ -1313,6 +1355,7 @@ main(int argc, char **argv)
 	/* Enter capability mode. */
 	init_caps(argc, devs);
 
+	printf("time to DoFile, argc=%d\n", argc);
 	for (i = 0; i < argc; i++)
 		DoFile(savedir, savedirfd, devs[i]);
 
