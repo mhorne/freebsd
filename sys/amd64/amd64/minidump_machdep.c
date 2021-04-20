@@ -67,15 +67,15 @@ SYSCTL_INT(_machdep, OID_AUTO, dump_retry_count, CTLFLAG_RWTUN,
     &dump_retry_count, 0, "Number of times dump has to retry before bailing out");
 
 static int
-is_dumpable(vm_paddr_t pa)
+is_dumpable(vm_paddr_t pa, vm_paddr_t *dump_availp)
 {
 	vm_page_t m;
 	int i;
 
 	if ((m = vm_phys_paddr_to_vm_page(pa)) != NULL)
 		return ((m->flags & PG_NODUMP) == 0);
-	for (i = 0; dump_avail[i] != 0 || dump_avail[i + 1] != 0; i += 2) {
-		if (pa >= dump_avail[i] && pa < dump_avail[i + 1])
+	for (i = 0; dump_availp[i] != 0 || dump_availp[i + 1] != 0; i += 2) {
+		if (pa >= dump_availp[i] && pa < dump_availp[i + 1])
 			return (1);
 	}
 	return (0);
@@ -215,7 +215,7 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 static pd_entry_t fakepd[NPDEPG];
 
 int
-minidumpsys(struct dumperinfo *di)
+minidumpsys(struct dumperinfo *di, struct minidumpstate *state)
 {
 	uint32_t pmapsize;
 	vm_offset_t va;
@@ -224,6 +224,7 @@ minidumpsys(struct dumperinfo *di)
 	int i, ii, j, k, n;
 	int retry_count;
 	struct minidumphdr mdhdr;
+	struct msgbuf *mbp;
 
 	retry_count = 0;
  retry:
@@ -256,7 +257,7 @@ minidumpsys(struct dumperinfo *di)
 			va += NBPDP;
 			pa = pdp[i] & PG_PS_FRAME;
 			for (n = 0; n < NPDEPG * NPTEPG; n++) {
-				if (is_dumpable(pa))
+				if (is_dumpable(pa, state->dump_availp))
 					dump_add_page(pa);
 				pa += PAGE_SIZE;
 			}
@@ -274,7 +275,7 @@ minidumpsys(struct dumperinfo *di)
 				/* This is an entire 2M page. */
 				pa = pd[j] & PG_PS_FRAME;
 				for (k = 0; k < NPTEPG; k++) {
-					if (is_dumpable(pa))
+					if (is_dumpable(pa, state->dump_availp))
 						dump_add_page(pa);
 					pa += PAGE_SIZE;
 				}
@@ -283,7 +284,7 @@ minidumpsys(struct dumperinfo *di)
 
 			pa = pd[j] & PG_FRAME;
 			/* set bit for this PTE page */
-			if (is_dumpable(pa))
+			if (is_dumpable(pa, state->dump_availp))
 				dump_add_page(pa);
 			/* and for each valid page in this 2MB block */
 			pt = (uint64_t *)PHYS_TO_DMAP(pd[j] & PG_FRAME);
@@ -291,20 +292,21 @@ minidumpsys(struct dumperinfo *di)
 				if ((pt[k] & PG_V) == 0)
 					continue;
 				pa = pt[k] & PG_FRAME;
-				if (is_dumpable(pa))
+				if (is_dumpable(pa, state->dump_availp))
 					dump_add_page(pa);
 			}
 		}
 	}
+	mbp = state->mbp;
 
 	/* Calculate dump size. */
 	dumpsize = pmapsize;
-	dumpsize += round_page(msgbufp->msg_size);
+	dumpsize += round_page(mbp->msg_size);
 	dumpsize += round_page(sizeof(dump_avail));
 	dumpsize += round_page(BITSET_SIZE(vm_page_dump_pages));
 	VM_PAGE_DUMP_FOREACH(pa) {
 		/* Clear out undumpable pages now if needed */
-		if (is_dumpable(pa)) {
+		if (is_dumpable(pa, state->dump_availp)) {
 			dumpsize += PAGE_SIZE;
 		} else {
 			dump_drop_page(pa);
@@ -318,7 +320,7 @@ minidumpsys(struct dumperinfo *di)
 	bzero(&mdhdr, sizeof(mdhdr));
 	strcpy(mdhdr.magic, MINIDUMP_MAGIC);
 	mdhdr.version = MINIDUMP_VERSION;
-	mdhdr.msgbufsize = msgbufp->msg_size;
+	mdhdr.msgbufsize = mbp->msg_size;
 	mdhdr.bitmapsize = round_page(BITSET_SIZE(vm_page_dump_pages));
 	mdhdr.pmapsize = pmapsize;
 	mdhdr.kernbase = VM_MIN_KERNEL_ADDRESS;
@@ -344,15 +346,18 @@ minidumpsys(struct dumperinfo *di)
 		goto fail;
 
 	/* Dump msgbuf up front */
-	error = blk_write(di, (char *)msgbufp->msg_ptr, 0, round_page(msgbufp->msg_size));
+	error = blk_write(di, (char *)mbp->msg_ptr, 0, round_page(mbp->msg_size));
 	if (error)
 		goto fail;
+
+	//if (livedump)
+	//	return (0);
 
 	/* Dump dump_avail */
 	_Static_assert(sizeof(dump_avail) <= sizeof(fakepd),
 	    "Large dump_avail not handled");
 	bzero(&fakepd, sizeof(fakepd));
-	memcpy(fakepd, dump_avail, sizeof(dump_avail));
+	memcpy(fakepd, state->dump_availp, sizeof(dump_avail));
 	error = blk_write(di, (char *)fakepd, 0, PAGE_SIZE);
 	if (error)
 		goto fail;

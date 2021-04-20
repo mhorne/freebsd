@@ -52,6 +52,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/elf.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
+#include <machine/minidump.h>
+
+#include <sys/msgbuf.h>
 
 CTASSERT(sizeof(struct kerneldumpheader) == 512);
 
@@ -72,6 +75,9 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 	struct dumperinfo di;
 	char path[PATH_MAX];
 	int error;
+	struct msgbuf mb_copy;
+	vm_paddr_t *da_copy;
+	struct minidumpstate state;
 
 	if (req->newptr == NULL)
 		return (EINVAL);
@@ -92,9 +98,24 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 	di.priv = path;
 
 	/* do stuff */
-	error = minidumpsys(&di, true);
+
+	/* copy message buffer */
+	bcopy(msgbufp, &mb_copy, sizeof(mb_copy));
+	mb_copy.msg_ptr = malloc(mb_copy.msg_size, M_TEMP, M_WAITOK);
+	bcopy(msgbufp->msg_ptr, mb_copy.msg_ptr, mb_copy.msg_size);
+
+	/* copy dump_avail */
+	da_copy = malloc(sizeof(dump_avail), M_TEMP, M_WAITOK);
+	bcopy(dump_avail, da_copy, sizeof(dump_avail));
+
+	state.dump_availp = da_copy;
+	state.mbp = &mb_copy;
+	error = minidumpsys(&di, &state);
 
 	VOP_UNLOCK((struct vnode *)di.priv);
+	free(mb_copy.msg_ptr, M_TEMP);
+	free(da_copy, M_TEMP);
+
 	return (error);
 }
 
@@ -417,8 +438,13 @@ dumpsys_generic(struct dumperinfo *di)
 	int error;
 
 #if MINIDUMP_PAGE_TRACKING == 1
-	if (do_minidump)
-		return (minidumpsys(di));
+	if (do_minidump) {
+		struct minidumpstate state = {
+			.mbp = msgbufp,
+			.dump_availp = dump_avail,
+		};
+		return (minidumpsys(di, &state));
+	}
 #endif
 
 	bzero(&ehdr, sizeof(ehdr));

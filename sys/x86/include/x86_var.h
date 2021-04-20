@@ -104,6 +104,7 @@ struct	fpreg;
 struct  dbreg;
 struct	dumperinfo;
 struct	trapframe;
+struct	minidumpstate;
 
 /*
  * The interface type of the interrupt handler entry point cannot be
@@ -151,7 +152,7 @@ void	pagecopy(void *from, void *to);
 void	printcpuinfo(void);
 int	pti_get_default(void);
 int	user_dbreg_trap(register_t dr6);
-int	minidumpsys(struct dumperinfo *);
+int	minidumpsys(struct dumperinfo *, struct minidumpstate *);
 struct pcb *get_pcb_td(struct thread *td);
 
 #define	MSR_OP_ANDNOT		0x00000001
