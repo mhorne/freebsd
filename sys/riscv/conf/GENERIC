@@ -85,6 +85,8 @@ device		rcons
 # pseudo devices
 device		clk
 device		hwreset
+device		phy
+device		regulator
 device		syscon
 device		syscon_power
 device		riscv_syscon
@@ -147,6 +149,7 @@ device		goldfish_rtc	# QEMU RTC
 
 # Ethernet drivers
 device		cgem		# Cadence GEM Gigabit Ethernet device
+device		dwc
 device		miibus		# MII bus support
 device		xae		# Xilinx AXI Ethernet MAC
 
@@ -201,6 +204,12 @@ device		tuntap		# Packet tunnel.
 device		md		# Memory "disks"
 device		gif		# IPv6 and IPv4 tunneling
 device		firmware	# firmware assist module
+
+# MMC/SD/SDIO Card slot support
+device		sdhci
+device		mmc			# mmc/sd bus
+device		mmcsd			# mmc/sd flash cards
+device		dwmmc
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!

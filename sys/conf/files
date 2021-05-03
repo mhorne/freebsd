@@ -1633,6 +1633,8 @@ dev/drm2/ttm/ttm_execbuf_util.c	optional drm2
 dev/drm2/ttm/ttm_memory.c	optional drm2
 dev/drm2/ttm/ttm_page_alloc.c	optional drm2
 dev/drm2/ttm/ttm_bo_vm.c	optional drm2
+dev/dwc/if_dwc.c		optional fdt dwc
+dev/dwc/if_dwc_if.m		optional fdt dwc
 dev/efidev/efidev.c		optional efirt
 dev/efidev/efirt.c		optional efirt
 dev/efidev/efirtc.c		optional efirt
@@ -2463,6 +2465,7 @@ dev/mlxfw/mlxfw_mfa2_tlv_multi.c	optional mlxfw \
 dev/mlx/mlx.c			optional mlx
 dev/mlx/mlx_disk.c		optional mlx
 dev/mlx/mlx_pci.c		optional mlx pci
+dev/mmc/host/dwmmc.c		optional dwmmc fdt
 dev/mmc/mmc_subr.c		optional mmc | mmcsd !mmccam
 dev/mmc/mmc.c			optional mmc !mmccam
 dev/mmc/mmcbr_if.m		standard
