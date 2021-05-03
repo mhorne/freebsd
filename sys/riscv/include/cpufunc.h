@@ -109,12 +109,14 @@ sfence_vma_page(uintptr_t addr)
 #define	rdinstret()			csr_read64(instret)
 #define	rdhpmcounter(n)			csr_read64(hpmcounter##n)
 
+void sifive_l2_cache_flush_dcache(vm_offset_t va, vm_size_t size);
+
 extern int64_t dcache_line_size;
 extern int64_t icache_line_size;
 
-#define	cpu_dcache_wbinv_range(a, s)
-#define	cpu_dcache_inv_range(a, s)
-#define	cpu_dcache_wb_range(a, s)
+#define	cpu_dcache_wbinv_range(a, s) sifive_l2_cache_flush_dcache(a, s)
+#define	cpu_dcache_inv_range(a, s) sifive_l2_cache_flush_dcache(a, s)
+#define	cpu_dcache_wb_range(a, s) sifive_l2_cache_flush_dcache(a, s)
 
 #define	cpu_idcache_wbinv_range(a, s)
 #define	cpu_icache_sync_range(a, s)
