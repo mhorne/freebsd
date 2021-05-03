@@ -4193,6 +4193,23 @@ restart:
 	rw_runlock(&pvh_global_lock);
 }
 
+//void *
+//pmap_mapdev(vm_paddr_t pa, vm_size_t size)
+//{
+//	vm_offset_t va, offset;
+//
+//	offset = pa & PAGE_MASK;
+//	size = round_page(offset + size);
+//	pa = trunc_page(pa);
+//
+//	va = kva_alloc(size);
+//	if (va == 0)
+//		panic("%s: couldn't allocate KVA", __func__);
+//	pmap_kenter_device(va, size, pa);
+//
+//	return ((void *)(va + offset));
+//}
+
 void *
 pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 {

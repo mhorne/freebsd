@@ -428,6 +428,7 @@ newnfs_connect(struct nfsmount *nmp, struct nfssockreq *nrp,
 	}
 
 out:
+	printf("newnfs_connect() out\n");
 	/* Restore current thread's credentials. */
 	td->td_ucred = origcred;
 
@@ -592,14 +593,18 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 	 * term, change nfs_mount to call nfs_connect unconditionally
 	 * and let clnt_reconnect_create handle reconnects.
 	 */
-	if (nrp->nr_client == NULL)
+	if (nrp->nr_client == NULL) {
+		printf("newnfs_connect enter\n");
 		newnfs_connect(nmp, nrp, cred, td, 0, false);
+		printf("newnfs_connect done\n");
+	}
 
 	/*
 	 * For a client side mount, nmp is != NULL and clp == NULL. For
 	 * server calls (callbacks or upcalls), nmp == NULL.
 	 */
 	if (clp != NULL) {
+		printf("case 1\n");
 		NFSLOCKSTATE();
 		if ((clp->lc_flags & LCL_GSS) && nfsrv_gsscallbackson) {
 			secflavour = RPCSEC_GSS_KRB5;
@@ -613,6 +618,7 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		NFSUNLOCKSTATE();
 	} else if (nmp != NULL && NFSHASKERB(nmp) &&
 	     nd->nd_procnum != NFSPROC_NULL) {
+		printf("case 2\n");
 		if (NFSHASALLGSSNAME(nmp) && nmp->nm_krbnamelen > 0)
 			nd->nd_flag |= ND_USEGSSNAME;
 		if ((nd->nd_flag & ND_USEGSSNAME) != 0) {
@@ -656,6 +662,7 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 	} else if (nmp != NULL && !NFSHASKERB(nmp) &&
 	    nd->nd_procnum != NFSPROC_NULL &&
 	    (nd->nd_flag & ND_USEGSSNAME) != 0) {
+		printf("case 3\n");
 		/*
 		 * Use the uid that did the mount when the RPC is doing
 		 * NFSv4 system operations, as indicated by the
@@ -667,7 +674,9 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		    ("newnfs_request: NULL nr_cred"));
 		crfree(authcred);
 		authcred = crhold(nmp->nm_sockreq.nr_cred);
-	}
+	} else
+		printf("case 4\n");
+	printf(" big if is done\n");
 
 	if (nmp != NULL) {
 		bzero(&nf, sizeof(struct nfs_feedback_arg));
@@ -677,9 +686,12 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		    ((nmp->nm_tprintf_delay)-(nmp->nm_tprintf_initial_delay));
 	}
 
-	if (nd->nd_procnum == NFSPROC_NULL)
+	if (nd->nd_procnum == NFSPROC_NULL) {
+		printf("authnone_create()\n");
 		auth = authnone_create();
-	else if (usegssname) {
+		printf("authnone_create() done\n");
+	} else if (usegssname) {
+		printf("authnone_create case 2()\n");
 		/*
 		 * For this case, the authenticator is held in the
 		 * nfssockreq structure, so don't release the reference count
@@ -691,9 +703,12 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		else
 			rpc_gss_refresh_auth_call(nrp->nr_auth);
 		auth = nrp->nr_auth;
-	} else
+	} else {
+		printf("nfs_getauth ()\n");
 		auth = nfs_getauth(nrp, secflavour, NULL,
 		    srv_principal, NULL, authcred);
+		printf("nfs_getauth done\n");
+	}
 	crfree(authcred);
 	if (auth == NULL) {
 		m_freem(nd->nd_mreq);
@@ -715,6 +730,7 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		procnum = NFSV4PROC_COMPOUND;
 
 	if (nmp != NULL) {
+		printf("nmp != NULL \n");
 		NFSINCRGLOBAL(nfsstatsv1.rpcrequests);
 
 		/* Map the procnum to the old NFSv2 one, as required. */
@@ -759,6 +775,7 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 	}
 	freeslot = -1;		/* Set to slot that needs to be free'd */
 tryagain:
+	printf("tryagain\n");
 	slot = -1;		/* Slot that needs a sequence# increment. */
 	/*
 	 * This timeout specifies when a new socket should be created,
@@ -811,12 +828,15 @@ tryagain:
 	}
 
 	nd->nd_mrep = NULL;
-	if (clp != NULL && sep != NULL)
+	if (clp != NULL && sep != NULL) {
+		printf("clnt_bck_call enter\n");
 		stat = clnt_bck_call(nrp->nr_client, &ext, procnum,
 		    nd->nd_mreq, &nd->nd_mrep, timo, sep->nfsess_xprt);
-	else
+	}else {
+		printf("CLNT_CALL_MBUF\n");
 		stat = CLNT_CALL_MBUF(nrp->nr_client, &ext, procnum,
 		    nd->nd_mreq, &nd->nd_mrep, timo);
+	}
 	NFSCL_DEBUG(2, "clnt call=%d\n", stat);
 
 	if (rep != NULL) {
@@ -898,6 +918,7 @@ tryagain:
 	 * These could cause pointer alignment problems, so copy them to
 	 * well aligned mbufs.
 	 */
+	printf("newnfs_realign start\n");
 	newnfs_realign(&nd->nd_mrep, M_WAITOK);
 	nd->nd_md = nd->nd_mrep;
 	nd->nd_dpos = mtod(nd->nd_md, caddr_t);
@@ -1166,6 +1187,7 @@ tryagain:
 				nd->nd_repstat = NFSERR_STALEDONTRECOVER;
 		}
 	}
+	printf("bigger if done\n");
 
 #ifdef KDTRACE_HOOKS
 	if (nmp != NULL && dtrace_nfscl_nfs234_done_probe != NULL) {

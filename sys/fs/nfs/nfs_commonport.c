@@ -93,7 +93,7 @@ SYSCTL_INT(_vfs_nfs, OID_AUTO, realign_count, CTLFLAG_RW, &nfs_realign_count,
 SYSCTL_STRING(_vfs_nfs, OID_AUTO, callback_addr, CTLFLAG_RW,
     nfsv4_callbackaddr, sizeof(nfsv4_callbackaddr),
     "NFSv4 callback addr for server to use");
-SYSCTL_INT(_vfs_nfs, OID_AUTO, debuglevel, CTLFLAG_RW, &nfscl_debuglevel,
+SYSCTL_INT(_vfs_nfs, OID_AUTO, debuglevel, CTLFLAG_RWTUN, &nfscl_debuglevel,
     0, "Debug level for NFS client");
 SYSCTL_INT(_vfs_nfs, OID_AUTO, userhashsize, CTLFLAG_RDTUN, &nfsrv_lughashsize,
     0, "Size of hash tables for uid/name mapping");

@@ -164,8 +164,11 @@ cninit(void)
 		cn->cn_ops->cn_probe(cn);
 		if (cn->cn_pri == CN_DEAD)
 			continue;
-		if (best_cn == NULL || cn->cn_pri > best_cn->cn_pri)
+		if (best_cn == NULL || cn->cn_pri > best_cn->cn_pri) {
 			best_cn = cn;
+			printf("best_cn: %s\n", cn->cn_name);
+			printf("\n\n\n\n");
+		}
 		if (boothowto & RB_MULTIPLE) {
 			/*
 			 * Initialize console, and attach to it.

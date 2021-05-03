@@ -509,6 +509,8 @@ nfs_mountroot(struct mount *mp)
 		return (error);
 	}
 
+	printf("nfs_mountdiskless returned!\n");
+
 	/*
 	 * This is not really an nfs issue, but it is much easier to
 	 * set hostname here and then let the "/etc/rc.xxx" files
@@ -534,6 +536,7 @@ nfs_mountdiskless(char *path,
 	int dirlen, error;
 	char *dirpath;
 
+	printf("nfs_mountdiskless enter\n");
 	/*
 	 * Find the directory path in "path", which also has the server's
 	 * name/ip address in it.
@@ -543,7 +546,9 @@ nfs_mountdiskless(char *path,
 		dirlen = strlen(++dirpath);
 	else
 		dirlen = 0;
+	printf("sodupsockaddr enter\n");
 	nam = sodupsockaddr((struct sockaddr *)sin, M_WAITOK);
+	printf("sodupsockaddr exit\n");
 	if ((error = mountnfs(args, mp, nam, path, NULL, 0, dirpath, dirlen,
 	    NULL, 0, vpp, td->td_ucred, td, NFS_DEFAULT_NAMETIMEO, 
 	    NFS_DEFAULT_NEGNAMETIMEO, 0, 0, NULL)) != 0) {
@@ -1569,8 +1574,11 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 	else
 		nmp->nm_sockreq.nr_vers = NFS_VER2;
 
-	if ((error = newnfs_connect(nmp, &nmp->nm_sockreq, cred, td, 0, false)))
+	printf("newnfs_connect() enter\n");
+	if ((error = newnfs_connect(nmp, &nmp->nm_sockreq, cred, td, 0, false))) {
+		printf("newnfs_connect goto bad\n");
 		goto bad;
+	}
 	/* For NFSv4.1, get the clientid now. */
 	if (nmp->nm_minorvers > 0) {
 		NFSCL_DEBUG(3, "at getcl\n");
@@ -1608,6 +1616,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 	 * number == UFS_ROOTINO (2).
 	 */
 	if (nmp->nm_fhsize > 0) {
+		printf("nm_fhsize > 0\n");
 		/*
 		 * Set f_iosize to NFS_DIRBLKSIZ so that bo_bsize gets set
 		 * non-zero for the root vnode. f_iosize will be set correctly
@@ -1618,7 +1627,9 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 		    LK_EXCLUSIVE);
 		if (error)
 			goto bad;
+		printf("nget done\n");
 		*vpp = NFSTOV(np);
+		printf("NFSTOV(np) done\n");
 
 		/*
 		 * Get file attributes and transfer parameters for the
@@ -1627,6 +1638,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 		 */
 		ret = nfsrpc_getattrnovp(nmp, nmp->nm_fh, nmp->nm_fhsize, 1,
 		    cred, td, &nfsva, NULL, &lease);
+		printf("nfsrpc_getattrnovp done\n");
 		if (ret) {
 			/*
 			 * Just set default values to get things going.
@@ -1644,6 +1656,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 			lease = 60;
 		}
 		(void) nfscl_loadattrcache(vpp, &nfsva, NULL, NULL, 0, 1);
+		printf("nfscl_loadattrcache done\n");
 		if (nmp->nm_minorvers > 0) {
 			NFSCL_DEBUG(3, "lease=%d\n", (int)lease);
 			NFSLOCKCLSTATE();
@@ -1676,12 +1689,16 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 		 * Lose the lock but keep the ref.
 		 */
 		NFSVOPUNLOCK(*vpp);
+		printf("vfs_cache_root_set start \n");
 		vfs_cache_root_set(mp, *vpp);
+		printf("vfs_cache_root_set done \n");
 		return (0);
 	}
+	printf("error = EIO\n");
 	error = EIO;
 
 bad:
+	printf("wentto bad!\n");
 	if (clp != NULL)
 		nfscl_clientrelease(clp);
 	newnfs_disconnect(&nmp->nm_sockreq);

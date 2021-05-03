@@ -279,6 +279,7 @@ clnt_reconnect_call(
 	enum clnt_stat stat;
 	int tries, error;
 
+	printf("clnt_reconnect_call enter\n");
 	tries = 0;
 	do {
 		mtx_lock(&rc->rc_lock);
@@ -291,8 +292,10 @@ clnt_reconnect_call(
 			mtx_unlock(&rc->rc_lock);
 			stat = clnt_reconnect_connect(cl);
 			if (stat == RPC_SYSTEMERROR) {
+				printf("tsleep enter\n");
 				error = tsleep(&fake_wchan,
 				    rc->rc_intr ? PCATCH : 0, "rpccon", hz);
+				printf("tsleep exit %d\n", error);
 				if (error == EINTR || error == ERESTART)
 					return (RPC_INTR);
 				tries++;

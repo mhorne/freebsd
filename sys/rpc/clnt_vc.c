@@ -317,6 +317,7 @@ clnt_vc_call(
 	u_int maxlen;
 #endif
 
+	printf("clnt_vc_call enter\n");
 	cr = malloc(sizeof(struct ct_request), M_RPC, M_WAITOK);
 
 	mtx_lock(&ct->ct_lock);

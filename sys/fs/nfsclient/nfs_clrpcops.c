@@ -1240,7 +1240,9 @@ nfsrpc_getattrnovp(struct nfsmount *nmp, u_int8_t *fhp, int fhlen, int syscred,
 	int error, vers = NFS_VER2;
 	nfsattrbit_t attrbits;
 
+	printf("nfsrpc_getattrnovp entry\n");
 	nfscl_reqstart(nd, NFSPROC_GETATTR, nmp, fhp, fhlen, NULL, NULL, 0, 0);
+	printf("reqstart done\n");
 	if (nd->nd_flag & ND_NFSV4) {
 		vers = NFS_VER4;
 		NFSGETATTR_ATTRBIT(&attrbits);
@@ -1251,8 +1253,10 @@ nfsrpc_getattrnovp(struct nfsmount *nmp, u_int8_t *fhp, int fhlen, int syscred,
 	}
 	if (syscred)
 		nd->nd_flag |= ND_USEGSSNAME;
+	printf("newnfs_request enter\n");
 	error = newnfs_request(nd, nmp, NULL, &nmp->nm_sockreq, NULL, p, cred,
 	    NFS_PROG, vers, NULL, 1, xidp, NULL);
+	printf("newnfs_request done\n");
 	if (error)
 		return (error);
 	if (nd->nd_repstat == 0) {

@@ -299,6 +299,7 @@ dwc_miibus_statchg(device_t dev)
 	 * link to set the MAC interface registers.
 	 */
 
+	device_printf(dev, "%s() entered\n", __func__);
 	sc = device_get_softc(dev);
 
 	DWC_ASSERT_LOCKED(sc);
@@ -310,6 +311,7 @@ dwc_miibus_statchg(device_t dev)
 	else
 		sc->link_is_up = false;
 
+	printf("reading configuration\n");
 	reg = READ4(sc, MAC_CONFIGURATION);
 	switch (IFM_SUBTYPE(mii->mii_media_active)) {
 	case IFM_1000_T:
@@ -325,6 +327,7 @@ dwc_miibus_statchg(device_t dev)
 		break;
 	case IFM_NONE:
 		sc->link_is_up = false;
+		printf("IFM_NONE\n");
 		return;
 	default:
 		sc->link_is_up = false;
@@ -332,6 +335,7 @@ dwc_miibus_statchg(device_t dev)
 		    IFM_SUBTYPE(mii->mii_media_active));
 		return;
 	}
+	printf("reading options\n");
 	if ((IFM_OPTIONS(mii->mii_media_active) & IFM_FDX) != 0)
 		reg |= (CONF_DM);
 	else
@@ -347,6 +351,7 @@ dwc_miibus_statchg(device_t dev)
 		reg |= dwc_pause_time << FLOW_CONTROL_PT_SHIFT;
 	WRITE4(sc, FLOW_CONTROL, reg);
 
+	printf("call IF_DWC_SET_SPEED()\n");
 	IF_DWC_SET_SPEED(dev, IFM_SUBTYPE(mii->mii_media_active));
 
 }
@@ -909,7 +914,7 @@ setup_dma(struct dwc_softc *sc)
 	}
 
 	error = bus_dmamem_alloc(sc->txdesc_tag, (void**)&sc->txdesc_ring,
-	    BUS_DMA_COHERENT | BUS_DMA_WAITOK | BUS_DMA_ZERO,
+	    BUS_DMA_WAITOK | BUS_DMA_ZERO,
 	    &sc->txdesc_map);
 	if (error != 0) {
 		device_printf(sc->dev,
@@ -951,7 +956,7 @@ setup_dma(struct dwc_softc *sc)
 	}
 
 	for (idx = 0; idx < TX_MAP_COUNT; idx++) {
-		error = bus_dmamap_create(sc->txbuf_tag, BUS_DMA_COHERENT,
+		error = bus_dmamap_create(sc->txbuf_tag, 0,
 		    &sc->txbuf_map[idx].map);
 		if (error != 0) {
 			device_printf(sc->dev,
@@ -984,7 +989,7 @@ setup_dma(struct dwc_softc *sc)
 	}
 
 	error = bus_dmamem_alloc(sc->rxdesc_tag, (void **)&sc->rxdesc_ring,
-	    BUS_DMA_COHERENT | BUS_DMA_WAITOK | BUS_DMA_ZERO,
+	    BUS_DMA_WAITOK | BUS_DMA_ZERO,
 	    &sc->rxdesc_map);
 	if (error != 0) {
 		device_printf(sc->dev,
@@ -1019,7 +1024,7 @@ setup_dma(struct dwc_softc *sc)
 	}
 
 	for (idx = 0; idx < RX_DESC_COUNT; idx++) {
-		error = bus_dmamap_create(sc->rxbuf_tag, BUS_DMA_COHERENT,
+		error = bus_dmamap_create(sc->rxbuf_tag, 0,
 		    &sc->rxbuf_map[idx].map);
 		if (error != 0) {
 			device_printf(sc->dev,

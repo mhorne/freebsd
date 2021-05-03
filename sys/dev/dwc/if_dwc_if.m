@@ -30,29 +30,70 @@
 INTERFACE if_dwc;
 
 #include <dev/dwc/if_dwc.h>
+#include <sys/bus.h>
+#include <sys/socket.h>
+#include <vm/vm.h>
+#include <vm/pmap.h>
+
+#include <net/if.h>
+#include <net/if_media.h>
+
+#include <dev/dwc/if_dwcvar.h>
+#include <machine/pmap.h>
 
 CODE {
 	static int
 	if_dwc_default_init(device_t dev)
 	{
+		device_printf(dev, "%s\n", __func__);
 		return (0);
 	}
 
 	static int
 	if_dwc_default_mac_type(device_t dev)
 	{
+		device_printf(dev, "%s\n", __func__);
 		return (DWC_GMAC_EXT_DESC);
 	}
 
 	static int
 	if_dwc_default_mii_clk(device_t dev)
 	{
+		device_printf(dev, "%s\n", __func__);
 		return (GMAC_MII_CLK_25_35M_DIV16);
 	}
 
 	static int
 	if_dwc_default_set_speed(device_t dev, int speed)
 	{
+		struct dwc_softc *sc;
+		uint32_t *addr;
+		uint32_t val;
+
+		device_printf(dev, "%s\n", __func__);
+		sc = device_get_softc(dev);
+
+		addr = pmap_mapdev(0x118001EC, 4);
+		val = *addr;
+		printf("val: %x\n", val);
+
+		switch(speed) {
+		case IFM_1000_T:
+		case IFM_1000_SX:
+			printf("speed 1000\n");
+			val |= 0x4;
+			*addr = val;
+			break;
+		case IFM_100_TX:
+			printf("speed 100\n");
+			break;
+		case IFM_10_T:
+			printf("speed 10\n");
+			break;
+		default:
+			printf("unknown speed %d\n", speed);
+		}
+
 		return (0);
 	}
 };

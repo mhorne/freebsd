@@ -356,6 +356,8 @@ clnt_dg_call(
 	struct cu_request *cr;
 	int error;
 
+	printf("clnt_dg_call enter\n");
+
 	cs = cu->cu_socket->so_rcv.sb_upcallarg;
 	cr = malloc(sizeof(struct cu_request), M_RPC, M_WAITOK);
 

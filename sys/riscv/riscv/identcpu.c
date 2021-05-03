@@ -193,6 +193,9 @@ identify_cpu(void)
 
 	/* TODO: can we get misa somewhere ? */
 	misa = 0;
+	printf("mvendorid: %lx\n", mvendorid);
+	printf("marchid: %lx\n", marchid);
+	printf("mimpid: %lx\n", mimpid);
 
 	cpu = PCPU_GET(cpuid);
 
