@@ -82,6 +82,9 @@ device		rcons
 # EXT_RESOURCES pseudo devices
 options 	EXT_RESOURCES
 device		clk
+device		phy
+device		hwreset
+device		regulator
 device		syscon
 device		syscon_power
 device		riscv_syscon
@@ -123,6 +126,9 @@ device		xae		# Xilinx AXI Ethernet MAC
 device		xdma		# DMA interface
 device		axidma		# Xilinx AXI DMA Controller
 
+# GPIO / PINCTRL
+device		gpio
+
 # Uncomment for memory disk
 # options 	MD_ROOT
 # options 	MD_ROOT_SIZE=32768	# 32MB ram disk
@@ -159,6 +165,14 @@ device		tuntap		# Packet tunnel.
 device		md		# Memory "disks"
 device		gif		# IPv6 and IPv4 tunneling
 device		firmware	# firmware assist module
+
+# MMC/SD/SDIO Card slot support
+device		sdhci
+device		mmc			# mmc/sd bus
+device		mmcsd			# mmc/sd flash cards
+device		dwmmc
+
+device		dwc
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!
