@@ -238,6 +238,7 @@ uart_cpu_fdt_probe(struct uart_class **classp, bus_space_tag_t *bst,
 		if (class == NULL)
 			return (ENXIO);
 		clk = 0;
+		OF_getencprop(node, "current-clock", &clk, sizeof(clk));
 	}
 
 	/*
