@@ -236,6 +236,8 @@ uart_cpu_fdt_probe(struct uart_class **classp, bus_space_tag_t *bst,
 			return (ENXIO);
 		if (uart_fdt_get_clock(node, &clk) != 0)
 			clk = 0;
+		/* TODO: why does this work? */
+		OF_getencprop(node, "current-clock", &clk, sizeof(clk));
 	}
 
 	/*
