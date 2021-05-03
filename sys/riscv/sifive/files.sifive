@@ -5,3 +5,4 @@ riscv/sifive/sifive_gpio.c		optional	sifive_gpio gpio
 riscv/sifive/sifive_prci.c		standard
 riscv/sifive/sifive_spi.c		optional	sifive_spi spibus
 riscv/sifive/sifive_uart.c		standard
+riscv/sifive/l2cache.c                  standard
