@@ -18,6 +18,7 @@ CFLAGS+=	-I${SRCTOP}/sys/contrib/zstd/lib
 .elif ${MK_CASPER} != "no" && !defined(RESCUE)
 CFLAGS+=	-DWITH_CASPER
 LIBADD+=	casper cap_fileargs cap_syslog
+LIBADD+=	cap_sysctl
 .endif
 
 .include <bsd.prog.mk>

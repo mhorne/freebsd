@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kerneldump.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
 
 #include <capsicum_helpers.h>
 #include <ctype.h>
@@ -92,6 +93,7 @@ __FBSDID("$FreeBSD$");
 
 #include <libcasper.h>
 #include <casper/cap_fileargs.h>
+#include <casper/cap_sysctl.h>
 #include <casper/cap_syslog.h>
 
 #include <libxo/xo.h>
@@ -104,6 +106,7 @@ __FBSDID("$FreeBSD$");
 #define	STATUS_UNKNOWN	2
 
 static cap_channel_t *capsyslog;
+static cap_channel_t *capsysctl;
 static fileargs_t *capfa;
 static bool checkfor, compress, uncompress, clear, force, keep, livecore;	/* flags */
 static int verbose;
@@ -220,6 +223,7 @@ printheader(xo_handle_t *xo, const struct kerneldumpheader *h,
 		break;
 	}
 	xo_emit_h(xo, "{P:  }{Lwc:Dump Status}{:dump_status/%s}\n", stat_str);
+	xo_emit_h(xo, "{P:  }{Lwc:Livedump}{:livedump/%s}\n", livecore ? "yes" : "no");
 	xo_flush_h(xo);
 }
 
@@ -692,6 +696,51 @@ DoTextdumpFile(int fd, off_t dumpsize, off_t lasthd, char *buf,
 	return (0);
 }
 
+static int
+DoLivedumpFile(int fd, off_t dumpsize, const char *filename, FILE *fp)
+{
+	char *buf;
+	int error;
+	int wl, nr, nw, dmpcnt;
+
+	error = 0;
+	wl = 512;
+	dmpcnt = 0;
+	buf = malloc(2048);
+	while (dumpsize > 0) {
+		nr = read(fd, buf, wl);
+		if (nr != wl) {
+			if (nr == 0)
+				logmsg(LOG_WARNING,
+				    "WARNING: EOF on dump device");
+			else
+				logmsg(LOG_ERR, "read error: %m");
+			nerr++;
+			return (-1);
+		}
+		nw = fwrite(buf, 1, wl, fp);
+		if (nw != wl) {
+			logmsg(LOG_ERR,
+			    "write error on %s file: %m", filename);
+			logmsg(LOG_WARNING,
+			    "WARNING: dump may be incomplete");
+			nerr++;
+			return (-1);
+		}
+		if (verbose) {
+			dmpcnt += wl;
+			printf("%llu\r", (unsigned long long)dmpcnt);
+			fflush(stdout);
+		}
+		dumpsize -= wl;
+	}
+
+	/* Remove the vestigial kernel dump header. */
+	//error = ftruncate(fd, dumpsize);
+
+	return (0);
+}
+
 static void
 DoFile(const char *savedir, int savedirfd, const char *device)
 {
@@ -757,6 +806,8 @@ DoFile(const char *savedir, int savedirfd, const char *device)
 			logmsg(LOG_ERR, "Failed to read kernel dump header");
 			goto closefd;
 		}
+		/* Reset cursor */
+		(void)lseek(fddev, 0, SEEK_SET);
 		goto validate;
 	}
 
@@ -887,29 +938,33 @@ validate:
 	printf("dumpextent: %lx\n", dumpextent);
 	printf("dumplength: %lx\n", dumplength);
 	printf("dumpkeysize: %x\n", dumpkeysize);
-	exit(0);
+	//exit(0);
 
-	firsthd = lasthd - dumpextent - sectorsize - dumpkeysize;
-	if (lseek(fddev, firsthd, SEEK_SET) != firsthd ||
-	    read(fddev, temp, sectorsize) != (ssize_t)sectorsize) {
-		logmsg(LOG_ERR,
-		    "error reading first dump header at offset %lld in %s: %m",
-		    (long long)firsthd, device);
-		nerr++;
-		goto closefd;
+	if (!livecore) {
+		firsthd = lasthd - dumpextent - sectorsize - dumpkeysize;
+		if (lseek(fddev, firsthd, SEEK_SET) != firsthd ||
+		    read(fddev, temp, sectorsize) != (ssize_t)sectorsize) {
+			logmsg(LOG_ERR,
+			    "error reading first dump header at offset %lld in %s: %m",
+			    (long long)firsthd, device);
+			nerr++;
+			goto closefd;
+		}
+		memcpy(&kdhf, temp, sizeof(kdhf));
 	}
-	memcpy(&kdhf, temp, sizeof(kdhf));
 
 	if (verbose >= 2) {
 		printf("First dump headers:\n");
 		printheader(xostdout, &kdhf, device, bounds, -1);
 
-		printf("\nLast dump headers:\n");
-		printheader(xostdout, &kdhl, device, bounds, -1);
-		printf("\n");
+		if (!livecore) {
+			printf("\nLast dump headers:\n");
+			printheader(xostdout, &kdhl, device, bounds, -1);
+			printf("\n");
+		}
 	}
 
-	if (memcmp(&kdhl, &kdhf, sizeof(kdhl))) {
+	if (!livecore && memcmp(&kdhl, &kdhf, sizeof(kdhl))) {
 		logmsg(LOG_ERR,
 		    "first and last dump headers disagree on %s", device);
 		nerr++;
@@ -935,6 +990,7 @@ validate:
 	if (verbose)
 		printf("Checking for available free space\n");
 
+	/* Live cores are already written to the filesystem */
 	if (!check_space(savedir, savedirfd, dumplength, bounds)) {
 		nerr++;
 		goto closefd;
@@ -1040,6 +1096,9 @@ validate:
 		if (DoTextdumpFile(fddev, dumplength, lasthd, buf, device,
 		    corename, core) < 0)
 			goto closeall;
+	} else if (livecore) {
+		if (DoLivedumpFile(fddev, dumplength, corename, core) < 0)
+			goto closeall;
 	} else {
 		if (DoRegularFile(fddev, dumplength, sectorsize,
 		    !(compress || iscompressed || isencrypted),
@@ -1076,8 +1135,9 @@ validate:
 		    (kdhl.compression == KERNELDUMP_COMP_ZSTD) ? "zst" : "gz");
 	} else {
 		snprintf(linkname, sizeof(linkname), "%s.last",
-		    istextdump ? "textdump.tar" :
-		    (isencrypted ? "vmcore_encrypted" : "vmcore"));
+		    livecore ? "livedump" :
+		    (istextdump ? "textdump.tar" :
+		    (isencrypted ? "vmcore_encrypted" : "vmcore")));
 	}
 	if (symlinkat(corename, savedirfd, linkname) == -1) {
 		logmsg(LOG_WARNING, "unable to create symlink %s/%s: %m",
@@ -1090,7 +1150,7 @@ validate:
 		printf("dump saved\n");
 
 nuke:
-	if (!keep) {
+	if (!keep && !livecore) {
 		if (verbose)
 			printf("clearing dump header\n");
 		memcpy(kdhl.magic, KERNELDUMPMAGIC_CLEARED, sizeof(kdhl.magic));
@@ -1232,6 +1292,12 @@ init_caps(int argc, char **argv)
 		logmsg(LOG_ERR, "cap_service_open(system.syslog): %m");
 		exit(1);
 	}
+	capsysctl = cap_service_open(capcas, "system.sysctl");
+	if (capsysctl == NULL) {
+		logmsg(LOG_ERR, "cap_service_open(system.sysctl): %m");
+		exit(1);
+	}
+	printf("capsysctl %p\n", capsysctl);
 	cap_close(capcas);
 }
 
@@ -1241,6 +1307,7 @@ usage(void)
 	xo_error("%s\n%s\n%s\n",
 	    "usage: savecore -c [-v] [device ...]",
 	    "       savecore -C [-v] [device ...]",
+	    "       savecore -L [-v] [directory]",
 	    "       savecore [-fkvz] [-m maxdumps] [directory [device ...]]");
 	exit(1);
 }
@@ -1265,7 +1332,7 @@ main(int argc, char **argv)
 	if (argc < 0)
 		exit(1);
 
-	while ((ch = getopt(argc, argv, "CcfkL:m:uvz")) != -1)
+	while ((ch = getopt(argc, argv, "CcfkLm:uvz")) != -1)
 		switch(ch) {
 		case 'C':
 			checkfor = true;
@@ -1281,10 +1348,6 @@ main(int argc, char **argv)
 			break;
 		case 'L':
 			livecore = true;
-			if (optarg == NULL)
-				usage();
-			devs = malloc(sizeof(char *));
-			devs[0] = optarg;
 			break;
 		case 'm':
 			maxdumps = atoi(optarg);
@@ -1327,7 +1390,16 @@ main(int argc, char **argv)
 		argv++;
 	}
 	if (livecore) {
-		printf("devs[0]: %s\n", devs[0]);
+		char *tmpname;
+		if (argc > 0)
+			usage();
+
+		/* Create a temporary file for the livedump. */
+		asprintf(&tmpname, "%slivedump.XXXXXX", _PATH_TMP);
+
+		devs = malloc(sizeof(char *));
+		devs[0] = mktemp(tmpname);
+		printf("created tmp file %s\n", devs[0]);
 		argc++;
 	} else if (argc == 0)
 		devs = enum_dumpdevs(&argc);
@@ -1355,9 +1427,34 @@ main(int argc, char **argv)
 	/* Enter capability mode. */
 	init_caps(argc, devs);
 
+	/* Invoke the live dump, if applicable. */
+	if (livecore) {
+		cap_sysctl_limit_t *limit;
+		limit = cap_sysctl_limit_init(capsysctl);
+		if (limit == NULL) {
+			printf("limit NULL!\n");
+			exit(1);
+		}
+		(void)cap_sysctl_limit_name(limit, "kern", CAP_SYSCTL_RDWR | CAP_SYSCTL_RECURSIVE);
+		(void)cap_sysctl_limit_name(limit, "kern.livedump", CAP_SYSCTL_WRITE);
+		if (cap_sysctl_limit(limit) < 0) {
+			logmsg(LOG_ERR, "cap_sysctl_limit failed: %m");
+			exit(1);
+		}
+		if (cap_sysctlbyname(capsysctl, "kern.livedump", NULL, 0, devs[0],
+		    strlen(devs[0])) == -1) {
+			unlink(devs[0]);
+			logmsg(LOG_ERR, "live dump failed: %m");
+			exit(1);
+		}
+	}
+
 	printf("time to DoFile, argc=%d\n", argc);
 	for (i = 0; i < argc; i++)
 		DoFile(savedir, savedirfd, devs[i]);
+
+	if (livecore)
+		unlink(devs[0]);
 
 	/* Emit minimal output. */
 	if (nfound == 0) {
