@@ -71,6 +71,13 @@ pmu_intr(void *arg)
 	struct trapframe *tf;
 #endif
 	uint32_t r;
+
+#ifdef HWPMC_HOOKS
+	tf = arg;
+	PMCDBG3(MDP,INT,1, "cpu=%d tf=%p um=%d", curcpu, (void *)tf,
+	    TRAPF_USERMODE(tf));
+#endif
+
 #if defined(__arm__) && (__ARM_ARCH > 6)
 	u_int cpu;
 
@@ -90,7 +97,6 @@ pmu_intr(void *arg)
 #ifdef HWPMC_HOOKS
 	/* Only call into the HWPMC framework if we know there is work. */
 	if (r != 0 && pmc_intr) {
-		tf = arg;
 		(*pmc_intr)(tf);
 	}
 #endif
