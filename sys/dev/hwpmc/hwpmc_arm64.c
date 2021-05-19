@@ -181,9 +181,15 @@ arm64_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	}
 	pe = a->pm_ev;
 
-	config = (uint32_t)pe - PMC_EV_ARMV8_FIRST;
-	if (config > (PMC_EV_ARMV8_LAST - PMC_EV_ARMV8_FIRST))
+	/*
+	 * pm_ev may contain the raw event code, or an ARMV8-class event code in the
+	 * range [PMC_EV_ARMV8_FIRST, PMC_EV_ARMV8_LAST].
+	 */
+	config = (uint32_t)pe;
+	if (config > PMC_EV_ARMV8_LAST)
 		return (EINVAL);
+	else if (config > PMC_EV_ARMV8_FIRST)
+		config -= PMC_EV_ARMV8_FIRST;
 	pm->pm_md.pm_arm64.pm_arm64_evsel = config;
 
 	PMCDBG2(MDP, ALL, 2, "arm64-allocate ri=%d -> config=0x%x", ri, config);
