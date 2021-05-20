@@ -677,7 +677,7 @@ init_proc0(vm_offset_t kstack)
 
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = kstack;
-	thread0.td_kstack_pages = KSTACK_PAGES;
+	thread0.td_kstack_pages = kstack_pages;
 	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
 	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
 	thread0.td_pcb->pcb_fpflags = 0;
@@ -853,13 +853,13 @@ parse_metadata(void)
 	return (lastaddr);
 }
 
-void
+vm_offset_t
 initriscv(struct riscv_bootparams *rvbp)
 {
 	struct mem_region mem_regions[FDT_MEM_REGIONS];
 	struct pcpu *pcpup;
 	int mem_regions_sz;
-	vm_offset_t lastaddr;
+	vm_offset_t lastaddr, kstack0;
 	vm_size_t kernlen;
 #ifdef FDT
 	phandle_t chosen;
@@ -927,9 +927,15 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	cache_setup();
 
+	/* Reserve some space for proc0's kstack */
+	kstack0 = lastaddr;
+	lastaddr += kstack_pages * PAGE_SIZE;
+
 	/* Bootstrap enough of pmap to enter the kernel proper */
 	kernlen = (lastaddr - KERNBASE);
 	pmap_bootstrap(rvbp->kern_l1pt, rvbp->kern_phys, kernlen);
+
+	bzero((void *)kstack0, kstack_pages * PAGE_SIZE);
 
 #ifdef FDT
 	/*
@@ -961,7 +967,7 @@ initriscv(struct riscv_bootparams *rvbp)
 	if (getenv_is_true("debug.dump_modinfo_at_boot"))
 		preload_dump();
 
-	init_proc0(rvbp->kern_stack);
+	init_proc0(kstack0);
 
 	msgbufinit(msgbufp, msgbufsize);
 	mutex_init();
@@ -978,6 +984,12 @@ initriscv(struct riscv_bootparams *rvbp)
 	early_boot = 0;
 
 	TSEXIT();
+
+	/* Return the bottom of our new stack */
+	printf("td_kstack_pages: %d\n", thread0.td_kstack_pages);
+	printf("new kstack: %lx\n",thread0.td_kstack + (thread0.td_kstack_pages * PAGE_SIZE) - 1 - sizeof(struct pcb));
+	return (thread0.td_kstack + (thread0.td_kstack_pages * PAGE_SIZE) - 1 - sizeof(struct pcb));
+	//return (kstack0 + (kstack_pages * PAGE_SIZE));
 }
 
 #undef bzero

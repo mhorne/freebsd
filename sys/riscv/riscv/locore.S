@@ -222,7 +222,7 @@ va:
 	csrw	sscratch, t0
 
 	/* Initialize stack pointer */
-	la	sp, initstack_end
+	la	sp, bootstack_bsp
 
 	/* Clear frame pointer */
 	mv	s0, zero
@@ -243,9 +243,6 @@ va:
 	sd	t0, RISCV_BOOTPARAMS_KERN_L1PT(sp)
 	sd	s9, RISCV_BOOTPARAMS_KERN_PHYS(sp)
 
-	la	t0, initstack
-	sd	t0, RISCV_BOOTPARAMS_KERN_STACK(sp)
-
 	li	t0, (VM_EARLY_DTB_ADDRESS)
 	/* Add offset of DTB within superpage */
 	li	t1, (L2_OFFSET)
@@ -258,6 +255,7 @@ va:
 
 	mv	a0, sp
 	call	_C_LABEL(initriscv)	/* Off we go */
+	mv	sp, a0			/* Switch to the new kstack */
 	call	_C_LABEL(mi_startup)
 
 	/* We should never reach here, but if so just hang. */
@@ -277,9 +275,8 @@ get_physmem:
 	ret
 
 	.align  4
-initstack:
-	.space  (PAGE_SIZE * KSTACK_PAGES)
-initstack_end:
+	.space  (2 * PAGE_SIZE)
+bootstack_bsp:
 
 ENTRY(sigcode)
 	mv	a0, sp

@@ -40,7 +40,6 @@
 struct riscv_bootparams {
 	vm_offset_t	kern_l1pt;	/* Kernel L1 base */
 	vm_offset_t	kern_phys;	/* Kernel base (physical) addr */
-	vm_offset_t	kern_stack;
 	vm_offset_t	dtbp_virt;	/* Device tree blob virtual addr */
 	vm_offset_t	dtbp_phys;	/* Device tree blob physical addr */
 	vm_offset_t	modulep;	/* loader(8) metadata */
@@ -49,6 +48,6 @@ struct riscv_bootparams {
 extern vm_paddr_t physmap[PHYS_AVAIL_ENTRIES];
 extern u_int physmap_idx;
 
-void initriscv(struct riscv_bootparams *);
+vm_offset_t initriscv(struct riscv_bootparams *);
 
 #endif /* _MACHINE_MACHDEP_H_ */
