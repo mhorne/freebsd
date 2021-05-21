@@ -89,6 +89,15 @@ device		riscv_syscon
 # Bus drivers
 device		pci
 
+# Block devices
+device		ahci
+device		scbus
+device		da
+
+# ATA/SCSI peripherals
+device		cd		# CD
+device		pass		# Passthrough device (direct ATA/SCSI access)
+
 # VirtIO support
 device		virtio			# Generic VirtIO bus (required)
 device		virtio_pci		# VirtIO PCI device
@@ -117,8 +126,6 @@ device		goldfish_rtc	# QEMU RTC
 device		cgem		# Cadence GEM Gigabit Ethernet device
 device		miibus		# MII bus support
 device		xae		# Xilinx AXI Ethernet MAC
-
-# Block devices
 
 # DMA support
 device		xdma		# DMA interface
