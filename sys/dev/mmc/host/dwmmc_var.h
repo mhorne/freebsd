@@ -47,6 +47,7 @@ enum {
 	HWTYPE_EXYNOS,
 	HWTYPE_HISILICON,
 	HWTYPE_ROCKCHIP,
+	HWTYPE_STARFIVE,
 };
 
 struct dwmmc_softc {
