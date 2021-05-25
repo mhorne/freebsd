@@ -544,7 +544,7 @@ parse_fdt(struct dwmmc_softc *sc)
 	/* clock-frequency */
 	if ((len = OF_getproplen(node, "clock-frequency")) > 0) {
 		OF_getencprop(node, "clock-frequency", dts_value, len);
-		bus_hz = dts_value[0];
+		sc->bus_hz = bus_hz = dts_value[0];
 	}
 
 	/* IP block reset is optional */
