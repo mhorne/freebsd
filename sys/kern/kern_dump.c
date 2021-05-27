@@ -120,8 +120,8 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_kern, OID_AUTO, livedump,
-    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE, NULL, 0,
-    sysctl_live_dump, "A",
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_CAPWR,
+    NULL, 0, sysctl_live_dump, "A",
     "Start live dump of system");
 
 int
