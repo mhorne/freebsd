@@ -38,14 +38,19 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/physmem.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_page.h>
 #include <vm/vm_phys.h>
 #include <vm/vm_dumpset.h>
+
 #include <machine/md_var.h>
+#include <machine/resource.h>
 
 /*
  * These structures are used internally to keep track of regions of physical
@@ -425,3 +430,96 @@ DB_SHOW_COMMAND(physmem, db_show_physmem)
 }
 
 #endif /* DDB */
+
+/* Placeholder for system RAM. */
+static void
+ram_identify(driver_t *driver, device_t parent)
+{
+
+	if (resource_disabled("ram", 0))
+		return;
+	if (BUS_ADD_CHILD(parent, 0, "ram", 0) == NULL)
+		panic("ram_identify");
+}
+
+static int
+ram_probe(device_t dev)
+{
+
+	device_quiet(dev);
+	device_set_desc(dev, "System RAM");
+	return (0);
+}
+
+static int
+ram_attach(device_t dev)
+{
+	vm_paddr_t avail_list[PHYS_AVAIL_COUNT];
+	rman_res_t start, end;
+	struct region *hwp;
+	int error, rid, i;
+
+	rid = 0;
+
+	/* Get the avail list */
+	bzero(avail_list, sizeof(avail_list));
+	regions_to_avail(avail_list, EXFLAG_NOALLOC | EXFLAG_NODUMP,
+	    PHYS_AVAIL_COUNT, 0, NULL, NULL);
+
+	/* Include all hwregions */
+	for (i = 0; avail_list[i + 1] != 0; i += 2) {
+		start = avail_list[i];
+		end = avail_list[i + 1];
+
+		/* TODO: needed? */
+		if (start == end)
+			continue;
+
+		//printf("hw region: %lx-%lx\n", start, end);
+		//printf("rid: %d\n", rid);
+
+		/* Set and reserve the resource */
+		error = bus_set_resource(dev, SYS_RES_MEMORY, rid, start, end - start);
+		if (error)
+			panic("ram_attach: resource %d failed set with %d", rid,
+			    error);
+		if (bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, 0) == NULL)
+			panic("ram_attach: resource %d failed to attach", rid);
+		rid++;
+	}
+
+	/* Now, reserve the excluded memory regions */
+	for (i = 0, hwp = exregions; i < excnt; ++i, ++hwp) {
+		//printf("ex region: %lx-%lx\n", hwp->addr, hwp->addr + hwp->size);
+		//printf("rid: %d\n", rid);
+
+		/* Set and reserve the resource */
+		error = bus_set_resource(dev, SYS_RES_MEMORY, rid, hwp->addr,
+		    hwp->size);
+		if (error)
+			panic("ram_attach: resource %d failed set with %d", rid,
+			    error);
+		if (bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, 0) == NULL)
+			panic("ram_attach: resource %d failed to attach", rid);
+		rid++;
+	}
+
+	return (0);
+}
+
+static device_method_t ram_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_identify,	ram_identify),
+	DEVMETHOD(device_probe,		ram_probe),
+	DEVMETHOD(device_attach,	ram_attach),
+	{ 0, 0 }
+};
+
+static driver_t ram_driver = {
+	"ram",
+	ram_methods,
+	1,		/* no softc */
+};
+static devclass_t ram_devclass;
+
+DRIVER_MODULE(ram, nexus, ram_driver, ram_devclass, 0, 0);
