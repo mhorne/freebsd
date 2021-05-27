@@ -138,8 +138,33 @@ pmu_alias_get(const char *name)
 
 	return (name);
 }
-#else
 
+#elif defined(__aarch64__)
+
+static struct pmu_alias pmu_armv8_alias_table[] = {
+	{"BRANCH_INSTRUCTION_RETIRED", "BR_PRED"},
+	{"BRANCH-INSTRUCTION-RETIRED", "BR_PRED"},
+	{"BRANCH_MISSES_RETIRED", "BR_MIS_PRED"},
+	{"BRANCH-MISSES-RETIRED", "BR_MIS_PRED"},
+	{"branch-mispredicts", "BR_MIS_PRED"},
+	{"branch", "BR_PRED"},
+	{"instructions", "INST_SPEC"},
+};
+
+
+static const char *
+pmu_alias_get(const char *name)
+{
+	struct pmu_alias *pa;
+
+	for (pa = pmu_armv8_alias_table; pa->pa_alias != NULL; pa++)
+		if (strcasecmp(name, pa->pa_alias) == 0)
+			return (pa->pa_name);
+
+	return (name);
+}
+
+#else
 
 static const char *
 pmu_alias_get(const char *name)
@@ -147,6 +172,7 @@ pmu_alias_get(const char *name)
 
 	return (name);
 }
+
 #endif
 
 struct pmu_event_desc {
@@ -555,6 +581,35 @@ pmc_pmu_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm)
 		return (pmc_pmu_intel_pmcallocate(event_name, pm, &ped));
 	else
 		return (pmc_pmu_amd_pmcallocate(event_name, pm, &ped));
+}
+
+#elif defined(__aarch64__)
+
+int
+pmc_pmu_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm)
+{
+	const struct pmu_event *pe;
+	struct pmu_event_desc ped;
+	int idx = -1;
+
+	bzero(&pm->pm_md, sizeof(pm->pm_md));
+	pm->pm_caps |= (PMC_CAP_READ | PMC_CAP_WRITE);
+	event_name = pmu_alias_get(event_name);
+	if ((pe = pmu_event_get(NULL, event_name, &idx)) == NULL)
+		return (ENOENT);
+	if (pe->alias && (pe = pmu_event_get(NULL, pe->alias, &idx)) == NULL)
+		return (ENOENT);
+	assert(idx >= 0);
+	pm->pm_ev = idx;
+
+	if (pe->event == NULL)
+		return (ENOENT);
+	if (pmu_parse_event(&ped, pe->event))
+		return (ENOENT);
+
+	pm->pm_class = PMC_CLASS_ARMV8;
+
+	return (0);
 }
 
 #else
