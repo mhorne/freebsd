@@ -46,4 +46,9 @@ struct minidumphdr {
 	uint32_t dumpavailsize;
 };
 
+struct minidumpstate {
+	struct msgbuf	*mbp;
+	vm_paddr_t	*dump_availp;
+};
+
 #endif /* _MACHINE_MINIDUMP_H_ */

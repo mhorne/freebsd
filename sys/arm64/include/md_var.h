@@ -40,10 +40,11 @@ extern u_long elf_hwcap;
 extern u_long elf_hwcap2;
 
 struct dumperinfo;
+struct minidumpstate;
 
 extern int busdma_swi_pending;
 void busdma_swi(void);
-int minidumpsys(struct dumperinfo *);
+int minidumpsys(struct dumperinfo *, struct minidumpstate *state);
 void generic_bs_fault(void) __asm(__STRING(generic_bs_fault));
 void generic_bs_peek_1(void) __asm(__STRING(generic_bs_peek_1));
 void generic_bs_peek_2(void) __asm(__STRING(generic_bs_peek_2));
