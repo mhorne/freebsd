@@ -1306,7 +1306,7 @@ copy(int from_fd, const char *from_name, int to_fd, const char *to_name,
  * strip --
  *	Use strip(1) to strip the target file.
  *	Just invoke strip(1) on to_name if from_name is NULL, else try
- *	to run "strip -o to_name -- from_name" and return 0 on failure.
+ *	to run "strip -o to_name from_name" and return 0 on failure.
  *	Return 1 on success and assign result of digest_file(to_name)
  *	to *dresp.
  */
@@ -1314,7 +1314,7 @@ static int
 strip(const char *to_name, int to_fd, const char *from_name, char **dresp)
 {
 	const char *stripbin;
-	const char *args[6];
+	const char *args[5];
 	pid_t pid;
 	int error, serrno, status;
 
@@ -1328,9 +1328,8 @@ strip(const char *to_name, int to_fd, const char *from_name, char **dresp)
 	} else {
 		args[1] = "-o";
 		args[2] = to_name;
-		args[3] = "--";
-		args[4] = from_name;
-		args[5] = NULL;
+		args[3] = from_name;
+		args[4] = NULL;
 	}
 	error = posix_spawnp(&pid, stripbin, NULL, NULL,
 	    __DECONST(char **, args), environ);

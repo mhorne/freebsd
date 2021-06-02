@@ -358,6 +358,8 @@ saved_dump_remove(int savedirfd, int bounds)
 	(void)unlinkat(savedirfd, path, 0);
 	(void)snprintf(path, sizeof(path), "textdump.tar.%d.gz", bounds);
 	(void)unlinkat(savedirfd, path, 0);
+	(void)snprintf(path, sizeof(path), "livecore.%d", bounds);
+	(void)unlinkat(savedirfd, path, 0);
 }
 
 static void
@@ -373,6 +375,7 @@ symlinks_remove(int savedirfd)
 	(void)unlinkat(savedirfd, "vmcore_encrypted.last.gz", 0);
 	(void)unlinkat(savedirfd, "textdump.tar.last", 0);
 	(void)unlinkat(savedirfd, "textdump.tar.last.gz", 0);
+	(void)unlinkat(savedirfd, "livecore.last", 0);
 }
 
 /*
