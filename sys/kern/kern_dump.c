@@ -96,6 +96,9 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 	di.dumper = vnode_dump;
 	di.dumper_hdr = vnode_write_headers;
 	di.priv = path;
+	di.mediasize = 0;
+	di.mediaoffset = 0;
+	di.blocksize = 512; /* TODO blocksize */
 
 	/* do stuff */
 
@@ -120,7 +123,7 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_kern, OID_AUTO, livedump,
-    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_CAPWR,
+    CTLTYPE_STRING | CTLFLAG_WR | CTLFLAG_MPSAFE | CTLFLAG_CAPWR,
     NULL, 0, sysctl_live_dump, "A",
     "Start live dump of system");
 
@@ -133,7 +136,7 @@ vnode_dumper_start(struct dumperinfo *di)
 	int cmode;
 	int error;
 
-	printf("%s start", __func__);
+	//printf("%s start", __func__);
 
 	/* Lookup vnode */
 	path = di->priv;
@@ -154,8 +157,6 @@ vnode_dumper_start(struct dumperinfo *di)
 	/* XXX: replace priv with the vnode pointer, now that we've obtained it */
 	di->priv = (void *)nd.ni_vp;
 	di->dumpoff = 0; /* TODO needed? */
-	di->blocksize = 512; /* TODO blocksize */
-	di->mediasize = 256 * 1024 * 1024;
 
 	return (0);
 }
