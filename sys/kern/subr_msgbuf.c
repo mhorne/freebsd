@@ -109,8 +109,7 @@ msgbuf_reinit(struct msgbuf *mbp, void *ptr, int size)
 	/* Assume that the old message buffer didn't end in a newline. */
 	mbp->msg_flags |= MSGBUF_NEEDNL;
 	bzero(&mbp->msg_lock, sizeof(mbp->msg_lock));
-	mtx_init(&mbp->msg_lock, "msgbuf", NULL, MTX_SPIN);
-}
+	mtx_init(&mbp->msg_lock, "msgbuf", NULL, MTX_SPIN); }
 
 /*
  * Clear the message buffer.
@@ -413,4 +412,19 @@ msgbuf_copy(struct msgbuf *src, struct msgbuf *dst)
 
 	while ((c = msgbuf_getchar(src)) >= 0)
 		msgbuf_addchar(dst, c);
+}
+
+/*
+ * Create a duplicate struct msgbuf. The caller is responsible for the memory
+ * backing the message pointer.
+ */
+void
+msgbuf_duplicate(struct msgbuf *src, struct msgbuf *dst, char *dst_msgptr)
+{
+
+	mtx_lock_spin(&src->msg_lock);
+	bcopy(src, dst, sizeof(struct msgbuf));
+	dst->msg_ptr = dst_msgptr;
+	bcopy(src->msg_ptr, dst->msg_ptr, src->msg_size);
+	mtx_unlock_spin(&src->msg_lock);
 }

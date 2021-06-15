@@ -202,7 +202,7 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 }
 
 int
-minidumpsys(struct dumperinfo *di, struct minidumpstate *state)
+cpu_minidumpsys(struct dumperinfo *di, struct minidumpstate *state)
 {
 	struct minidumphdr mdhdr;
 	pd_entry_t *l0, *l1, *l2;
@@ -227,38 +227,41 @@ minidumpsys(struct dumperinfo *di, struct minidumpstate *state)
 			pa = *l1 & ~ATTR_MASK;
 			for (i = 0; i < Ln_ENTRIES * Ln_ENTRIES;
 			    i++, pa += PAGE_SIZE)
-				if (is_dumpable(pa, state->dump_availp))
-					dump_add_page(pa);
+				if (dump_page_is_dumpable(state->dump_availp, pa))
+					dump_add_page(state->dump_availp,
+					    state->dump_bitset, pa);
 			pmapsize += (Ln_ENTRIES - 1) * PAGE_SIZE;
 			va += L1_SIZE - L2_SIZE;
 		} else if ((*l2 & ATTR_DESCR_MASK) == L2_BLOCK) {
 			pa = *l2 & ~ATTR_MASK;
 			for (i = 0; i < Ln_ENTRIES; i++, pa += PAGE_SIZE) {
-				if (is_dumpable(pa, state->dump_availp))
-					dump_add_page(pa);
+				if (dump_page_is_dumpable(state->dump_availp, pa))
+					dump_add_page(state->dump_availp,
+					    state->dump_bitset, pa);
 			}
 		} else if ((*l2 & ATTR_DESCR_MASK) == L2_TABLE) {
 			for (i = 0; i < Ln_ENTRIES; i++) {
 				if ((l3[i] & ATTR_DESCR_MASK) != L3_PAGE)
 					continue;
 				pa = l3[i] & ~ATTR_MASK;
-				if (is_dumpable(pa, state->dump_availp))
-					dump_add_page(pa);
+				if (dump_page_is_dumpable(state->dump_availp, pa))
+					dump_add_page(state->dump_availp,
+					    state->dump_bitset, pa);
 			}
 		}
 	}
-	mbp = state->mbp;
+	mbp = state->msgbufp;
 
 	/* Calculate dump size. */
 	dumpsize = pmapsize;
 	dumpsize += round_page(mbp->msg_size);
-	dumpsize += round_page(sizeof(dump_avail));
+	dumpsize += round_page(sizeof(vm_paddr_t) * PHYS_AVAIL_COUNT); /* TODO */
 	dumpsize += round_page(BITSET_SIZE(vm_page_dump_pages));
-	VM_PAGE_DUMP_FOREACH(pa) {
-		if (is_dumpable(pa, state->dump_availp))
+	VM_PAGE_DUMP_FOREACH(state->dump_availp, state->dump_bitset, pa) {
+		if (dump_page_is_dumpable(state->dump_availp, pa))
 			dumpsize += PAGE_SIZE;
 		else
-			dump_drop_page(pa);
+			dump_drop_page(state->dump_availp, state->dump_bitset, pa);
 	}
 	dumpsize += PAGE_SIZE;
 
@@ -310,7 +313,7 @@ minidumpsys(struct dumperinfo *di, struct minidumpstate *state)
 		goto fail;
 
 	/* Dump bitmap */
-	error = blk_write(di, (char *)vm_page_dump, 0,
+	error = blk_write(di, (char *)state->dump_bitset, 0,
 	    round_page(BITSET_SIZE(vm_page_dump_pages)));
 	if (error)
 		goto fail;
@@ -378,7 +381,7 @@ minidumpsys(struct dumperinfo *di, struct minidumpstate *state)
 	}
 
 	/* Dump memory chunks */
-	VM_PAGE_DUMP_FOREACH(pa) {
+	VM_PAGE_DUMP_FOREACH(state->dump_availp, state->dump_bitset, pa) {
 		error = blk_write(di, 0, pa, PAGE_SIZE);
 		if (error)
 			goto fail;

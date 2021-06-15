@@ -52,7 +52,7 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 		return (NULL);
 	pa = m->phys_addr;
 	if ((wait & M_NODUMP) == 0)
-		dump_add_page(pa);
+		dump_add_page(dump_avail, vm_page_dump, pa);
 	va = (void *)PHYS_TO_DMAP(pa);
 	if ((wait & M_ZERO) && (m->flags & PG_ZERO) == 0)
 		pagezero(va);
@@ -66,7 +66,7 @@ uma_small_free(void *mem, vm_size_t size, u_int8_t flags)
 	vm_paddr_t pa;
 
 	pa = DMAP_TO_PHYS((vm_offset_t)mem);
-	dump_drop_page(pa);
+	dump_drop_page(dump_avail, vm_page_dump, pa);
 	m = PHYS_TO_VM_PAGE(pa);
 	vm_page_unwire_noq(m);
 	vm_page_free(m);

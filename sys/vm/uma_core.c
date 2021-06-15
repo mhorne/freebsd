@@ -1847,7 +1847,7 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 #if defined(__aarch64__) || defined(__amd64__) || defined(__mips__) || \
     defined(__riscv) || defined(__powerpc64__)
 		if ((wait & M_NODUMP) == 0)
-			dump_add_page(pa);
+			dump_add_page(dump_avail, vm_page_dump, pa);
 #endif
 	}
 	/* Allocate KVA and indirectly advance bootmem. */
@@ -1877,7 +1877,7 @@ startup_free(void *mem, vm_size_t bytes)
 	for (; bytes != 0; bytes -= PAGE_SIZE, m++) {
 #if defined(__aarch64__) || defined(__amd64__) || defined(__mips__) || \
     defined(__riscv) || defined(__powerpc64__)
-		dump_drop_page(VM_PAGE_TO_PHYS(m));
+		dump_drop_page(dump_avail, vm_page_dump, VM_PAGE_TO_PHYS(m));
 #endif
 		vm_page_unwire_noq(m);
 		vm_page_free(m);

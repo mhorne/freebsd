@@ -32,68 +32,82 @@
 
 #include <sys/_bitset.h>
 #include <sys/bitset.h>
+#include <vm/vm_phys.h>
 
 extern struct bitset *vm_page_dump;
 extern long vm_page_dump_pages;
 extern vm_paddr_t dump_avail[PHYS_AVAIL_COUNT];
 
+static inline bool
+dump_page_is_dumpable(vm_paddr_t *availp, vm_paddr_t pa)
+{
+	vm_page_t m;
+	int i;
+
+	if ((m = vm_phys_paddr_to_vm_page(pa)) != NULL)
+		return ((m->flags & PG_NODUMP) == 0);
+	for (i = 0; availp[i] != 0 || availp[i + 1] != 0; i += 2) {
+		if (pa >= availp[i] && pa < availp[i + 1])
+			return (true);
+	}
+	return (false);
+}
+
 static inline void
-dump_add_page(vm_paddr_t pa)
+dump_add_page(vm_paddr_t *availp, struct bitset *bitset, vm_paddr_t pa)
 {
 	vm_pindex_t adj;
 	int i;
 
 	adj = 0;
-	for (i = 0; dump_avail[i + 1] != 0; i += 2) {
-		if (pa >= dump_avail[i] && pa < dump_avail[i + 1]) {
-			BIT_SET_ATOMIC(vm_page_dump_pages,
-			    (pa >> PAGE_SHIFT) - (dump_avail[i] >> PAGE_SHIFT) +
-			    adj, vm_page_dump);
+	for (i = 0; availp[i + 1] != 0; i += 2) {
+		if (pa >= availp[i] && pa < availp[i + 1]) {
+			BIT_SET_ATOMIC(vm_page_dump_pages, (pa >> PAGE_SHIFT) -
+			    (availp[i] >> PAGE_SHIFT) + adj, bitset);
 			return;
 		}
-		adj += howmany(dump_avail[i + 1], PAGE_SIZE) -
-		    dump_avail[i] / PAGE_SIZE;
+		adj += howmany(availp[i + 1], PAGE_SIZE) -
+		    availp[i] / PAGE_SIZE;
 	}
 }
 
 static inline void
-dump_drop_page(vm_paddr_t pa)
+dump_drop_page(vm_paddr_t *availp, struct bitset *bitset, vm_paddr_t pa)
 {
 	vm_pindex_t adj;
 	int i;
 
 	adj = 0;
-	for (i = 0; dump_avail[i + 1] != 0; i += 2) {
-		if (pa >= dump_avail[i] && pa < dump_avail[i + 1]) {
-			BIT_CLR_ATOMIC(vm_page_dump_pages,
-			    (pa >> PAGE_SHIFT) - (dump_avail[i] >> PAGE_SHIFT) +
-			    adj, vm_page_dump);
+	for (i = 0; availp[i + 1] != 0; i += 2) {
+		if (pa >= availp[i] && pa < availp[i + 1]) {
+			BIT_CLR_ATOMIC(vm_page_dump_pages, (pa >> PAGE_SHIFT) -
+			    (availp[i] >> PAGE_SHIFT) + adj, bitset);
 			return;
 		}
-		adj += howmany(dump_avail[i + 1], PAGE_SIZE) -
-		    dump_avail[i] / PAGE_SIZE;
+		adj += howmany(availp[i + 1], PAGE_SIZE) -
+		    availp[i] / PAGE_SIZE;
 	}
 }
 
 static inline vm_paddr_t
-vm_page_dump_index_to_pa(int bit)
+vm_page_dump_index_to_pa(vm_paddr_t *availp, int bit)
 {
 	int i, tot;
 
-	for (i = 0; dump_avail[i + 1] != 0; i += 2) {
-		tot = howmany(dump_avail[i + 1], PAGE_SIZE) -
-		    dump_avail[i] / PAGE_SIZE;
+	for (i = 0; availp[i + 1] != 0; i += 2) {
+		tot = howmany(availp[i + 1], PAGE_SIZE) -
+		    availp[i] / PAGE_SIZE;
 		if (bit < tot)
 			return ((vm_paddr_t)bit * PAGE_SIZE +
-			    (dump_avail[i] & ~PAGE_MASK));
+			    (availp[i] & ~PAGE_MASK));
 		bit -= tot;
 	}
 	return ((vm_paddr_t)NULL);
 }
 
-#define VM_PAGE_DUMP_FOREACH(pa)						\
-	for (vm_pindex_t __b = BIT_FFS(vm_page_dump_pages, vm_page_dump);	\
-	    (pa) = vm_page_dump_index_to_pa(__b - 1), __b != 0;			\
-	    __b = BIT_FFS_AT(vm_page_dump_pages, vm_page_dump, __b))
+#define VM_PAGE_DUMP_FOREACH(availp, bitset, pa)				\
+	for (vm_pindex_t __b = BIT_FFS(vm_page_dump_pages, bitset);		\
+	    (pa) = vm_page_dump_index_to_pa(availp, __b - 1), __b != 0;		\
+	    __b = BIT_FFS_AT(vm_page_dump_pages, bitset, __b))
 
 #endif	/* _SYS_DUMPSET_H_ */

@@ -130,10 +130,18 @@ kerneldump_parity(struct kerneldumpheader *kdhp)
 }
 
 #ifdef _KERNEL
+struct minidumpstate {
+	struct msgbuf	*msgbufp;
+	vm_paddr_t	*dump_availp;
+	struct bitset	*dump_bitset;
+};
+
 struct dump_pa {
 	vm_paddr_t pa_start;
 	vm_paddr_t pa_size;
 };
+
+int minidumpsys(struct dumperinfo *, bool);
 
 int dumpsys_generic(struct dumperinfo *);
 

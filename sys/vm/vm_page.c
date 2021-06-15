@@ -631,7 +631,7 @@ vm_page_startup(vm_offset_t vaddr)
 	 * not automatically included.
 	 */
 	for (pa = new_end; pa < end; pa += PAGE_SIZE)
-		dump_add_page(pa);
+		dump_add_page(dump_avail, vm_page_dump, pa);
 #endif
 	phys_avail[biggestone + 1] = new_end;
 #ifdef __amd64__
@@ -643,7 +643,7 @@ vm_page_startup(vm_offset_t vaddr)
 	pa = DMAP_TO_PHYS((vm_offset_t)msgbufp->msg_ptr);
 	last_pa = pa + round_page(msgbufsize);
 	while (pa < last_pa) {
-		dump_add_page(pa);
+		dump_add_page(dump_avail, vm_page_dump, pa);
 		pa += PAGE_SIZE;
 	}
 #endif
@@ -734,7 +734,7 @@ vm_page_startup(vm_offset_t vaddr)
 	 * Include vm_page_array and vm_reserv_array in a crash dump.
 	 */
 	for (pa = new_end; pa < end; pa += PAGE_SIZE)
-		dump_add_page(pa);
+		dump_add_page(dump_avail, vm_page_dump, pa);
 #endif
 	phys_avail[biggestone + 1] = new_end;
 

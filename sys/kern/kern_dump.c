@@ -75,9 +75,9 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 	struct dumperinfo di;
 	char path[PATH_MAX];
 	int error;
-	struct msgbuf mb_copy;
-	vm_paddr_t *da_copy;
-	struct minidumpstate state;
+	//struct msgbuf mb_copy;
+	//vm_paddr_t *da_copy;
+	//struct minidumpstate state;
 
 	if (req->newptr == NULL)
 		return (EINVAL);
@@ -100,24 +100,11 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 	di.mediaoffset = 0;
 	di.blocksize = 512; /* TODO blocksize */
 
-	/* do stuff */
-
-	/* copy message buffer */
-	bcopy(msgbufp, &mb_copy, sizeof(mb_copy));
-	mb_copy.msg_ptr = malloc(mb_copy.msg_size, M_TEMP, M_WAITOK);
-	bcopy(msgbufp->msg_ptr, mb_copy.msg_ptr, mb_copy.msg_size);
-
-	/* copy dump_avail */
-	da_copy = malloc(sizeof(dump_avail), M_TEMP, M_WAITOK);
-	bcopy(dump_avail, da_copy, sizeof(dump_avail));
-
-	state.dump_availp = da_copy;
-	state.mbp = &mb_copy;
-	error = minidumpsys(&di, &state);
+	error = minidumpsys(&di, true);
 
 	VOP_UNLOCK((struct vnode *)di.priv);
-	free(mb_copy.msg_ptr, M_TEMP);
-	free(da_copy, M_TEMP);
+	//free(mb_copy.msg_ptr, M_TEMP);
+	//free(da_copy, M_TEMP);
 
 	return (error);
 }
@@ -439,13 +426,8 @@ dumpsys_generic(struct dumperinfo *di)
 	int error;
 
 #if MINIDUMP_PAGE_TRACKING == 1
-	if (do_minidump) {
-		struct minidumpstate state = {
-			.mbp = msgbufp,
-			.dump_availp = dump_avail,
-		};
-		return (minidumpsys(di, &state));
-	}
+	if (do_minidump)
+		return (minidumpsys(di, false));
 #endif
 
 	bzero(&ehdr, sizeof(ehdr));
@@ -536,5 +518,48 @@ dumpsys_generic(struct dumperinfo *di)
 		printf("\nDump failed. Partition too small.\n");
 	else
 		printf("\n** DUMP FAILED (ERROR %d) **\n", error);
+	return (error);
+}
+
+/* =============== Minidump routines ==================== */
+
+int
+minidumpsys(struct dumperinfo *di, bool livedump)
+{
+	struct minidumpstate state;
+	struct msgbuf mbp_copy;
+	vm_paddr_t *avail_copy;
+	char *msg_ptr;
+	int error;
+
+	bzero(&state, sizeof(state));
+	if (livedump) {
+		msg_ptr = malloc(msgbufsize, M_TEMP, M_WAITOK);
+		msgbuf_duplicate(msgbufp, &mbp_copy, msg_ptr);
+
+		avail_copy = malloc(sizeof(vm_paddr_t) * PHYS_AVAIL_COUNT,
+		    M_TEMP, M_WAITOK);
+		bcopy(dump_avail, avail_copy,
+		    sizeof(vm_paddr_t) * PHYS_AVAIL_COUNT);
+		
+		state.msgbufp = &mbp_copy;
+		state.dump_availp = avail_copy;
+		state.dump_bitset = malloc(BITSET_SIZE(vm_page_dump_pages),
+		    M_TEMP, M_WAITOK);
+		bcopy(vm_dump_pages, state.dump_bitset, BITSET_SIZE(vm_page_dump_pages));
+	} else {
+		/* Use the globals */
+		state.msgbufp = msgbufp;
+		state.dump_availp = dump_avail;
+		state.dump_bitset = vm_page_dump;
+	}
+
+	error = cpu_minidumpsys(di, &state);
+	if (livedump) {
+		free(msg_ptr, M_TEMP);
+		free(avail_copy, M_TEMP);
+		free(state.dump_bitset, M_TEMP);
+	}
+
 	return (error);
 }
