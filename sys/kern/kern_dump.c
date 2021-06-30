@@ -31,6 +31,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/cons.h>
+#include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/kernel.h>
 #include <sys/kerneldump.h>
@@ -69,15 +70,34 @@ static dumper_t vnode_dump;
 static dumper_start_t vnode_dumper_start;
 static dumper_hdr_t vnode_write_headers;
 
+static int livedump_running;
+
+typedef void (*livedump_event_fn)(void *arg, int *errorp);
+EVENTHANDLER_DECLARE(livedumper_start, livedump_event_fn);
+//EVENTHANDLER_DECLARE(livedumper_progress, livedump_event_fn);
+EVENTHANDLER_DECLARE(livedumper_finish, livedump_event_fn);
+
+typedef void (*livedump_dump_fn)(void *arg, vm_offset_t physical, off_t offset,
+    size_t len, int *errorp);
+EVENTHANDLER_DECLARE(livedumper_dump, livedump_dump_fn);
+
+void minidumpsys_progress_init(size_t dumpsize);
+void minidumpsys_progress(size_t delta, size_t dumpsize);
+
+static void
+dump_diagnostic(void *arg __unused, vm_offset_t physical,
+
+EVENTHANDLER_DEFINE(livedumper_dump, 
+
+/*
+ * Invoke a live minidump on the system.
+ */
 static int
 sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 {
 	struct dumperinfo di;
 	char path[PATH_MAX];
 	int error;
-	//struct msgbuf mb_copy;
-	//vm_paddr_t *da_copy;
-	//struct minidumpstate state;
 
 	if (req->newptr == NULL)
 		return (EINVAL);
@@ -100,11 +120,20 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 	di.mediaoffset = 0;
 	di.blocksize = 512; /* TODO blocksize */
 
-	error = minidumpsys(&di, true);
+	/* Only allow one livedump to proceed at a time. */
+	while (!atomic_cmpset_int(&livedump_running, 0, 1))
+		pause("livedump", hz / 2);
 
+	EVENTHANDLER_INVOKE(livedumper_start, &error);
+	if (error != 0)
+		return (error);
+	error = minidumpsys(&di, true);
+	if (error != 0)
+		EVENTHANDLER_INVOKE(livedumper_finish, &error);
+
+	/* Done. Unlock the vnode before departing. */
 	VOP_UNLOCK((struct vnode *)di.priv);
-	//free(mb_copy.msg_ptr, M_TEMP);
-	//free(da_copy, M_TEMP);
+	livedump_running = 0;
 
 	return (error);
 }
@@ -145,6 +174,8 @@ vnode_dumper_start(struct dumperinfo *di)
 	di->priv = (void *)nd.ni_vp;
 	di->dumpoff = 0; /* TODO needed? */
 
+	/* EVENTHANDLER_INVOKE */
+
 	return (0);
 }
 
@@ -157,6 +188,8 @@ vnode_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t 
 	vp = arg;
 	MPASS(vp != NULL);
 	ASSERT_VOP_LOCKED(vp, __func__);
+
+	EVENTHANDLER_INVOKE(livedumper_dump, physical, offset, length, &error);
 
 	error = vn_rdwr(UIO_WRITE, vp, virtual, length, offset, UIO_SYSSPACE, IO_NODELOCKED,
 	    curthread->td_ucred, NOCRED, NULL, curthread);
@@ -546,7 +579,7 @@ minidumpsys(struct dumperinfo *di, bool livedump)
 		state.dump_availp = avail_copy;
 		state.dump_bitset = malloc(BITSET_SIZE(vm_page_dump_pages),
 		    M_TEMP, M_WAITOK);
-		bcopy(vm_dump_pages, state.dump_bitset, BITSET_SIZE(vm_page_dump_pages));
+		bcopy(vm_page_dump, state.dump_bitset, BITSET_SIZE(vm_page_dump_pages));
 	} else {
 		/* Use the globals */
 		state.msgbufp = msgbufp;
@@ -562,4 +595,56 @@ minidumpsys(struct dumperinfo *di, bool livedump)
 	}
 
 	return (error);
+}
+
+/* Minidump progress */
+static struct {
+	const int min_per;
+	const int max_per;
+	bool visited;
+} progress_track[10] = {
+	{  0,  10, false},
+	{ 10,  20, false},
+	{ 20,  30, false},
+	{ 30,  40, false},
+	{ 40,  50, false},
+	{ 50,  60, false},
+	{ 60,  70, false},
+	{ 70,  80, false},
+	{ 80,  90, false},
+	{ 90, 100, false}
+};
+
+static size_t remaining;
+
+void
+minidumpsys_progress_init(size_t dumpsize)
+{
+	int i;
+
+	remaining = dumpsize;
+
+	/* Reset the progress bar. */
+	for (i = 0; i < nitems(progress_track); i++)
+		progress_track[i].visited = false;
+}
+
+void
+minidumpsys_progress(size_t delta, size_t dumpsize)
+{
+	int sofar, i;
+
+	remaining -= delta;
+
+	sofar = 100 - ((remaining * 100) / dumpsize);
+	for (i = 0; i < nitems(progress_track); i++) {
+		if (sofar < progress_track[i].min_per ||
+		    sofar > progress_track[i].max_per)
+			continue;
+		if (progress_track[i].visited)
+			return;
+		progress_track[i].visited = true;
+		printf("..%d%%", sofar);
+		return;
+	}
 }

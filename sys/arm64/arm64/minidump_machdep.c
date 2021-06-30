@@ -59,10 +59,13 @@ CTASSERT(sizeof(struct kerneldumpheader) == 512);
 
 static struct kerneldumpheader kdh;
 
+void minidumpsys_progress_init(size_t dumpsize);
+void minidumpsys_progress(size_t delta, size_t dumpsize);
+
 /* Handle chunked writes. */
 static size_t fragsz;
 static void *dump_va;
-static size_t counter, progress, dumpsize;
+static size_t counter, dumpsize;
 
 static uint64_t tmpbuffer[Ln_ENTRIES];
 
@@ -94,45 +97,10 @@ blk_flush(struct dumperinfo *di)
 	return (error);
 }
 
-static struct {
-	int min_per;
-	int max_per;
-	int visited;
-} progress_track[10] = {
-	{  0,  10, 0},
-	{ 10,  20, 0},
-	{ 20,  30, 0},
-	{ 30,  40, 0},
-	{ 40,  50, 0},
-	{ 50,  60, 0},
-	{ 60,  70, 0},
-	{ 70,  80, 0},
-	{ 80,  90, 0},
-	{ 90, 100, 0}
-};
-
-static void
-report_progress(size_t progress, size_t dumpsize)
-{
-	int sofar, i;
-
-	sofar = 100 - ((progress * 100) / dumpsize);
-	for (i = 0; i < nitems(progress_track); i++) {
-		if (sofar < progress_track[i].min_per ||
-		    sofar > progress_track[i].max_per)
-			continue;
-		if (progress_track[i].visited)
-			return;
-		progress_track[i].visited = 1;
-		printf("..%d%%", sofar);
-		return;
-	}
-}
-
 static int
 blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 {
-	size_t len;
+	size_t len, delta;
 	int error, c;
 	u_int maxdumpsz;
 
@@ -161,14 +129,17 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 		if (error)
 			return (error);
 	}
+	delta = 0;
 	while (sz) {
 		len = maxdumpsz - fragsz;
 		if (len > sz)
 			len = sz;
 		counter += len;
-		progress -= len;
+		delta += len;
+		//progress -= len;
 		if (counter >> 22) {
-			report_progress(progress, dumpsize);
+			minidumpsys_progress(delta, dumpsize);
+			delta = 0;
 			counter &= (1 << 22) - 1;
 		}
 
@@ -197,6 +168,8 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 		if (c != -1)
 			printf(" (CTRL-C to abort) ");
 	}
+	if (delta > 0)
+		minidumpsys_progress(delta, dumpsize);
 
 	return (0);
 }
@@ -265,7 +238,7 @@ cpu_minidumpsys(struct dumperinfo *di, struct minidumpstate *state)
 	}
 	dumpsize += PAGE_SIZE;
 
-	progress = dumpsize;
+	minidumpsys_progress_init(dumpsize);
 
 	/* Initialize mdhdr */
 	bzero(&mdhdr, sizeof(mdhdr));
