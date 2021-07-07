@@ -179,7 +179,7 @@ pmc_intel_initialize(void)
 		case 0x3D:
 		case 0x47:
 			cputype = PMC_CPU_INTEL_BROADWELL;
-			nclasses = 3;
+			nclasses = 5;
 			break;
 		case 0x4f:
 		case 0x56:
@@ -255,6 +255,7 @@ pmc_intel_initialize(void)
 	case PMC_CPU_INTEL_IVYBRIDGE_XEON:
 	case PMC_CPU_INTEL_HASWELL:
 	case PMC_CPU_INTEL_HASWELL_XEON:
+		MPASS(nclasses >= PMC_MDEP_CLASS_INDEX_IAF);
 		error = pmc_core_initialize(pmc_mdep, ncpus, verov);
 		break;
 
@@ -279,6 +280,7 @@ pmc_intel_initialize(void)
 	case PMC_CPU_INTEL_SANDYBRIDGE:
 	case PMC_CPU_INTEL_WESTMERE:
 	case PMC_CPU_INTEL_BROADWELL:
+		MPASS(nclasses >= PMC_MDEP_CLASS_INDEX_UCF);
 		error = pmc_uncore_initialize(pmc_mdep, ncpus);
 		break;
 	default:
