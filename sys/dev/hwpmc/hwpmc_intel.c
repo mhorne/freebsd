@@ -98,7 +98,7 @@ pmc_intel_initialize(void)
 	snprintf(pmc_cpuid, sizeof(pmc_cpuid), "GenuineIntel-%d-%02X-%X",
 	    family, model, stepping);
 
-	switch (cpu_id & 0xF00) {
+	switch (family) {
 	case 0x600:		/* Pentium Pro, Celeron, Pentium II & III */
 		switch (model) {
 		case 0xE:
