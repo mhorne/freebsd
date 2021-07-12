@@ -1848,16 +1848,17 @@ __PMC_EV_ALIAS("unhalted-core-cycles",		IAP_ARCH_UNH_COR_CYC)
  * 0x1000	0x0001		TSC
  * 0x2000	0x0080		AMD K7 events
  * 0x2080	0x0100		AMD K8 events
- * 0x10000	0x0080		INTEL architectural fixed-function events
- * 0x10080	0x0F80		INTEL architectural programmable events
- * 0x11000	0x0080		INTEL Pentium 4 events
- * 0x11080	0x0080		INTEL Pentium MMX events
- * 0x11100	0x0100		INTEL Pentium Pro/P-II/P-III/Pentium-M events
+ * 0x10000	0x0080		free (was INTEL architectural fixed-function events)
+ * 0x10080	0x0F80		free (was INTEL architectural programmable events)
+ * 0x11000	0x0080		free (was INTEL Pentium 4 events)
+ * 0x11080	0x0080		free (was INTEL Pentium MMX events)
+ * 0x11100	0x0100		free (was Pentium Pro/P-II/P-III/Pentium-M events)
  * 0x11200	0x00FF		free (was INTEL XScale events)
  * 0x11300	0x00FF		MIPS 24K events
  * 0x11400	0x00FF		Octeon events
  * 0x11500	0x00FF		MIPS 74K events
  * 0x11600	0x00FF		BERI statcounters
+ * 0x12080	0x0008		Intel Uncore programmable events
  * 0x13000	0x00FF		MPC7450 events
  * 0x13100	0x00FF		IBM PPC970 events
  * 0x13200	0x00FF		IBM POWER8 events
