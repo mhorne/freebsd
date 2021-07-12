@@ -57,11 +57,13 @@ __FBSDID("$FreeBSD$");
     PMC_CAP_INVERT | PMC_CAP_QUALIFIER | PMC_CAP_PRECISE)
 
 #define	SELECTSEL(x) \
-	(((x) == PMC_CPU_INTEL_SANDYBRIDGE || (x) == PMC_CPU_INTEL_HASWELL) ? \
+	(((x) == PMC_CPU_INTEL_SANDYBRIDGE || (x) == PMC_CPU_INTEL_HASWELL || \
+	  (x) == PMC_CPU_INTEL_BROADWELL) ? \
 	UCP_CB0_EVSEL0 : UCP_EVSEL0)
 
 #define SELECTOFF(x) \
-	(((x) == PMC_CPU_INTEL_SANDYBRIDGE || (x) == PMC_CPU_INTEL_HASWELL) ? \
+	(((x) == PMC_CPU_INTEL_SANDYBRIDGE || (x) == PMC_CPU_INTEL_HASWELL || \
+	  (x) == PMC_CPU_INTEL_BROADWELL) ? \
 	UCF_OFFSET_SB : UCF_OFFSET)
 
 static enum pmc_cputype	uncore_cputype;
