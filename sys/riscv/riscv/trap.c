@@ -207,13 +207,14 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		 */
 		intr_enable();
 
-		if (stval >= VM_MAX_USER_ADDRESS) {
+		if (stval >= VM_MIN_KERNEL_ADDRESS) {
 			map = kernel_map;
-		} else {
+		} else if (stval < VM_MAX_USER_ADDRESS) {
 			if (pcb->pcb_onfault == 0)
 				goto fatal;
 			map = &td->td_proc->p_vmspace->vm_map;
-		}
+		} else
+			goto fatal;
 	}
 
 	va = trunc_page(stval);
