@@ -48,6 +48,8 @@
 #define	REG_FLUSH64_OFFSET	0x200
 #define	REG_FLUSH32_OFFSET	0x240
 
+static void sifive_l2_cache_flush_dcache(vm_offset_t va, vm_size_t size);
+
 static struct ofw_compat_data compat_data[] = {
 	{ "sifive,fu540-c000-ccache",	0 },
 	{ "starfive,ccache0",		0 },
@@ -151,7 +153,7 @@ sifive_l2_cache_attach(device_t dev)
 }
 
 #if 1
-void
+static void
 sifive_l2_cache_flush_dcache(vm_offset_t va, vm_size_t size)
 {
 	vm_paddr_t line, end;

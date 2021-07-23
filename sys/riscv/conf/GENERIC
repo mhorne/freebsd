@@ -79,6 +79,11 @@ options 	RCTL			# Resource limits
 options 	SMP
 options 	INTRNG
 
+options         KTR
+options         KTR_COMPILE=(KTR_BUF|KTR_VFS|KTR_SCHED|KTR_BUSDMA)
+options         KTR_MASK=(KTR_BUSDMA)
+options         KTR_VERBOSE=0
+
 # RISC-V SBI console
 device		rcons
 
@@ -234,3 +239,8 @@ device		fu740_pci_dw
 device		sifive_gpio
 device		sifive_spi
 include		"../sifive/std.sifive"
+
+options         KTR
+options         KTR_COMPILE=KTR_BUSDMA
+options         KTR_MASK=KTR_BUSDMA
+options         KTR_VERBOSE=0

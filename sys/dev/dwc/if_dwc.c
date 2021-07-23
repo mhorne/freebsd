@@ -74,6 +74,11 @@ __FBSDID("$FreeBSD$");
 #include <dev/extres/clk/clk.h>
 #include <dev/extres/hwreset/hwreset.h>
 
+#define	dprintf		printf
+#ifndef dprintf
+#define	dprintf
+#endif
+
 #include "if_dwc_if.h"
 #include "gpio_if.h"
 #include "miibus_if.h"
@@ -500,7 +505,7 @@ dwc_setup_core(struct dwc_softc *sc)
 
 	/* Enable core */
 	reg = READ4(sc, MAC_CONFIGURATION);
-	reg |= (CONF_JD | CONF_ACS | CONF_BE);
+	reg |= (CONF_JD | CONF_ACS | CONF_BE | CONF_DO);
 	WRITE4(sc, MAC_CONFIGURATION, reg);
 }
 
@@ -581,7 +586,10 @@ dwc_init_dma(struct dwc_softc *sc)
 	reg = READ4(sc, OPERATION_MODE);
 	reg |= (MODE_TSF | MODE_OSF | MODE_FUF);
 	reg &= ~(MODE_RSF);
+	//reg |= (MODE_OSF | MODE_FUF);
+	//reg &= ~(MODE_TSF | MODE_RSF);
 	reg |= (MODE_RTC_LEV32 << MODE_RTC_SHIFT);
+	//reg |= 0x140000; /* TTC */
 	WRITE4(sc, OPERATION_MODE, reg);
 
 	WRITE4(sc, INTERRUPT_ENABLE, INT_EN_DEFAULT);
@@ -697,6 +705,7 @@ dwc_setup_txbuf(struct dwc_softc *sc, int idx, struct mbuf **mp)
 	int i;
 	int first, last;
 
+	dprintf("dwc_setup_txbuf: idx=%d, mbuf=%p\n", idx, *mp);
 	error = bus_dmamap_load_mbuf_sg(sc->txbuf_tag, sc->txbuf_map[idx].map,
 	    *mp, segs, &nsegs, 0);
 	if (error == EFBIG) {
@@ -795,6 +804,7 @@ dwc_setup_rxbuf(struct dwc_softc *sc, int idx, struct mbuf *m)
 
 	m_adj(m, ETHER_ALIGN);
 
+	dprintf("dwc_setup_rxbuf: idx=%d, mbuf=%p\n", idx, m);
 	error = bus_dmamap_load_mbuf_sg(sc->rxbuf_tag, sc->rxbuf_map[idx].map,
 	    m, &seg, &nsegs, 0);
 	if (error != 0)
@@ -832,6 +842,7 @@ dwc_rxfinish_one(struct dwc_softc *sc, struct dwc_hwdesc *desc,
 	int len;
 	uint32_t rdesc0;
 
+	dprintf("dwc_rxfinish_one()\n");
 	m = map->mbuf;
 	ifp = sc->ifp;
 	rdesc0 = desc ->desc0;
@@ -1314,6 +1325,7 @@ dwc_txfinish_locked(struct dwc_softc *sc)
 	int idx, last_idx;
 	bool map_finished;
 
+	dprintf("dwc_txfinish_locked()\n");
 	DWC_ASSERT_LOCKED(sc);
 
 	/* Sync descriptors */
@@ -1329,6 +1341,7 @@ dwc_txfinish_locked(struct dwc_softc *sc)
 		last_idx = next_txidx(sc, bmap->last_desc_idx);
 		while (idx != last_idx) {
 			desc = &sc->txdesc_ring[idx];
+			dprintf("tx desc %p: %x\n", desc, desc->desc0);
 			if ((desc->desc0 & TDESC0_OWN) != 0) {
 				map_finished = false;
 				break;
@@ -1359,6 +1372,27 @@ dwc_txfinish_locked(struct dwc_softc *sc)
 	}
 }
 
+static int
+check_rx_descriptors(struct dwc_softc *sc)
+{
+	struct dwc_hwdesc *desc;
+	uint32_t rdesc0;
+	int proceed = 0;
+
+	dprintf("check_rx_descriptors()\n");
+	for (int i = 0; i < RX_DESC_COUNT; i++) {
+		desc = sc->rxdesc_ring + i;
+		rdesc0 = desc->desc0;
+
+		if (rdesc0 != RDESC0_OWN) {
+			printf("rdesc0 index %d: %x\n", i, rdesc0);
+			proceed = 1;
+		}
+	}
+
+	return (proceed);
+}
+
 static void
 dwc_rxfinish_locked(struct dwc_softc *sc)
 {
@@ -1366,6 +1400,7 @@ dwc_rxfinish_locked(struct dwc_softc *sc)
 	int error, idx;
 	struct dwc_hwdesc *desc;
 
+	dprintf("dwc_rxfinish_locked()\n");
 	DWC_ASSERT_LOCKED(sc);
 	for (;;) {
 		bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
@@ -1374,8 +1409,11 @@ dwc_rxfinish_locked(struct dwc_softc *sc)
 		rmb();
 		desc = sc->rxdesc_ring + idx;
 		rmb();
-		if ((desc->desc0 & RDESC0_OWN) != 0)
+		dprintf("desc %d: %x\n", idx, desc->desc0);
+		if ((desc->desc0 & RDESC0_OWN) != 0) {
+			check_rx_descriptors(sc);
 			break;
+		}
 
 		m = dwc_rxfinish_one(sc, desc, sc->rxbuf_map + idx);
 		if (m == NULL) {
@@ -1395,6 +1433,7 @@ dwc_rxfinish_locked(struct dwc_softc *sc)
 		}
 		sc->rx_idx = next_rxidx(sc, sc->rx_idx);
 	}
+	dprintf("loop broken\n");
 	bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 }
@@ -1412,8 +1451,10 @@ dwc_intr(void *arg)
 	reg = READ4(sc, INTERRUPT_STATUS);
 	if (reg)
 		READ4(sc, SGMII_RGMII_SMII_CTRL_STATUS);
+	dprintf("dwc_intr: %x\n", reg);
 
 	reg = READ4(sc, DMA_STATUS);
+	dprintf("DMA_STATUS: %x\n", reg);
 	if (reg & DMA_STATUS_NIS) {
 		if (reg & DMA_STATUS_RI)
 			dwc_rxfinish_locked(sc);
@@ -1502,6 +1543,7 @@ dwc_tick(void *arg)
 	 */
 	if (sc->tx_watchdog_count > 0) {
 		if (--sc->tx_watchdog_count == 0) {
+			dprintf("dwc_tick: tx timed out \n");
 			dwc_txfinish_locked(sc);
 		}
 	}
@@ -1701,6 +1743,7 @@ dwc_attach(device_t dev)
 
 	/* Reset */
 	reg = READ4(sc, BUS_MODE);
+	dprintf("BUS_MODE:   %x\n", reg);
 	reg |= (BUS_MODE_SWR);
 	WRITE4(sc, BUS_MODE, reg);
 
@@ -1723,12 +1766,14 @@ dwc_attach(device_t dev)
 	if (fixed_burst)
 		reg |= BUS_MODE_FIXEDBURST;
 
+	dprintf("BUS_MODE 2: %x\n", reg);
 	WRITE4(sc, BUS_MODE, reg);
 
 	/*
 	 * DMA must be stop while changing descriptor list addresses.
 	 */
 	reg = READ4(sc, OPERATION_MODE);
+	printf("dma reg: %x\n", reg);
 	reg &= ~(MODE_ST | MODE_SR);
 	WRITE4(sc, OPERATION_MODE, reg);
 

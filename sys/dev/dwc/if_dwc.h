@@ -47,6 +47,7 @@
 #define	 CONF_BE		(1 << 21)	/* Frame Burst Enable */
 #define	 CONF_PS		(1 << 15)	/* GMII/MII */
 #define	 CONF_FES		(1 << 14)	/* MII speed select */
+#define	 CONF_DO		(1 << 13)	/* Disable Receive Own */
 #define	 CONF_DM		(1 << 11)	/* Full Duplex Enable */
 #define	 CONF_IPC		(1 << 10)	/* IPC checksum offload */
 #define	 CONF_ACS		(1 << 7)
