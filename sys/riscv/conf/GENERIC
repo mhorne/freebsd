@@ -150,6 +150,7 @@ device		goldfish_rtc	# QEMU RTC
 # Ethernet drivers
 device		cgem		# Cadence GEM Gigabit Ethernet device
 device		dwc
+device          dwc_starfive
 device		miibus		# MII bus support
 device		xae		# Xilinx AXI Ethernet MAC
 
