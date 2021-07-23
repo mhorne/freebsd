@@ -239,6 +239,11 @@ rxdesc_setup(struct dwc_softc *sc, int idx, bus_addr_t paddr)
 	wmb();
 	sc->rxdesc_ring[idx].desc0 = RDESC0_OWN;
 	wmb();
+
+	/* Probably too many syncs */
+	bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
+	    BUS_DMASYNC_PREWRITE | BUS_DMASYNC_PREREAD);
+
 	return (nidx);
 }
 
@@ -429,6 +434,10 @@ dma1000_txfinish_locked(struct dwc_softc *sc)
 
 	DWC_ASSERT_LOCKED(sc);
 
+	/* Sync descriptors */
+	bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map,
+	    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+
 	ifp = sc->ifp;
 	/* check if all descriptors of the map are done */
 	while (sc->tx_map_tail != sc->tx_map_head) {
@@ -476,6 +485,9 @@ dma1000_txstart(struct dwc_softc *sc)
 
 	enqueued = 0;
 
+	/* Sync descriptors */
+	bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map,
+	    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 	for (;;) {
 		if (sc->tx_desccount > (TX_DESC_COUNT - TX_MAP_MAX_SEGS  + 1)) {
 			if_setdrvflagbits(sc->ifp, IFF_DRV_OACTIVE, 0);
@@ -502,6 +514,8 @@ dma1000_txstart(struct dwc_softc *sc)
 	}
 
 	if (enqueued != 0) {
+		bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map,
+		    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 		WRITE4(sc, TRANSMIT_POLL_DEMAND, 0x1);
 		sc->tx_watchdog_count = WATCHDOG_TIMEOUT_SECS;
 	}
@@ -516,8 +530,12 @@ dma1000_rxfinish_locked(struct dwc_softc *sc)
 
 	DWC_ASSERT_LOCKED(sc);
 	for (;;) {
+		bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
+		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 		idx = sc->rx_idx;
+		rmb();
 		desc = sc->rxdesc_ring + idx;
+		rmb();
 		if ((desc->desc0 & RDESC0_OWN) != 0)
 			break;
 
@@ -526,6 +544,9 @@ dma1000_rxfinish_locked(struct dwc_softc *sc)
 			wmb();
 			desc->desc0 = RDESC0_OWN;
 			wmb();
+			/* Probably too many syncs */
+			bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
+			    BUS_DMASYNC_PREWRITE | BUS_DMASYNC_PREREAD);
 		} else {
 			/* We cannot create hole in RX ring */
 			error = dma1000_setup_rxbuf(sc, idx, m);
@@ -536,6 +557,8 @@ dma1000_rxfinish_locked(struct dwc_softc *sc)
 		}
 		sc->rx_idx = next_rxidx(sc, sc->rx_idx);
 	}
+	bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 }
 
 /*
