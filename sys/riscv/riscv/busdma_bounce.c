@@ -165,6 +165,12 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 	if (((newtag->bounce_flags & BF_COULD_BOUNCE) != 0) &&
 	    (flags & BUS_DMA_ALLOCNOW) != 0) {
 		struct bounce_zone *bz;
+		/*
+		 * Round size up to a full page, and add one more page because
+		 * there can always be one more boundary crossing than the
+		 * number of pages in a transfer.
+		 */
+		maxsize = roundup2(maxsize, PAGE_SIZE) + PAGE_SIZE;
 
 		/* Must bounce */
 		if ((error = alloc_bounce_zone(newtag)) != 0) {
@@ -176,7 +182,7 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		if (ptoa(bz->total_bpages) < maxsize) {
 			int pages;
 
-			pages = atop(round_page(maxsize)) - bz->total_bpages;
+			pages = atop(maxsize) + 1 - bz->total_bpages;
 
 			/* Add pages to our bounce pool */
 			if (alloc_bounce_pages(newtag, pages) < pages)
@@ -311,9 +317,9 @@ bounce_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 			    atop(dmat->common.lowaddr));
 		if ((dmat->bounce_flags & BF_MIN_ALLOC_COMP) == 0 ||
 		    (bz->map_count > 0 && bz->total_bpages < maxpages)) {
-			pages = MAX(atop(dmat->common.maxsize), 1);
+			pages = atop(roundup2(dmat->common.maxsize, PAGE_SIZE)) + 1;
 			pages = MIN(maxpages - bz->total_bpages, pages);
-			pages = MAX(pages, 1);
+			pages = MAX(pages, 2);
 			if (alloc_bounce_pages(dmat, pages) < pages)
 				error = ENOMEM;
 			if ((dmat->bounce_flags & BF_MIN_ALLOC_COMP)
@@ -539,7 +545,7 @@ _bus_dmamap_count_pages(bus_dma_tag_t dmat, bus_dmamap_t map, pmap_t pmap,
 	bus_size_t sg_len;
 
 	if ((map->flags & DMAMAP_COULD_BOUNCE) != 0 && map->pagesneeded == 0) {
-		CTR4(KTR_BUSDMA, "lowaddr= %d Maxmem= %d, boundary= %d, "
+		CTR4(KTR_BUSDMA, "lowaddr= %lx Maxmem= %lx, boundary= %lx, "
 		    "alignment= %d", dmat->common.lowaddr,
 		    ptoa((vm_paddr_t)Maxmem),
 		    dmat->common.boundary, dmat->common.alignment);
@@ -691,7 +697,7 @@ bounce_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
     int *segp)
 {
 	struct sync_list *sl;
-	bus_size_t sgsize, max_sgsize;
+	bus_size_t sgsize;
 	bus_addr_t curaddr, sl_pend;
 	vm_offset_t kvaddr, vaddr, sl_vend;
 	int error;
@@ -728,17 +734,16 @@ bounce_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		max_sgsize = MIN(buflen, dmat->common.maxsegsz);
-		sgsize = PAGE_SIZE - (curaddr & PAGE_MASK);
+		sgsize = MIN(buflen, dmat->common.maxsegsz);
+		sgsize = MIN(sgsize, PAGE_SIZE - (curaddr & PAGE_MASK));
 		if (((dmat->bounce_flags & BF_COULD_BOUNCE) != 0) &&
 		    map->pagesneeded != 0 &&
 		    bus_dma_run_filter(&dmat->common, curaddr)) {
-			sgsize = roundup2(sgsize, dmat->common.alignment);
-			sgsize = MIN(sgsize, max_sgsize);
+			//printf("add_bounce_page(%lx, %lx\n", kvaddr, curaddr);
 			curaddr = add_bounce_page(dmat, map, kvaddr, curaddr,
 			    sgsize);
+			//printf("new curaddr: %lx\n", curaddr);
 		} else if ((dmat->bounce_flags & BF_COHERENT) == 0) {
-			sgsize = MIN(sgsize, max_sgsize);
 			if (map->sync_count > 0) {
 				sl_pend = sl->paddr + sl->datacount;
 				sl_vend = sl->vaddr + sl->datacount;
@@ -764,8 +769,6 @@ bounce_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 				sl->datacount = sgsize;
 			} else
 				sl->datacount += sgsize;
-		} else {
-			sgsize = MIN(sgsize, max_sgsize);
 		}
 		sgsize = _bus_dmamap_addseg(dmat, map, curaddr, sgsize, segs,
 		    segp);
@@ -779,7 +782,11 @@ cleanup:
 	/*
 	 * Did we fit?
 	 */
-	return (buflen != 0 ? EFBIG : 0); /* XXX better return value here? */
+	if (buflen != 0) {
+		bus_dmamap_unload(dmat, map);
+		return (EFBIG);
+	}
+	return (0);
 }
 
 static void
@@ -914,15 +921,19 @@ bounce_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map,
 		    op);
 
 		if ((op & BUS_DMASYNC_PREWRITE) != 0) {
+			//printf("BUS_DMASYNC_PREWRITE: %p\n", bpage);
 			while (bpage != NULL) {
 				tempvaddr = 0;
 				datavaddr = bpage->datavaddr;
 				if (datavaddr == 0) {
+					//printf("pre-write qenter\n");
 					tempvaddr = pmap_quick_enter_page(
 					    bpage->datapage);
 					datavaddr = tempvaddr | bpage->dataoffs;
 				}
+				cpu_dcache_wb_range(datavaddr, bpage->datacount);
 
+				//printf("pre-write bcopy(%lx, %lx, %zu\n", datavaddr, bpage->vaddr, bpage->datacount);
 				bcopy((void *)datavaddr,
 				    (void *)bpage->vaddr, bpage->datacount);
 				if (tempvaddr != 0)
@@ -935,6 +946,7 @@ bounce_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map,
 			dmat->bounce_zone->total_bounced++;
 		} else if ((op & BUS_DMASYNC_PREREAD) != 0) {
 			while (bpage != NULL) {
+				//printf("BUS_DMASYNC_PREREAD: %p\n", bpage);
 				if ((dmat->bounce_flags & BF_COHERENT) == 0)
 					cpu_dcache_wbinv_range(bpage->vaddr,
 					    bpage->datacount);
@@ -944,17 +956,22 @@ bounce_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map,
 
 		if ((op & BUS_DMASYNC_POSTREAD) != 0) {
 			while (bpage != NULL) {
-				if ((dmat->bounce_flags & BF_COHERENT) == 0)
+				if ((dmat->bounce_flags & BF_COHERENT) == 0) {
 					cpu_dcache_inv_range(bpage->vaddr,
 					    bpage->datacount);
+				}
 				tempvaddr = 0;
 				datavaddr = bpage->datavaddr;
 				if (datavaddr == 0) {
+					//printf("busdma qenter\n");
 					tempvaddr = pmap_quick_enter_page(
 					    bpage->datapage);
 					datavaddr = tempvaddr | bpage->dataoffs;
 				}
 
+				//printf("busdma bcopy(%lx, %lx, %zu\n", bpage->vaddr,
+				 //   datavaddr, bpage->datacount);
+				cpu_dcache_wb_range(datavaddr, bpage->datacount);
 				bcopy((void *)bpage->vaddr,
 				    (void *)datavaddr, bpage->datacount);
 
