@@ -31,6 +31,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/cons.h>
+#include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/kdb.h>
 #include <sys/kernel.h>
@@ -71,6 +72,15 @@ static dumper_hdr_t vnode_write_headers;
 
 static int livedump_running;
 
+typedef void (*livedump_event_fn)(void *arg, int *errorp);
+typedef void (*livedump_dump_fn)(void *arg, vm_offset_t physical, off_t offset,
+    size_t len, int *errorp);
+
+EVENTHANDLER_DECLARE(livedumper_start, livedump_event_fn);
+EVENTHANDLER_DECLARE(livedumper_dump, livedump_dump_fn);
+//EVENTHANDLER_DECLARE(livedumper_progress, livedump_event_fn);
+EVENTHANDLER_DECLARE(livedumper_finish, livedump_event_fn);
+
 /*
  * Invoke a live minidump on the system.
  */
@@ -108,9 +118,17 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 	while (!atomic_cmpset_int(&livedump_running, 0, 1))
 		pause("livedump", hz / 2);
 
+	EVENTHANDLER_INVOKE(livedumper_start, &error);
+	if (error != 0)
+		return (error);
+
 	dump_savectx();
 	error = minidumpsys(&di, true);
+	if (error != 0)
+		goto done;
 
+	EVENTHANDLER_INVOKE(livedumper_finish, &error);
+done:
 	/* Unlock the vnode before departing. */
 	if (di.priv != NULL)
 		VOP_UNLOCK((struct vnode *)di.priv);
@@ -165,6 +183,8 @@ vnode_dumper_start(struct dumperinfo *di, void *key, uint32_t keysize)
 	/* Start at offset 0. */
 	di->dumpoff = 0;
 
+	/* EVENTHANDLER_INVOKE */
+
 	return (0);
 }
 
@@ -193,6 +213,10 @@ vnode_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t 
 	vp = arg;
 	MPASS(vp != NULL);
 	ASSERT_VOP_LOCKED(vp, __func__);
+
+	EVENTHANDLER_INVOKE(livedumper_dump, physical, offset, length, &error);
+	if (error != 0)
+		return (error);
 
 	error = vn_rdwr(UIO_WRITE, vp, virtual, length, offset, UIO_SYSSPACE, IO_NODELOCKED,
 	    curthread->td_ucred, NOCRED, NULL, curthread);
