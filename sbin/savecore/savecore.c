@@ -1446,12 +1446,18 @@ main(int argc, char **argv)
 			logmsg(LOG_ERR, "cap_sysctl_limit failed: %m");
 			exit(1);
 		}
-		if (cap_sysctlbyname(capsysctl, "kern.livedump", NULL, 0, devs[0],
-		    strlen(devs[0])) == -1) {
+		char *arg;
+		if (compress)
+			asprintf(&arg, "%s,%s", devs[0], "gzip");
+		else
+			asprintf(&arg, "%s", devs[0]);
+		if (cap_sysctlbyname(capsysctl, "kern.livedump", NULL, 0, arg,
+		    strlen(arg)) == -1) {
 			unlink(devs[0]);
 			logmsg(LOG_ERR, "live dump failed: %m");
 			exit(1);
 		}
+		free(arg);
 	}
 
 	printf("time to DoFile, argc=%d\n", argc);
