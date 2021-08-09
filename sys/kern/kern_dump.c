@@ -31,6 +31,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/cons.h>
+#include <sys/disk.h>
 #include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/kdb.h>
@@ -81,15 +82,33 @@ EVENTHANDLER_DECLARE(livedumper_dump, livedump_dump_fn);
 //EVENTHANDLER_DECLARE(livedumper_progress, livedump_event_fn);
 EVENTHANDLER_DECLARE(livedumper_finish, livedump_event_fn);
 
+static void
+set_compression(const char *comp, struct diocskerneldump_arg *kda)
+{
+
+	if (strcmp(comp, "gzip") == 0)
+		kda->kda_compression = KERNELDUMP_COMP_GZIP;
+	else if (strcmp(comp, "zstd") == 0)
+		kda->kda_compression = KERNELDUMP_COMP_ZSTD;
+	else
+		kda->kda_compression = KERNELDUMP_COMP_NONE;
+}
+
 /*
- * Invoke a live minidump on the system.
+ * Invoke a live minidump on the system using a vnode dumper.
+ *
+ * sysctl kern.livedump=/path/to/dump
+ * sysctl kern.livedump=/path/to/dump:gzip
+ * sysctl kern.livedump=/path/to/dump:zstd
  */
 static int
 sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 {
 #if MINIDUMP_PAGE_TRACKING == 1
-	struct dumperinfo di;
-	char path[PATH_MAX];
+	struct diocskerneldump_arg kda;
+	struct dumperinfo di, *livedi;
+	char path[PATH_MAX + 6];
+	char *comp;
 	int error;
 
 	if (req->newptr == NULL)
@@ -103,6 +122,13 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 	if (error != 0)
 		return (error);
 
+       /* Check if a compression algorithm was specified. */
+	comp = strchr(path, ':');
+	if (comp != NULL) {
+		*comp = '\0';
+		comp++;
+	}
+
 	/* Set up dumper */
 	bzero(&di, sizeof(di));
 	di.dumper_start = vnode_dumper_start;
@@ -114,6 +140,13 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 	di.mediaoffset = 0;
 	di.priv = path; /* pass path via priv */
 
+	bzero(&kda, sizeof(kda));
+	if (comp != NULL)
+		set_compression(comp, &kda);
+	error = dumper_create(&di, "livedump", &kda, &livedi);
+	if (error != 0)
+		return (error);
+
 	/* Only allow one livedump to proceed at a time. */
 	while (!atomic_cmpset_int(&livedump_running, 0, 1))
 		pause("livedump", hz / 2);
@@ -123,15 +156,16 @@ sysctl_live_dump(SYSCTL_HANDLER_ARGS)
 		return (error);
 
 	dump_savectx();
-	error = minidumpsys(&di, true);
+	error = minidumpsys(livedi, true);
 	if (error != 0)
 		goto done;
 
 	EVENTHANDLER_INVOKE(livedumper_finish, &error);
 done:
 	/* Unlock the vnode before departing. */
-	if (di.priv != NULL)
-		VOP_UNLOCK((struct vnode *)di.priv);
+	if (livedi->priv != NULL)
+		VOP_UNLOCK((struct vnode *)livedi->priv);
+	dumper_destroy(livedi);
 	livedump_running = 0;
 
 	return (error);
