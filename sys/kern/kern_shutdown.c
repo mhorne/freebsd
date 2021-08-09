@@ -1167,10 +1167,10 @@ kerneldumpcomp_destroy(struct dumperinfo *di)
 }
 
 /*
- * Must not be present on global list.
+ * Free a dumper. Must not be present on global list.
  */
-static void
-free_single_dumper(struct dumperinfo *di)
+void
+dumper_destroy(struct dumperinfo *di)
 {
 
 	if (di == NULL)
@@ -1186,7 +1186,64 @@ free_single_dumper(struct dumperinfo *di)
 	zfree(di, M_DUMPER);
 }
 
-/* Registration of dumpers */
+/*
+ * Allocate and set up a new dumper from the provided template.
+ */
+int
+dumper_create(const struct dumperinfo *di_template, const char *devname,
+    const struct diocskerneldump_arg *kda, struct dumperinfo **dip)
+{
+	struct dumperinfo *newdi;
+
+	/* Allocate a new dumper */
+	newdi = malloc(sizeof(*newdi) + strlen(devname) + 1, M_DUMPER,
+	    M_WAITOK | M_ZERO);
+	memcpy(newdi, di_template, sizeof(*newdi));
+	newdi->blockbuf = NULL;
+	newdi->kdcrypto = NULL;
+	newdi->kdcomp = NULL;
+	strcpy(newdi->di_devname, devname);
+
+	*dip = newdi;
+
+	if (kda->kda_encryption != KERNELDUMP_ENC_NONE) {
+#ifdef EKCD
+		newdi->kdcrypto = kerneldumpcrypto_create(newdi->blocksize,
+		    kda->kda_encryption, kda->kda_key,
+		    kda->kda_encryptedkeysize, kda->kda_encryptedkey);
+		if (newdi->kdcrypto == NULL) {
+			return (EINVAL);
+		}
+#else
+		return (EOPNOTSUPP);
+#endif
+	}
+	if (kda->kda_compression != KERNELDUMP_COMP_NONE) {
+#ifdef EKCD
+		/*
+		 * We can't support simultaneous unpadded block cipher
+		 * encryption and compression because there is no guarantee the
+		 * length of the compressed result is exactly a multiple of the
+		 * cipher block size.
+		 */
+		if (kda->kda_encryption == KERNELDUMP_ENC_AES_256_CBC) {
+			return (EOPNOTSUPP);
+		}
+#endif
+		newdi->kdcomp = kerneldumpcomp_create(newdi,
+		    kda->kda_compression);
+		if (newdi->kdcomp == NULL) {
+			return (EINVAL);
+		}
+	}
+	newdi->blockbuf = malloc(newdi->blocksize, M_DUMPER, M_WAITOK | M_ZERO);
+
+	return (0);
+}
+
+/*
+ * Create a new dumper and register it in the global list.
+ */
 int
 dumper_insert(const struct dumperinfo *di_template, const char *devname,
     const struct diocskerneldump_arg *kda)
@@ -1204,50 +1261,9 @@ dumper_insert(const struct dumperinfo *di_template, const char *devname,
 	if (error != 0)
 		return (error);
 
-	newdi = malloc(sizeof(*newdi) + strlen(devname) + 1, M_DUMPER, M_WAITOK
-	    | M_ZERO);
-	memcpy(newdi, di_template, sizeof(*newdi));
-	newdi->blockbuf = NULL;
-	newdi->kdcrypto = NULL;
-	newdi->kdcomp = NULL;
-	strcpy(newdi->di_devname, devname);
-
-	if (kda->kda_encryption != KERNELDUMP_ENC_NONE) {
-#ifdef EKCD
-		newdi->kdcrypto = kerneldumpcrypto_create(di_template->blocksize,
-		    kda->kda_encryption, kda->kda_key,
-		    kda->kda_encryptedkeysize, kda->kda_encryptedkey);
-		if (newdi->kdcrypto == NULL) {
-			error = EINVAL;
-			goto cleanup;
-		}
-#else
-		error = EOPNOTSUPP;
+	error = dumper_create(di_template, devname, kda, &newdi);
+	if (error != 0)
 		goto cleanup;
-#endif
-	}
-	if (kda->kda_compression != KERNELDUMP_COMP_NONE) {
-#ifdef EKCD
-		/*
-		 * We can't support simultaneous unpadded block cipher
-		 * encryption and compression because there is no guarantee the
-		 * length of the compressed result is exactly a multiple of the
-		 * cipher block size.
-		 */
-		if (kda->kda_encryption == KERNELDUMP_ENC_AES_256_CBC) {
-			error = EOPNOTSUPP;
-			goto cleanup;
-		}
-#endif
-		newdi->kdcomp = kerneldumpcomp_create(newdi,
-		    kda->kda_compression);
-		if (newdi->kdcomp == NULL) {
-			error = EINVAL;
-			goto cleanup;
-		}
-	}
-
-	newdi->blockbuf = malloc(newdi->blocksize, M_DUMPER, M_WAITOK | M_ZERO);
 
 	/* Add the new configuration to the queue */
 	mtx_lock(&dumpconf_list_lk);
@@ -1267,7 +1283,7 @@ dumper_insert(const struct dumperinfo *di_template, const char *devname,
 	return (0);
 
 cleanup:
-	free_single_dumper(newdi);
+	dumper_destroy(newdi);
 	return (error);
 }
 
@@ -1323,6 +1339,9 @@ dumper_config_match(const struct dumperinfo *di, const char *devname,
 	return (true);
 }
 
+/*
+ * Remove and free the requested dumper(s) from the global list.
+ */
 int
 dumper_remove(const char *devname, const struct diocskerneldump_arg *kda)
 {
@@ -1346,7 +1365,7 @@ dumper_remove(const char *devname, const struct diocskerneldump_arg *kda)
 		if (dumper_config_match(di, devname, kda)) {
 			found = true;
 			TAILQ_REMOVE(&dumper_configs, di, di_next);
-			free_single_dumper(di);
+			dumper_destroy(di);
 		}
 	}
 	mtx_unlock(&dumpconf_list_lk);
