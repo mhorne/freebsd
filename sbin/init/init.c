@@ -865,6 +865,7 @@ single_user(void)
 	sigset_t mask;
 	const char *shell;
 	char *argv[2];
+	time_t sync_secs;
 	struct timeval tv, tn;
 #ifdef SECURE
 	struct ttyent *typ;
@@ -880,7 +881,13 @@ single_user(void)
 	if (Reboot) {
 		/* Instead of going single user, let's reboot the machine */
 		BOOTTRACE("shutting down the system");
+
+		sync_secs = time(NULL);
 		sync();
+		sync_secs = time(NULL) - sync_secs;
+		if (sync_secs > 60)
+			warning("sync(2) took %ld secs", (long)sync_secs);
+
 		/* Run scripts after all processes have been terminated. */
 		runfinal();
 		if (reboot(howto) == -1) {
