@@ -209,7 +209,6 @@ struct cdevsw {
 	d_poll_t		*d_poll;
 	d_mmap_t		*d_mmap;
 	d_strategy_t		*d_strategy;
-	dumper_t		*d_dump;
 	d_kqfilter_t		*d_kqfilter;
 	d_purge_t		*d_purge;
 	d_mmap_single_t		*d_mmap_single;
