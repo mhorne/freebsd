@@ -65,7 +65,6 @@ static size_t fragsz;
 
 struct dump_pa dump_map[DUMPSYS_MD_PA_NPAIRS];
 
-#if !defined(__powerpc__)
 void
 dumpsys_gen_pa_init(void)
 {
@@ -80,7 +79,6 @@ dumpsys_gen_pa_init(void)
 		dump_map[n].pa_size = dump_avail[idx + 1] - dump_avail[idx];
 	}
 }
-#endif
 
 struct dump_pa *
 dumpsys_gen_pa_next(struct dump_pa *mdp)
