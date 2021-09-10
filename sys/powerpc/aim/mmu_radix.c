@@ -493,7 +493,6 @@ static void mmu_radix_unmapdev(vm_offset_t, vm_size_t);
 static void mmu_radix_kenter_attr(vm_offset_t, vm_paddr_t, vm_memattr_t ma);
 static boolean_t mmu_radix_dev_direct_mapped(vm_paddr_t, vm_size_t);
 static void mmu_radix_dumpsys_map(vm_paddr_t pa, size_t sz, void **va);
-static void mmu_radix_scan_init(void);
 static void	mmu_radix_cpu_bootstrap(int ap);
 static void	mmu_radix_tlbie_all(void);
 
@@ -514,7 +513,6 @@ static struct pmap_funcs mmu_radix_methods = {
 	.unmapdev = mmu_radix_unmapdev,
 	.kenter_attr = mmu_radix_kenter_attr,
 	.dev_direct_mapped = mmu_radix_dev_direct_mapped,
-	.dumpsys_pa_init = mmu_radix_scan_init,
 	.dumpsys_map_chunk = mmu_radix_dumpsys_map,
 	.page_is_mapped = mmu_radix_page_is_mapped,
 	.ps_enabled = mmu_radix_ps_enabled,
@@ -6075,14 +6073,6 @@ mmu_radix_dev_direct_mapped(vm_paddr_t pa, vm_size_t size)
 
 	CTR3(KTR_PMAP, "%s(%#x, %#x)", __func__, pa, size);
 	return (mem_valid(pa, size));
-}
-
-static void
-mmu_radix_scan_init()
-{
-
-	CTR1(KTR_PMAP, "%s()", __func__);
-	UNIMPLEMENTED();
 }
 
 static void

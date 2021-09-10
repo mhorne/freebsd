@@ -415,7 +415,6 @@ static struct pmap_funcs mmu_booke_methods = {
 	/* dumpsys() support */
 	.dumpsys_map_chunk = mmu_booke_dumpsys_map,
 	.dumpsys_unmap_chunk = mmu_booke_dumpsys_unmap,
-	.dumpsys_pa_init = mmu_booke_scan_init,
 };
 
 MMU_DEF(booke_mmu, MMU_TYPE_BOOKE, mmu_booke_methods);
@@ -2113,70 +2112,6 @@ mmu_booke_dumpsys_unmap(vm_paddr_t pa, size_t sz, void *va)
 		e.mas2 = 0;
 		e.mas3 = 0;
 		tlb1_write_entry(&e, i);
-	}
-}
-
-extern struct dump_pa dump_map[PHYS_AVAIL_SZ + 1];
-
-void
-mmu_booke_scan_init()
-{
-	vm_offset_t va;
-	pte_t *pte;
-	int i;
-
-	if (!do_minidump) {
-		/* Initialize phys. segments for dumpsys(). */
-		memset(&dump_map, 0, sizeof(dump_map));
-		mem_regions(&physmem_regions, &physmem_regions_sz, &availmem_regions,
-		    &availmem_regions_sz);
-		for (i = 0; i < physmem_regions_sz; i++) {
-			dump_map[i].pa_start = physmem_regions[i].mr_start;
-			dump_map[i].pa_size = physmem_regions[i].mr_size;
-		}
-		return;
-	}
-
-	/* Virtual segments for minidumps: */
-	memset(&dump_map, 0, sizeof(dump_map));
-
-	/* 1st: kernel .data and .bss. */
-	dump_map[0].pa_start = trunc_page((uintptr_t)_etext);
-	dump_map[0].pa_size =
-	    round_page((uintptr_t)_end) - dump_map[0].pa_start;
-
-	/* 2nd: msgbuf and tables (see pmap_bootstrap()). */
-	dump_map[1].pa_start = data_start;
-	dump_map[1].pa_size = data_end - data_start;
-
-	/* 3rd: kernel VM. */
-	va = dump_map[1].pa_start + dump_map[1].pa_size;
-	/* Find start of next chunk (from va). */
-	while (va < virtual_end) {
-		/* Don't dump the buffer cache. */
-		if (va >= kmi.buffer_sva && va < kmi.buffer_eva) {
-			va = kmi.buffer_eva;
-			continue;
-		}
-		pte = pte_find(kernel_pmap, va);
-		if (pte != NULL && PTE_ISVALID(pte))
-			break;
-		va += PAGE_SIZE;
-	}
-	if (va < virtual_end) {
-		dump_map[2].pa_start = va;
-		va += PAGE_SIZE;
-		/* Find last page in chunk. */
-		while (va < virtual_end) {
-			/* Don't run into the buffer cache. */
-			if (va == kmi.buffer_sva)
-				break;
-			pte = pte_find(kernel_pmap, va);
-			if (pte == NULL || !PTE_ISVALID(pte))
-				break;
-			va += PAGE_SIZE;
-		}
-		dump_map[2].pa_size = va - dump_map[2].pa_start;
 	}
 }
 
