@@ -434,7 +434,6 @@ boolean_t moea64_dev_direct_mapped(vm_paddr_t, vm_size_t);
 static void moea64_sync_icache(pmap_t, vm_offset_t, vm_size_t);
 void moea64_dumpsys_map(vm_paddr_t pa, size_t sz,
     void **va);
-void moea64_scan_init(void);
 vm_offset_t moea64_quick_enter_page(vm_page_t m);
 vm_offset_t moea64_quick_enter_page_dmap(vm_page_t m);
 void moea64_quick_remove_page(vm_offset_t addr);
@@ -503,7 +502,6 @@ static struct pmap_funcs moea64_methods = {
 	.kenter = moea64_kenter,
 	.kenter_attr = moea64_kenter_attr,
 	.dev_direct_mapped = moea64_dev_direct_mapped,
-	.dumpsys_pa_init = moea64_scan_init,
 	.dumpsys_scan_pmap = moea64_scan_pmap,
 	.dumpsys_dump_pmap_init =    moea64_dump_pmap_init,
 	.dumpsys_map_chunk = moea64_dumpsys_map,
@@ -3249,69 +3247,6 @@ moea64_dumpsys_map(vm_paddr_t pa, size_t sz, void **va)
 {
 
 	*va = (void *)(uintptr_t)pa;
-}
-
-extern struct dump_pa dump_map[PHYS_AVAIL_SZ + 1];
-
-void
-moea64_scan_init()
-{
-	struct pvo_entry *pvo;
-	vm_offset_t va;
-	int i;
-
-	if (!do_minidump) {
-		/* Initialize phys. segments for dumpsys(). */
-		memset(&dump_map, 0, sizeof(dump_map));
-		mem_regions(&pregions, &pregions_sz, &regions, &regions_sz);
-		for (i = 0; i < pregions_sz; i++) {
-			dump_map[i].pa_start = pregions[i].mr_start;
-			dump_map[i].pa_size = pregions[i].mr_size;
-		}
-		return;
-	}
-
-	/* Virtual segments for minidumps: */
-	memset(&dump_map, 0, sizeof(dump_map));
-
-	/* 1st: kernel .data and .bss. */
-	dump_map[0].pa_start = trunc_page((uintptr_t)_etext);
-	dump_map[0].pa_size = round_page((uintptr_t)_end) -
-	    dump_map[0].pa_start;
-
-	/* 2nd: msgbuf and tables (see pmap_bootstrap()). */
-	dump_map[1].pa_start = (vm_paddr_t)(uintptr_t)msgbufp->msg_ptr;
-	dump_map[1].pa_size = round_page(msgbufp->msg_size);
-
-	/* 3rd: kernel VM. */
-	va = dump_map[1].pa_start + dump_map[1].pa_size;
-	/* Find start of next chunk (from va). */
-	while (va < virtual_end) {
-		/* Don't dump the buffer cache. */
-		if (va >= kmi.buffer_sva && va < kmi.buffer_eva) {
-			va = kmi.buffer_eva;
-			continue;
-		}
-		pvo = moea64_pvo_find_va(kernel_pmap, va & ~ADDR_POFF);
-		if (pvo != NULL && !(pvo->pvo_vaddr & PVO_DEAD))
-			break;
-		va += PAGE_SIZE;
-	}
-	if (va < virtual_end) {
-		dump_map[2].pa_start = va;
-		va += PAGE_SIZE;
-		/* Find last page in chunk. */
-		while (va < virtual_end) {
-			/* Don't run into the buffer cache. */
-			if (va == kmi.buffer_sva)
-				break;
-			pvo = moea64_pvo_find_va(kernel_pmap, va & ~ADDR_POFF);
-			if (pvo == NULL || (pvo->pvo_vaddr & PVO_DEAD))
-				break;
-			va += PAGE_SIZE;
-		}
-		dump_map[2].pa_size = va - dump_map[2].pa_start;
-	}
 }
 
 #ifdef __powerpc64__

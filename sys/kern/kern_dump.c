@@ -279,7 +279,6 @@ vnode_write_headers(struct dumperinfo *di, struct kerneldumpheader *kdh)
 	return (0);
 }
 
-#if !defined(__powerpc__)
 void
 dumpsys_gen_pa_init(void)
 {
@@ -294,7 +293,6 @@ dumpsys_gen_pa_init(void)
 		dump_map[n].pa_size = dump_avail[idx + 1] - dump_avail[idx];
 	}
 }
-#endif
 
 struct dump_pa *
 dumpsys_gen_pa_next(struct dump_pa *mdp)

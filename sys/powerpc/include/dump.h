@@ -38,11 +38,17 @@
 /* How often to check the dump progress bar? */
 #define	DUMPSYS_PB_CHECK_BITS	20	/* Every 1MB */
 
-void dumpsys_pa_init(void);
 void dumpsys_unmap_chunk(vm_paddr_t, size_t, void *);
 size_t dumpsys_scan_pmap(struct bitset *);
 void *dumpsys_dump_pmap_init(unsigned blkpgs);
 void *dumpsys_dump_pmap(void *ctx, void *buf, u_long *nbytes);
+
+static inline void
+dumpsys_pa_init(void)
+{
+
+	dumpsys_gen_pa_init();
+}
 
 static inline struct dump_pa *
 dumpsys_pa_next(struct dump_pa *p)
