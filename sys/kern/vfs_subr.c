@@ -121,6 +121,16 @@ static int	v_inval_buf_range_locked(struct vnode *vp, struct bufobj *bo,
 		    daddr_t startlbn, daddr_t endlbn);
 static void	vnlru_recalc(void);
 
+static int vfs_debug1 = 0;
+SYSCTL_INT(_kern, OID_AUTO, vfsdebug1, CTLFLAG_RW, &vfs_debug1, 0,
+    "reclaim debugging");
+
+#define	dprintf(...)				\
+do {						\
+	if (vfs_debug1)				\
+		printf(__VA_ARGS__);		\
+} while (0)
+
 /*
  * Number of vnodes in existence.  Increased whenever getnewvnode()
  * allocates a new vnode, decreased in vdropl() for VIRF_DOOMED vnode.
@@ -1152,8 +1162,10 @@ vlrureclaim(bool reclaim_nc_src, int trigger, u_long target)
 
 	retried = false;
 	done = 0;
+	u_long standard = 0;
 
 	mvp = vnode_list_reclaim_marker;
+	dprintf("vlrureclaim(%d, %d, %lu)\n", reclaim_nc_src, trigger, target);
 restart:
 	vp = mvp;
 	while (done < target) {
@@ -1172,13 +1184,27 @@ restart:
 		 */
 		if (vp->v_usecount > 0 || vp->v_holdcnt == 0 ||
 		    (!reclaim_nc_src && !LIST_EMPTY(&vp->v_cache_src)))
+		{
+			if (vp->v_usecount == 1 && vp->v_holdcnt == 1 && LIST_EMPTY(&vp->v_cache_src))
+				standard++;
+			else if (vp->v_usecount == 0 && vp->v_holdcnt == 0 && LIST_EMPTY(&vp->v_cache_src))
+				standard++;
+			else
+				dprintf("next_iter: v_usecount: %d, v_holdcnt: %d, LIST_EMPTY? %d\n",
+				    vp->v_usecount, vp->v_holdcnt, LIST_EMPTY(&vp->v_cache_src));
 			goto next_iter;
+		}
+		if (standard > 0) {
+			dprintf("standard vps: %lu\n", standard);
+			standard = 0;
+		}
 
 		if (vp->v_type == VBAD || vp->v_type == VNON)
 			goto next_iter;
 
 		object = atomic_load_ptr(&vp->v_object);
 		if (object == NULL || object->resident_page_count > trigger) {
+			dprintf("next_iter: object == NULL || object->resident_page_count > trigger\n");
 			goto next_iter;
 		}
 
@@ -1189,13 +1215,16 @@ restart:
 		 * Resorting to checking v_mount restores guarantees present
 		 * before the global list was reworked to contain all vnodes.
 		 */
-		if (!VI_TRYLOCK(vp))
+		if (!VI_TRYLOCK(vp)) {
+			dprintf("next_iter: VI_TRYLOCK failed!\n");
 			goto next_iter;
+		}
 		if (__predict_false(vp->v_type == VBAD || vp->v_type == VNON)) {
 			VI_UNLOCK(vp);
 			goto next_iter;
 		}
 		if (vp->v_mount == NULL) {
+			dprintf("vp->v_mount == NULL\n");
 			VI_UNLOCK(vp);
 			goto next_iter;
 		}
@@ -1205,11 +1234,14 @@ restart:
 		TAILQ_INSERT_AFTER(&vnode_list, vp, mvp, v_vnodelist);
 		mtx_unlock(&vnode_list_mtx);
 
+		dprintf("vn_start_write(%p)\n", vp);
 		if (vn_start_write(vp, &mp, V_NOWAIT) != 0) {
+			dprintf("case 1\n");
 			vdrop(vp);
 			goto next_iter_unlocked;
 		}
 		if (VOP_LOCK(vp, LK_EXCLUSIVE|LK_NOWAIT) != 0) {
+			dprintf("case 2\n");
 			vdrop(vp);
 			vn_finished_write(mp);
 			goto next_iter_unlocked;
@@ -1220,6 +1252,7 @@ restart:
 		    (!reclaim_nc_src && !LIST_EMPTY(&vp->v_cache_src)) ||
 		    (vp->v_object != NULL && vp->v_object->handle == vp &&
 		    vp->v_object->resident_page_count > trigger)) {
+			dprintf("case 3\n");
 			VOP_UNLOCK(vp);
 			vdropl(vp);
 			vn_finished_write(mp);
@@ -1231,6 +1264,7 @@ restart:
 		vdropl(vp);
 		vn_finished_write(mp);
 		done++;
+		dprintf("done = %lu\n", done);
 next_iter_unlocked:
 		if (should_yield())
 			kern_yield(PRI_USER);
@@ -1248,6 +1282,7 @@ next_iter:
 		goto restart;
 	}
 	if (done == 0 && !retried) {
+		dprintf("done == 0, retrying.....\n\n\n\n\n");
 		TAILQ_REMOVE(&vnode_list, mvp, v_vnodelist);
 		TAILQ_INSERT_HEAD(&vnode_list, mvp, v_vnodelist);
 		retried = true;
@@ -1518,6 +1553,7 @@ vnlru_proc(void)
 			vstir = 0;
 		}
 		if (force == 0 && !vnlru_under(rnumvnodes, vlowat)) {
+			dprintf("all done, vlruwt!\n");
 			vnlruproc_sig = 0;
 			wakeup(&vnlruproc_sig);
 			msleep(vnlruproc, &vnode_list_mtx,
@@ -1560,11 +1596,13 @@ vnlru_proc(void)
 			uma_reclaim(UMA_RECLAIM_DRAIN);
 		if (done == 0) {
 			if (force == 0 || force == 1) {
+				dprintf("Setting force = 2\n");
 				force = 2;
 				continue;
 			}
 			if (force == 2) {
 				force = 3;
+				dprintf("Setting force = 3\n");
 				continue;
 			}
 			want_reread = true;
