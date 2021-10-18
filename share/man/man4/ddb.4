@@ -1202,6 +1202,10 @@ subsystem.
 .El
 .Ss OFFLINE DEBUGGING COMMANDS
 .Bl -tag -width indent -compact
+.It Ic dump
+Initiate a kernel core dump to the device(s) configured by
+.Xr dumpon 8 .
+.Pp
 .It Ic gdb
 Switches to remote GDB mode.
 In remote GDB mode, another machine is required that runs
