@@ -322,12 +322,19 @@ extern	int vm_level_0_order;
 #define MINIDUMP_PAGE_TRACKING	0
 #endif
 
+#define	PHYS_IN_DMAP(pa)	(1)
+#define	VIRT_IN_DMAP(va)	((va) >= DMAP_MIN_ADDRESS &&		\
+    (va) =< (DMAP_MAX_ADDRESS))
+
 #define	PMAP_HAS_DMAP	(hw_direct_map)
 #define PHYS_TO_DMAP(x) ({						\
 	KASSERT(hw_direct_map, ("Direct map not provided by PMAP"));	\
 	(x) | DMAP_BASE_ADDRESS; })
 #define DMAP_TO_PHYS(x) ({						\
 	KASSERT(hw_direct_map, ("Direct map not provided by PMAP"));	\
+	KASSERT(VIRT_IN_DMAP(x),					\
+	    ("virtual address %#jx not covered by the DMAP",		\
+	     (uintmax_t)x));						\
 	(x) &~ DMAP_BASE_ADDRESS; })
 
 /*
