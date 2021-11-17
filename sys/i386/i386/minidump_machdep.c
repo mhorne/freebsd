@@ -148,7 +148,7 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 static pt_entry_t fakept[NPTEPG];
 
 int
-minidumpsys(struct dumperinfo *di)
+cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 {
 	uint64_t dumpsize;
 	uint32_t ptesize;

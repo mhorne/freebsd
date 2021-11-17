@@ -38,9 +38,10 @@ extern char sigcode[];
 extern int szsigcode;
 
 struct dumperinfo;
+struct minidumpstate;
 
 extern int busdma_swi_pending;
 void busdma_swi(void);
-int minidumpsys(struct dumperinfo *);
+int cpu_minidumpsys(struct dumperinfo *, const struct minidumpstate *);
 
 #endif /* !_MACHINE_MD_VAR_H_ */
