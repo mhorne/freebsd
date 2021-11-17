@@ -186,7 +186,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 			pa = pde & PG_PS_FRAME;
 			for (k = 0; k < NPTEPG; k++) {
 				if (vm_phys_is_dumpable(pa))
-					dump_add_page(pa);
+					vm_page_dump_add(state->dump_bitset, pa);
 				pa += PAGE_SIZE;
 			}
 			continue;
@@ -199,7 +199,8 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 				if ((pte & PG_V) == PG_V) {
 					pa = pte & PG_FRAME;
 					if (vm_phys_is_dumpable(pa))
-						dump_add_page(pa);
+						vm_page_dump_add(
+						    state->dump_bitset, pa);
 				}
 			}
 		} else {
@@ -212,12 +213,12 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 	dumpsize = ptesize;
 	dumpsize += round_page(mbp->msg_size);
 	dumpsize += round_page(BITSET_SIZE(vm_page_dump_pages));
-	VM_PAGE_DUMP_FOREACH(pa) {
+	VM_PAGE_DUMP_FOREACH(state->dump_bitset, pa) {
 		/* Clear out undumpable pages now if needed */
 		if (vm_phys_is_dumpable(pa)) {
 			dumpsize += PAGE_SIZE;
 		} else {
-			dump_drop_page(pa);
+			vm_page_dump_drop(state->dump_bitset, pa);
 		}
 	}
 	dumpsize += PAGE_SIZE;
@@ -259,7 +260,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 		goto fail;
 
 	/* Dump bitmap */
-	error = blk_write(di, (char *)vm_page_dump, 0,
+	error = blk_write(di, (char *)state->dump_bitset, 0,
 	    round_page(BITSET_SIZE(vm_page_dump_pages)));
 	if (error)
 		goto fail;
@@ -302,7 +303,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 	}
 
 	/* Dump memory chunks */
-	VM_PAGE_DUMP_FOREACH(pa) {
+	VM_PAGE_DUMP_FOREACH(state->dump_bitset, pa) {
 		error = blk_write(di, 0, pa, PAGE_SIZE);
 		if (error)
 			goto fail;
