@@ -23,7 +23,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd July 11, 2020
+.Dd December 6, 2021
 .Dt UART 4
 .Os
 .Sh NAME
@@ -37,31 +37,6 @@
 .Pp
 .Cd "device scc"
 .Cd "device uart"
-.Pp
-In
-.Pa /boot/device.hints :
-.Cd hint.uart.0.disabled="1"
-.Cd hint.uart.0.baud="38400"
-.Cd hint.uart.0.port="0x3f8"
-.Cd hint.uart.0.flags="0x10"
-.Pp
-With
-.Ar flags
-encoded as:
-.Bl -tag -compact -width 0x000000
-.It 0x00010
-device is potential system console
-.It 0x00080
-use this port for remote kernel debugging
-.It 0x00100
-set RX FIFO trigger level to ``low'' (NS8250 only)
-.It 0x00200
-set RX FIFO trigger level to ``medium low'' (NS8250 only)
-.It 0x00400
-set RX FIFO trigger level to ``medium high'' (default, NS8250 only)
-.It 0x00800
-set RX FIFO trigger level to ``high'' (NS8250 only)
-.El
 .\"
 .Sh DESCRIPTION
 The
@@ -147,6 +122,99 @@ the 16950 UARTs.
 SCC: serial communications controllers supported by the
 .Xr scc 4
 device driver.
+.El
+.\"
+.Sh CONFIGURATION
+Locating and configuring the system UART may be done in a number of ways,
+depending on the underlying CPU and bus architectures.
+In many cases,
+the device will automatically be discovered and configured correctly,
+however it may be desirable to override specific settings in the case of multiple UARTs,
+or specifying a debug port.
+.Ss Device Specification
+Two kernel environment variables,
+.Va hw.uart.console
+and
+.Va hw.uart.dbgport
+can be used to specify the system's serial console and debug port for
+.Xr gdb 4 ,
+respectively.
+These variables accept a 'device specification' encoded as a list of
+comma-separated key-value pairs,
+with the key and value separated by commas.
+The list of supported keys are:
+.Bl -bullet
+.It
+bd = Busy Detect
+.It
+br = Baudrate
+.It
+ch = Channel
+.It
+db = Data bits
+.It
+dt = Device type
+.It
+io = I/O port address (x86)
+.It
+mm = Memory mapped I/O address
+.It
+pa = Parity
+.It
+rs = Register shift
+.It
+sb = Stopbits
+.It
+xo = Device clock (xtal oscillator)
+.El
+.Ss Flattened Device Tree
+For systems which enumerate devices using a flattened device tree (see
+.Xr fdt 4 )
+such as some arm, arm64, and riscv systems,
+there are two variables which can select the console and debug ports to be used by the system.
+The
+.Va hw.fdt.console
+environment variable selects the system console, while
+.Va hw.fdt.dbgport selects the debug port.
+Both variables accept a device tree handle or node name,
+and can be set in
+.Pa /boot/loader.conf .
+For example,
+.Va hw.fdt.console="uart1" or
+.Va hw.fdt.dbgport="serial@10011000" .
+.Pp
+The device tree will usually describe the parameters of each UART such that no manual configuration is required,
+but it is possible to override these settings using the device specifiers described above.
+.Ss ISA Device Hints
+UART devices appearing on an ISA bus can also be configured with the legacy
+.Xr device.hints 5 .
+This method is supported but not preferred,
+and applies only to to the i386 and amd64 architectures.
+The hints are encoded as follows:
+.Pp
+In
+.Pa /boot/device.hints :
+.Cd hint.uart.0.disabled="1"
+.Cd hint.uart.0.baud="38400"
+.Cd hint.uart.0.port="0x3f8"
+.Cd hint.uart.0.flags="0x10"
+.Pp
+With
+.Ar flags
+encoded as:
+.Bl -tag -compact -width 0x000000
+.It 0x00010
+device is potential system console
+.It 0x00080
+use this port for remote kernel debugging
+.It 0x00100
+set RX FIFO trigger level to ``low'' (NS8250 only)
+.It 0x00200
+set RX FIFO trigger level to ``medium low'' (NS8250 only)
+.It 0x00400
+set RX FIFO trigger level to ``medium high'' (default, NS8250 only)
+.It 0x00800
+set RX FIFO trigger level to ``high'' (NS8250 only)
 .El
 .\"
 .Sh Pulse Per Second (PPS) Timing Interface
