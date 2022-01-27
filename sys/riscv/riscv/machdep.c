@@ -117,6 +117,8 @@ int64_t dcache_line_size;	/* The minimum D cache line size */
 int64_t icache_line_size;	/* The minimum I cache line size */
 int64_t idcache_line_size;	/* The minimum cache line size */
 
+struct riscv_cache_ops cache_ops;
+
 #define BOOT_HART_INVALID	0xffffffff
 uint32_t boot_hart = BOOT_HART_INVALID;	/* The hart we booted on. */
 

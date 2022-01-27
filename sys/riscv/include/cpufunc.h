@@ -107,12 +107,33 @@ sfence_vma_page(uintptr_t addr)
 #define	rdinstret()			csr_read64(instret)
 #define	rdhpmcounter(n)			csr_read64(hpmcounter##n)
 
+typedef void (*cache_flush_t)(vm_offset_t start, vm_size_t size);
+
+struct riscv_cache_ops {
+	cache_flush_t dcache_wb_range;
+	cache_flush_t dcache_inv_range;
+	cache_flush_t dcache_wbinv_range;
+};
+
+extern struct riscv_cache_ops cache_ops;
 extern int64_t dcache_line_size;
 extern int64_t icache_line_size;
 
-#define	cpu_dcache_wbinv_range(a, s)
-#define	cpu_dcache_inv_range(a, s)
-#define	cpu_dcache_wb_range(a, s)
+#define	cpu_dcache_wbinv_range(a, s)					\
+	do {								\
+		if (cache_ops.dcache_wbinv_range != NULL)		\
+			cache_ops.dcache_wbinv_range(a, s);		\
+	} while (0)
+#define	cpu_dcache_inv_range(a, s)					\
+	do {								\
+		if (cache_ops.dcache_inv_range != NULL)			\
+			cache_ops.dcache_inv_range(a, s);		\
+	} while (0)
+#define	cpu_dcache_wb_range(a, s)					\
+	do {								\
+		if (cache_ops.dcache_wb_range != NULL)			\
+			cache_ops.dcache_wb_range(a, s);		\
+	} while (0)
 
 #define	cpu_idcache_wbinv_range(a, s)
 #define	cpu_icache_sync_range(a, s)
