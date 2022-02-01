@@ -1222,8 +1222,7 @@ g_union_kerneldump(struct bio *bp, struct g_union_softc *sc)
  * Handler for g_union_kerneldump().
  */
 static int
-g_union_dumper(void *priv, void *virtual, vm_offset_t physical, off_t offset,
-    size_t length)
+g_union_dumper(void *priv, void *virtual, off_t offset, size_t length)
 {
 
 	return (0);
