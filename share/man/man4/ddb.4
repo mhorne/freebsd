@@ -788,6 +788,23 @@ In addition to what
 shows, also list kernel internal details.
 .\"
 .Pp
+.It Ic show Cm ktr Ns Op Li / Ns Cm a Ns Cm v Ns Cm V
+Print the contents of the
+.Xr ktr 4
+trace buffer.
+The
+.Cm v
+modifier will request fully verbose output, causing the file, line number, and
+timestamp to be printed for each trace entry.
+The
+.Cm V
+modifier will request only the timestamps to be printed.
+The
+.Cm a
+modifier will request that the output be unpaginated.
+.\"
+.\"
+.Pp
 .It Ic show Cm lapic
 Show information from the local APIC registers for this CPU.
 .\"
