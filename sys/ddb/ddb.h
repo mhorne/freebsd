@@ -117,8 +117,11 @@ struct db_command {
 #define	CS_MORE		0x2	/* standard syntax, but may have other words
 				 * at end */
 #define	CS_SET_DOT	0x100	/* set dot after command */
+#define	DB_MAC1		0x10000	/* For MAC policy use */
+#define	DB_MAC2		0x20000
 	struct db_command_table *more; /* another level of command */
 	LIST_ENTRY(db_command) next; /* next entry in the command table */
+	void *mac_priv;		/* For MAC policy use */
 };
 
 /*
