@@ -90,7 +90,11 @@ livedump_start(int fd, int flags, uint8_t compression)
 	di.dumper_start = vnode_dumper_start;
 	di.dumper = vnode_dump;
 	di.dumper_hdr = vnode_write_headers;
+#ifdef __arm__
+	di.blocksize = 1024;
+#else
 	di.blocksize = PAGE_SIZE; /* Arbitrary. */
+#endif
 	di.maxiosize = MAXDUMPPGS * PAGE_SIZE;
 
 	bzero(&kda, sizeof(kda));
