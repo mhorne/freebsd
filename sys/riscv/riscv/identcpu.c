@@ -66,10 +66,12 @@ register_t marchid;	/* The architecture ID */
 register_t mimpid;	/* The implementation ID */
 
 struct cpu_desc {
-	u_int		cpu_impl;
+	u_int		cpu_marchid;
 	u_int		cpu_part_num;
-	const char	*cpu_impl_name;
+	u_int		cpu_core_impl;
+	const char	*cpu_march_name;
 	const char	*cpu_part_name;
+	const char	*cpu_vendor_name;
 };
 
 struct cpu_desc cpu_desc[MAXCPU];
@@ -79,12 +81,6 @@ struct cpu_parts {
 	const char	*part_name;
 };
 #define	CPU_PART_NONE	{ -1, "Unknown Processor" }
-
-struct cpu_implementers {
-	u_int			impl_id;
-	const char		*impl_name;
-};
-#define	CPU_IMPLEMENTER_NONE	{ 0, "Unknown Implementer" }
 
 /*
  * CPU base
@@ -97,11 +93,39 @@ static const struct cpu_parts cpu_parts_std[] = {
 };
 
 /*
- * Implementers table.
+ * Architecture implementers table.
  */
-const struct cpu_implementers cpu_implementers[] = {
-	{ CPU_IMPL_UCB_ROCKET,	"UC Berkeley Rocket" },
-	CPU_IMPLEMENTER_NONE,
+#define	MARCHID_IMPLEMENTER_NONE	{ 0, "Unknown Architecture Implementer" }
+
+struct marchid_implementers {
+	register_t	march_id;
+	const char	*march_name;
+};
+
+const struct marchid_implementers marchid_implementers[] = {
+	{ MARCHID_UCB_ROCKET,	"UC Berkeley Rocket" },
+	{ MARCHID_UCB_BOOM,	"UC Berkeley Boom" },
+	{ MARCHID_OHWG_CVA6,	"OpenHW Group CVA6" },
+	{ MARCHID_OHWG_CV32E40P, "OpenHW Group CV32E40P" },
+	{ MARCHID_UCB_SPIKE,	"UC Berkeley Spike" },
+	{ MARCHID_UC_RVBS,	"University of Cambridge RVBS" },
+	MARCHID_IMPLEMENTER_NONE,
+};
+
+/*
+ * Core implementers table.
+*/
+#define	MVENDORID_NONE		{ 0, "Unknown Core Implementer" }
+
+struct mvendorid_implementers {
+	register_t	mvendor_id;
+	const char	*mvendor_name;
+};
+
+const struct mvendorid_implementers mvendorid_implementers[] = {
+	{ MVENDORID_WDC,	"Western Digital Corporation" },
+	{ MVENDORID_SIFIVE,	"SiFive" },
+	MVENDORID_NONE,
 };
 
 #ifdef FDT
@@ -183,8 +207,8 @@ void
 identify_cpu(void)
 {
 	const struct cpu_parts *cpu_partsp;
+	struct cpu_desc *desc;
 	uint32_t part_id;
-	uint32_t impl_id;
 	uint64_t misa;
 	u_int cpu;
 	size_t i;
@@ -195,14 +219,24 @@ identify_cpu(void)
 	misa = 0;
 
 	cpu = PCPU_GET(cpuid);
+	desc = &cpu_desc[cpu];
 
-	impl_id	= CPU_IMPL(mimpid);
-	for (i = 0; i < nitems(cpu_implementers); i++) {
-		if (impl_id == cpu_implementers[i].impl_id ||
-		    cpu_implementers[i].impl_id == 0) {
-			cpu_desc[cpu].cpu_impl = impl_id;
-			cpu_desc[cpu].cpu_impl_name = cpu_implementers[i].impl_name;
+	for (i = 0; i < nitems(marchid_implementers); i++) {
+		if (marchid == marchid_implementers[i].march_id ||
+		    marchid_implementers[i].march_id == 0) {
+			desc->cpu_marchid = marchid;
+			desc->cpu_march_name = marchid_implementers[i].march_name;
 			cpu_partsp = cpu_parts_std;
+			break;
+		}
+	}
+
+	for (i = 0; i < nitems(mvendorid_implementers); i++) {
+		if (mvendorid == mvendorid_implementers[i].mvendor_id ||
+		    mvendorid_implementers[i].mvendor_id == 0) {
+			desc->cpu_core_impl = mvendorid;
+			desc->cpu_vendor_name =
+			    mvendorid_implementers[i].mvendor_name;
 			break;
 		}
 	}
@@ -211,16 +245,26 @@ identify_cpu(void)
 	for (i = 0; &cpu_partsp[i] != NULL; i++) {
 		if (part_id == cpu_partsp[i].part_id ||
 		    cpu_partsp[i].part_id == -1) {
-			cpu_desc[cpu].cpu_part_num = part_id;
-			cpu_desc[cpu].cpu_part_name = cpu_partsp[i].part_name;
+			desc->cpu_part_num = part_id;
+			desc->cpu_part_name = cpu_partsp[i].part_name;
 			break;
 		}
 	}
 
 	/* Print details for boot CPU or if we want verbose output */
 	if (cpu == 0 || bootverbose) {
-		printf("CPU(%d): %s %s\n", cpu,
-		    cpu_desc[cpu].cpu_impl_name,
-		    cpu_desc[cpu].cpu_part_name);
+		if (desc->cpu_core_impl) {
+			printf("CPU(%d): %s,"
+			    " Core Manufacturer: %s"
+			    " Processor Implementation Version: %lu\n",
+			    cpu, desc->cpu_march_name, desc->cpu_vendor_name,
+			    mimpid);
+		} else {
+			printf("CPU(%d): %s,"
+			" %s\n",
+			cpu,
+			desc->cpu_march_name,
+			desc->cpu_vendor_name);
+		}
 	}
 }

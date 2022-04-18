@@ -52,20 +52,43 @@
 #ifdef _KERNEL
 
 /*
- * 0x0000         CPU ID unimplemented
- * 0x0001         UC Berkeley Rocket repo
- * 0x0002­0x7FFE  Reserved for open-source repos
+ * 0x0000         Unspecified architecture origin
+ * 0x0001­x7FFE  Reserved for open-source repos
  * 0x7FFF         Reserved for extension
  * 0x8000         Reserved for anonymous source
  * 0x8001­0xFFFE  Reserved for proprietary implementations
  * 0xFFFF         Reserved for extension
  */
 
-#define	CPU_IMPL_SHIFT		0
-#define	CPU_IMPL_MASK		(0xffff << CPU_IMPL_SHIFT)
-#define	CPU_IMPL(mimpid)	((mimpid & CPU_IMPL_MASK) >> CPU_IMPL_SHIFT)
-#define	CPU_IMPL_UNIMPLEMEN	0x0
-#define	CPU_IMPL_UCB_ROCKET	0x1
+#define	MARCHID_SHIFT		0
+#define	MARCHID_MASK		(0xffff << MARCHID_SHIFT)
+#define	MARCHID(mimpid)	((mimpid & MARCHID_MASK) >> MARCHID_SHIFT)
+#define	MARCHID_UNIMPLEMEN	0x0
+#define	MARCHID_UCB_ROCKET	0x1
+#define MARCHID_UCB_BOOM	0x2
+#define MARCHID_OHWG_CVA6	0x3
+#define MARCHID_OHWG_CV32E40P	0x4
+#define MARCHID_UCB_SPIKE	0x5
+#define MARCHID_UC_RVBS	0x10
+
+/*
+ * JEDEC manufacturer IDs
+ */
+#define JEDEC_ID_TO_MVENDORID(_bank, _offset) (((_bank-1)<<7) |\
+	(_offset & (~(1<<7))))
+
+#define	JEDEC_BANKID_SIFIVE	0xa
+#define	JEDEC_OFFSET_SIFIVE	0x89
+#define	JEDEC_BANKID_WDC	0x1
+#define	JEDEC_OFFSET_WDC	0x45
+
+/*
+ * Core manufacturers mvendor IDs.
+ */
+#define	MVENDORID_WDC	JEDEC_ID_TO_MVENDORID(JEDEC_BANKID_WDC, \
+	JEDEC_OFFSET_WDC)
+#define	MVENDORID_SIFIVE	JEDEC_ID_TO_MVENDORID(JEDEC_BANKID_SIFIVE, \
+	JEDEC_OFFSET_SIFIVE)
 
 #define	CPU_PART_SHIFT		62
 #define	CPU_PART_MASK		(0x3ul << CPU_PART_SHIFT)
