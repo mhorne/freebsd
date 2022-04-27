@@ -108,6 +108,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_vm.h"
 
 #include <sys/param.h>
+#include <sys/asan.h>
 #include <sys/bitstring.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
@@ -146,6 +147,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_dumpset.h>
 #include <vm/uma.h>
 
+#include <machine/asan.h>
 #include <machine/machdep.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
@@ -1110,6 +1112,50 @@ pmap_bootstrap_l3(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l3_start)
 	return l3pt;
 }
 
+#ifdef KASAN
+static vm_offset_t
+pmap_bootstrap_shadow_map(vm_offset_t l0pt, vm_offset_t freemempos)
+{
+	vm_offset_t va, l1pt, l2pt;
+	pd_entry_t *l0, *l1;
+	vm_paddr_t pa;
+
+	/*
+	 * First part of the kasan(9) shadow map setup: page table construction.
+	 *
+	 * Allocate space to store the shadow map page tables, link them up
+	 * properly, but don't actually map anything yet. We defer that action
+	 * until all early allocations in pmap_bootstrap() are done.
+	 */
+	va = KASAN_MIN_ADDRESS;
+
+	/* Allocate and link a new l1 table for the shadow map. */
+	l0 = (pd_entry_t *)l0pt;
+	l1pt = freemempos;
+	freemempos += PAGE_SIZE;
+	memset((void *)l1pt, 0, PAGE_SIZE);
+	pa = pmap_early_vtophys(l1pt);
+	pmap_store(&l0[pmap_l0_index(va)], pa | TATTR_UXN_TABLE |
+	    TATTR_AP_TABLE_NO_EL0 | L0_TABLE);
+
+	/*
+	 * Allocate and link a single l2 table. This is enough to cover
+	 * 1GB * KASAN_SHADOW_SCALE == 8GB of KVA, which is more than enough to
+	 * bootstrap.
+	 */
+	l1 = (pd_entry_t *)l1pt;
+	l2pt = freemempos;
+	freemempos += PAGE_SIZE;
+	memset((void *)l2pt, 0, PAGE_SIZE);
+	pa = pmap_early_vtophys(l2pt);
+	pmap_store(&l1[pmap_l1_index(va)], (pa & ~Ln_TABLE_MASK) |
+	    ATTR_DEFAULT | ATTR_S1_XN | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
+	    L1_TABLE);
+
+	return (freemempos);
+}
+#endif
+
 /*
  *	Bootstrap the system enough to run with virtual memory.
  */
@@ -1177,6 +1223,9 @@ pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
 	/* And the l3 tables for the early devmap */
 	freemempos = pmap_bootstrap_l3(l1pt,
 	    VM_MAX_KERNEL_ADDRESS - (PMAP_MAPDEV_EARLY_SIZE), freemempos);
+#ifdef KASAN
+	freemempos = pmap_bootstrap_shadow_map(l0pt, freemempos);
+#endif
 
 	cpu_tlb_flushID();
 
@@ -1203,6 +1252,42 @@ pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
 
 	pa = pmap_early_vtophys(freemempos);
 
+#ifdef KASAN
+	/*
+	 * Finish constructing the initial shadow map:
+	 * - Count how many pages from KERNBASE to virtual_avail (scaled for
+	 *   shadow map)
+	 * - Map that entire range using L2 superpages, stealing free physical
+	 *   memory by increasing 'pa'
+	 */
+	int shadow_npages, nkasan_l2;
+
+	shadow_npages = howmany(virtual_avail - VM_MIN_KERNEL_ADDRESS, PAGE_SIZE);
+	shadow_npages /= KASAN_SHADOW_SCALE;
+	nkasan_l2 = howmany(shadow_npages, Ln_ENTRIES);
+
+	/* Map the valid KVA up to this point. */
+	vm_offset_t va = KASAN_MIN_ADDRESS;
+	pd_entry_t *l2 = pmap_l2(kernel_pmap, va);
+
+	/* L2 mappings must be backed by memory that is L2-aligned */
+	pa = roundup2(pa, L2_SIZE);
+
+	for (i = 0; i < nkasan_l2; i++, va += L2_SIZE, pa += L2_SIZE) {
+		pmap_store(&l2[pmap_l2_index(va)], (pa & ~Ln_TABLE_MASK) |
+		    ATTR_DEFAULT | ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_S1_XN |
+		    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) | L2_BLOCK);
+	}
+
+	/*
+	 * Done. We should now have a valid shadow address mapped for all KVA
+	 * that has been mapped so far, i.e. KERNBASE to virtual_avail. Thus,
+	 * shadow accesses by the kasan(9) runtime will succeed for this range.
+	 * When the kernel virtual address range is later expanded, as will
+	 * happen in vm_mem_init(), the shadow map will be grown as well. This
+	 * is handled by pmap_san_enter().
+	 */
+#endif
 	physmem_exclude_region(start_pa, pa - start_pa, EXFLAG_NOALLOC);
 
 	cpu_tlb_flushID();
@@ -2374,6 +2459,8 @@ pmap_growkernel(vm_offset_t addr)
 	addr = roundup2(addr, L2_SIZE);
 	if (addr - 1 >= vm_map_max(kernel_map))
 		addr = vm_map_max(kernel_map);
+	if (kernel_vm_end < addr)
+		kasan_shadow_map(kernel_vm_end, addr - kernel_vm_end);
 	while (kernel_vm_end < addr) {
 		l0 = pmap_l0(kernel_pmap, kernel_vm_end);
 		KASSERT(pmap_load(l0) != 0,
@@ -7214,6 +7301,67 @@ pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
 	return (mode >= VM_MEMATTR_DEVICE && mode <= VM_MEMATTR_WRITE_THROUGH);
 }
 
+#if defined(KASAN)
+static vm_page_t
+pmap_san_enter_alloc_l3(void)
+{
+	vm_page_t m;
+
+	m = vm_page_alloc_noobj(VM_ALLOC_INTERRUPT | VM_ALLOC_WIRED |
+	    VM_ALLOC_ZERO);
+	if (m == NULL)
+		panic("%s: no memory to grow shadow map", __func__);
+	return (m);
+}
+
+static vm_page_t
+pmap_san_enter_alloc_l2(void)
+{
+	return (vm_page_alloc_noobj_contig(VM_ALLOC_WIRED | VM_ALLOC_ZERO,
+	    Ln_ENTRIES, 0, ~0ul, L2_SIZE, 0, VM_MEMATTR_DEFAULT));
+}
+
+void __nosanitizeaddress
+pmap_san_enter(vm_offset_t va)
+{
+	pd_entry_t *l1, *l2;
+	pt_entry_t *l3;
+	vm_page_t m;
+
+	mtx_assert(&kernel_map->system_mtx, MA_OWNED);
+	l1 = pmap_l1(kernel_pmap, va);
+	MPASS(l1 != NULL);
+	if ((pmap_load(l1) & ATTR_DESCR_VALID) == 0) {
+		m = pmap_san_enter_alloc_l3();
+		pmap_store(l1, (VM_PAGE_TO_PHYS(m) & ~Ln_TABLE_MASK) | ATTR_DEFAULT | ATTR_S1_XN |
+		    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) | L1_TABLE);
+	}
+	l2 = pmap_l1_to_l2(l1, va);
+	if ((pmap_load(l2) & ATTR_DESCR_VALID) == 0) {
+		m = pmap_san_enter_alloc_l2();
+		if (m != NULL) {
+			/* TODO: verify PTE bits. */
+			pmap_store(l2, VM_PAGE_TO_PHYS(m) | ATTR_DEFAULT |
+			    ATTR_S1_XN | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
+			    ATTR_S1_AP(ATTR_S1_AP_RW) | L2_BLOCK);
+		} else {
+			m = pmap_san_enter_alloc_l3();
+			pmap_store(l2, VM_PAGE_TO_PHYS(m) | ATTR_DEFAULT |
+			    ATTR_S1_XN | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
+			    L2_TABLE);
+		}
+	}
+	if ((pmap_load(l2) & ATTR_DESCR_MASK) == L2_BLOCK)
+		return;
+	l3 = pmap_l2_to_l3(l2, va);
+	if ((pmap_load(l3) & ATTR_DESCR_VALID) != 0)
+		return;
+	m = pmap_san_enter_alloc_l3();
+	pmap_store(l3, VM_PAGE_TO_PHYS(m) | ATTR_DEFAULT | ATTR_S1_XN |
+	    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) | ATTR_S1_AP(ATTR_S1_AP_RW) | L3_PAGE);
+}
+#endif /* KASAN */
+
 /*
  * Track a range of the kernel's virtual address space that is contiguous
  * in various mapping attributes.
@@ -7382,6 +7530,10 @@ sysctl_kmaps(SYSCTL_HANDLER_ARGS)
 			sbuf_printf(sb, "\nDirect map:\n");
 		else if (i == pmap_l0_index(VM_MIN_KERNEL_ADDRESS))
 			sbuf_printf(sb, "\nKernel map:\n");
+#ifdef KASAN
+		else if (i == pmap_l0_index(KASAN_MIN_ADDRESS))
+			sbuf_printf(sb, "\nKASAN shadow map:\n");
+#endif
 
 		l0e = kernel_pmap->pm_l0[i];
 		if ((l0e & ATTR_DESCR_VALID) == 0) {

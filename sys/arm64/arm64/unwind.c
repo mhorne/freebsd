@@ -34,7 +34,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/stack.h>
 #include <machine/vmparam.h>
 
-bool
+bool __nosanitizeaddress
 unwind_frame(struct thread *td, struct unwind_state *frame)
 {
 	uintptr_t fp;

@@ -59,7 +59,7 @@ _COPTFLAGS_EXTRA=-frename-registers
 .else
 _COPTFLAGS_EXTRA=
 .endif
-COPTFLAGS?=-O2 -pipe ${_COPTFLAGS_EXTRA}
+COPTFLAGS?=-O0 -pipe ${_COPTFLAGS_EXTRA}
 .if !empty(COPTFLAGS:M-O[23s]) && empty(COPTFLAGS:M-fno-strict-aliasing)
 COPTFLAGS+= -fno-strict-aliasing
 .endif
@@ -94,9 +94,19 @@ COMPAT_FREEBSD32_ENABLED!= grep COMPAT_FREEBSD32 opt_global.h || true ; echo
 
 KASAN_ENABLED!=	grep KASAN opt_global.h || true ; echo
 .if !empty(KASAN_ENABLED)
+# KASAN/ARM64 TODO: -asan-mapping-offset is calculated from:
+#	   (VM_KERNEL_MIN_ADDRESS >> KASAN_SHADOW_SCALE_SHIFT) + $offset = KASAN_MIN_ADDRESS
+#
+#	This is different than amd64, where we have a different
+#	KASAN_MIN_ADDRESS, and this offset value should eventually be
+#	upstreamed similar to: https://reviews.llvm.org/D98285
+#
+#	-asan-stack=false is a temporary workaround for early shadow map access
+#	before pmap_bootstrap()
 SAN_CFLAGS+=	-DSAN_NEEDS_INTERCEPTORS -DSAN_INTERCEPTOR_PREFIX=kasan \
 		-fsanitize=kernel-address \
-		-mllvm -asan-stack=true \
+		-mllvm -asan-stack=false \
+		-mllvm -asan-mapping-offset=0xdfff208000000000 \
 		-mllvm -asan-instrument-dynamic-allocas=true \
 		-mllvm -asan-globals=true \
 		-mllvm -asan-use-after-scope=true \

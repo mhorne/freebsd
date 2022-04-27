@@ -41,7 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/stack.h>
 
-static void
+static void __nosanitizeaddress
 stack_capture(struct thread *td, struct stack *st, struct unwind_state *frame)
 {
 
@@ -56,7 +56,7 @@ stack_capture(struct thread *td, struct stack *st, struct unwind_state *frame)
 	}
 }
 
-int
+int __nosanitizeaddress
 stack_save_td(struct stack *st, struct thread *td)
 {
 	struct unwind_state frame;
@@ -75,7 +75,7 @@ stack_save_td(struct stack *st, struct thread *td)
 	return (0);
 }
 
-void
+void __nosanitizeaddress
 stack_save(struct stack *st)
 {
 	struct unwind_state frame;
