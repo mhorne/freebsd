@@ -541,6 +541,14 @@ Switch the debugger to the thread with ID
 if the argument is a decimal number, or address
 .Ar addr ,
 otherwise.
+.Pp
+.It Ic watchdog Op Ar exp
+Program the
+.Xr watchdog 4
+timer to fire in 2^ .\" TODO: how to format this?
+.Ar exp
+seconds.
+If no argument is provided, the watchdog timer is disabled.
 .El
 .Ss SPECIALIZED HELPER COMMANDS
 .Bl -tag -width indent -compact
