@@ -29,13 +29,19 @@
  */
 
 #include <sys/param.h>
+#include <sys/jail.h>
 #include <sys/kdb.h>
 #include <sys/module.h>
+#include <sys/mount.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
+#include <sys/rman.h>
 #include <sys/sysctl.h>
 
+#include <net/vnet.h>
+
 #include <ddb/ddb.h>
+#include <ddb/db_command.h>
 
 #include <security/mac/mac_policy.h>
 
@@ -69,6 +75,13 @@
 
 typedef int db_validation_fn_t(db_expr_t addr, bool have_addr, db_expr_t count,
     char *modif);
+
+static db_validation_fn_t	db_thread_valid;
+static db_validation_fn_t	db_show_ffs_valid;
+static db_validation_fn_t	db_show_prison_valid;
+static db_validation_fn_t	db_show_proc_valid;
+static db_validation_fn_t	db_show_rman_valid;
+static db_validation_fn_t	db_show_vnet_valid;
 
 struct cmd_list_item {
 	const char *name;
@@ -108,6 +121,7 @@ static const struct cmd_list_item command_list[] = {
 	{ "sysctl",		NULL },
 	{ "t",			NULL },
 	{ "textdump",		NULL },
+	{ "thread",		db_thread_valid },
 	{ "trace",		NULL },
 	{ "unscript",		NULL },
 	{ "until",		NULL },
@@ -132,6 +146,7 @@ static const struct cmd_list_item show_command_list[] = {
 	{ "dmars",		NULL },
 	{ "domainsets",		NULL },
 	{ "dpcpu_off",		NULL },
+	{ "ffs",		db_show_ffs_valid },
 	{ "files",		NULL },
 	{ "freepages",		NULL },
 	{ "idt",		NULL },
@@ -154,23 +169,133 @@ static const struct cmd_list_item show_command_list[] = {
 	{ "pcpu",		NULL },
 	{ "pgrpdump",		NULL },
 	{ "physmem",		NULL },
+	{ "prison",		db_show_prison_valid },
+	{ "proc",		db_show_proc_valid },
 	{ "registers",		NULL },
+	{ "rman",		db_show_rman_valid },
 	{ "rmans",		NULL },
 	{ "routetable",		NULL },
 	{ "rtc",		NULL },
 	{ "sysinit",		NULL },
 	{ "sysregs",		NULL },
+	{ "thread",		db_thread_valid },
 	{ "threads",		NULL },
 	{ "turnstile",		NULL },
 	{ "uma",		NULL },
 	{ "umacache",		NULL },
 	{ "vmochk",		NULL },
 	{ "vmopag",		NULL },
+	{ "vnet",		db_show_vnet_valid },
 	{ "vnet_sysinit",	NULL },
 	{ "vnet_sysuninit",	NULL },
 	{ "watches",		NULL },
 	{ "witness",		NULL },
 };
+
+static int
+db_thread_valid(db_expr_t addr, bool have_addr, db_expr_t count, char *modif)
+{
+	struct thread *thr;
+	lwpid_t tid;
+
+	/* Default will show the current proc. */
+	if (!have_addr)
+		return (0);
+
+	/* Validate the provided addr OR tid against the thread list. */
+	tid = db_hex2dec(addr);
+	for (thr = kdb_thr_first(); thr != NULL; thr = kdb_thr_next(thr)) {
+		if ((void *)thr == (void *)addr || tid == thr->td_tid)
+			return (0);
+	}
+
+	return (EACCES);
+}
+
+static int
+db_show_ffs_valid(db_expr_t addr, bool have_addr, db_expr_t count, char *modif)
+{
+	struct mount *mp;
+
+	/* No addr will show all mounts. */
+	if (!have_addr)
+		return (0);
+
+	TAILQ_FOREACH(mp, &mountlist, mnt_list)
+		if ((void *)mp == (void *)addr)
+			return (0);
+
+	return (EACCES);
+}
+
+static int
+db_show_prison_valid(db_expr_t addr, bool have_addr, db_expr_t count,
+    char *modif)
+{
+	struct prison *pr;
+	int pr_id;
+
+	if (!have_addr || addr == 0)
+		return (0);
+
+	/* prison can match by pointer address or ID. */
+	pr_id = (int)addr;
+	TAILQ_FOREACH(pr, &allprison, pr_list)
+		if (pr->pr_id == pr_id || (void *)pr == (void *)addr)
+			return (0);
+
+	return (EACCES);
+}
+
+static int
+db_show_proc_valid(db_expr_t addr, bool have_addr, db_expr_t count,
+    char *modif)
+{
+	struct proc *p;
+	int i;
+
+	/* Default will show the current proc. */
+	if (!have_addr)
+		return (0);
+
+	for (i = 0; i <= pidhash; i++) {
+		LIST_FOREACH(p, &pidhashtbl[i], p_hash) {
+			if ((void *)p == (void *)addr)
+				return (0);
+		}
+	}
+
+	return (EACCES);
+}
+
+static int
+db_show_rman_valid(db_expr_t addr, bool have_addr, db_expr_t count, char *modif)
+{
+	struct rman *rm;
+
+	TAILQ_FOREACH(rm, &rman_head, rm_link) {
+		if ((void *)rm == (void *)rm)
+			return (0);
+	}
+
+	return (EACCES);
+}
+
+static int
+db_show_vnet_valid(db_expr_t addr, bool have_addr, db_expr_t count, char *modif)
+{
+	VNET_ITERATOR_DECL(vnet);
+
+	if (!have_addr)
+		return (0);
+
+	VNET_FOREACH(vnet) {
+		if ((void *)vnet == (void *)addr)
+			return (0);
+	}
+
+	return (EACCES);
+}
 
 static int
 command_match(struct db_command *cmd, struct cmd_list_item item)
