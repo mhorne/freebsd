@@ -779,15 +779,6 @@ Dump the interrupt statistics.
 Show interrupt lines and their respective kernel threads.
 .\"
 .Pp
-.It Ic show Cm jails
-Show the list of
-.Xr jail 8
-instances.
-In addition to what
-.Xr jls 8
-shows, also list kernel internal details.
-.\"
-.Pp
 .It Ic show Cm ktr Ns Op Li / Ns Cm a Ns Cm v Ns Cm V
 Print the contents of the
 .Xr ktr 4
@@ -973,6 +964,14 @@ Names of spin locks held.
 .Pp
 .It Ic show Cm pgrpdump
 Dump process groups present within the system.
+.\"
+.Pp
+.It Ic show Cm prison Op Ar addr
+Show the prison structure located at
+.Ar addr .
+If no
+.Ar addr
+argument is specified, show information about all prisons in the system.
 .\"
 .Pp
 .It Ic show Cm proc Op Ar addr
