@@ -226,18 +226,18 @@ SUBDIR=	\
 	linuxkpi \
 	${_lio} \
 	lpt \
-	mac_biba \
-	mac_bsdextended \
-	mac_ifoff \
-	mac_lomac \
-	mac_mls \
-	mac_none \
-	mac_ntpd \
-	mac_partition \
-	mac_portacl \
-	mac_seeotheruids \
-	mac_stub \
-	mac_test \
+	${_mac_biba} \
+	${_mac_bsdextended} \
+	${_mac_ifoff} \
+	${_mac_lomac} \
+	${_mac_mls} \
+	${_mac_none} \
+	${_mac_ntpd} \
+	${_mac_partition} \
+	${_mac_portacl} \
+	${_mac_seeotheruids} \
+	${_mac_stub} \
+	${_mac_test} \
 	malo \
 	md \
 	mdio \
@@ -526,6 +526,22 @@ _mlx5ib=	mlx5ib
 .if ${MK_NAND} != "no" || defined(ALL_MODULES)
 _nandfs=	nandfs
 _nandsim=	nandsim
+.endif
+
+# MAC framework
+.if ${KERN_OPTS:MMAC} || defined(ALL_MODULES)
+_mac_biba=	mac_biba
+_mac_bsdextended= mac_bsdextended
+_mac_ifoff=	mac_ifoff
+_mac_lomac=	mac_lomac
+_mac_mls=	mac_mls
+_mac_none=	mac_none
+_mac_ntpd=	mac_ntpd
+_mac_partition=	mac_partition
+_mac_portacl=	mac_portacl
+_mac_seeotheruids= mac_seeotheruids
+_mac_stub=	mac_stub
+_mac_test=	mac_test
 .endif
 
 .if ${MK_NETGRAPH} != "no" || defined(ALL_MODULES)
