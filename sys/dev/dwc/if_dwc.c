@@ -584,12 +584,15 @@ dwc_init_dma(struct dwc_softc *sc)
 
 	/* Initializa DMA and enable transmitters */
 	reg = READ4(sc, OPERATION_MODE);
-	reg |= (MODE_TSF | MODE_OSF | MODE_FUF);
-	reg &= ~(MODE_RSF);
-	//reg |= (MODE_OSF | MODE_FUF);
-	//reg &= ~(MODE_TSF | MODE_RSF);
-	reg |= (MODE_RTC_LEV32 << MODE_RTC_SHIFT);
-	//reg |= 0x140000; /* TTC */
+	reg |= (MODE_FUF | MODE_FTF);
+	reg &= ~(MODE_RSF | (MODE_RTC_MASK << MODE_RTC_SHIFT));
+	reg |= MODE_RTC_LEV128 << MODE_RTC_MASK;
+	if (sc->tx_dma_thresh_mode) {
+		reg &= ~(MODE_TSF | (MODE_TTC_MASK << MODE_TTC_SHIFT));
+		reg |= MODE_TTC_LEV128 << MODE_TTC_SHIFT;
+	} else {
+		reg |= MODE_TSF | MODE_OSF;
+	}
 	WRITE4(sc, OPERATION_MODE, reg);
 
 	WRITE4(sc, INTERRUPT_ENABLE, INT_EN_DEFAULT);
@@ -1719,6 +1722,8 @@ dwc_attach(device_t dev)
 		nopblx8 = true;
 	if (OF_hasprop(node, "snps,fixed-burst") == 1)
 		fixed_burst = true;
+	if (OF_hasprop(node, "snps,force_dma_thresh_mode"))
+		sc->tx_dma_thresh_mode = true;
 
 	if (IF_DWC_INIT(dev) != 0)
 		return (ENXIO);
