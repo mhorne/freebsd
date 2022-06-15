@@ -533,6 +533,8 @@ dwc_attach(device_t dev)
 		sc->mixed_burst = true;
 	if (OF_hasprop(sc->node, "snps,aal") == 1)
 		sc->aal = true;
+	if (OF_hasprop(sc->node, "snps,force_dma_thresh_mode"))
+		sc->tx_dma_thresh_mode = true;
 
 	error = clk_set_assigned(dev, ofw_bus_get_node(dev));
 	if (error != 0) {

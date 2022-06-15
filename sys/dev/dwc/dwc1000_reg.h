@@ -241,9 +241,17 @@
 #define	 MODE_RSF		(1 << 25) /* RX Full Frame */
 #define	 MODE_TSF		(1 << 21) /* TX Full Frame */
 #define	 MODE_FTF		(1 << 20) /* Flush TX FIFO */
+#define	 MODE_TTC_LEV32		0x5
+#define	 MODE_TTC_LEV64		0x0
+#define	 MODE_TTC_LEV128	0x1
+#define	 MODE_TTC_MASK		0x7
+#define	 MODE_TTC_SHIFT		14
 #define	 MODE_ST		(1 << 13) /* Start DMA TX */
 #define	 MODE_FUF		(1 << 6)  /* TX frames < 64bytes */
 #define	 MODE_RTC_LEV32		0x1
+#define	 MODE_RTC_LEV64		0x0
+#define	 MODE_RTC_LEV128	0x3
+#define	 MODE_RTC_MASK		0x3
 #define	 MODE_RTC_SHIFT		3
 #define	 MODE_OSF		(1 << 2) /* Process Second frame */
 #define	 MODE_SR		(1 << 1) /* Start DMA RX */

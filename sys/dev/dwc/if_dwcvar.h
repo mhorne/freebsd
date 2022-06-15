@@ -113,6 +113,7 @@ struct dwc_softc {
 	uint32_t		tx_map_tail;
 	int			tx_desccount;
 	int			tx_mapcount;
+	bool			tx_dma_thresh_mode;
 };
 
 #define	READ4(_sc, _reg) \

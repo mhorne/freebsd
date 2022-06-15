@@ -573,9 +573,15 @@ dma1000_start(struct dwc_softc *sc)
 
 	/* Initializa DMA and enable transmitters */
 	reg = READ4(sc, OPERATION_MODE);
-	reg |= (MODE_TSF | MODE_OSF | MODE_FUF);
-	reg &= ~(MODE_RSF);
+	reg |= (MODE_FUF); // | MODE_FTF
+	reg &= ~(MODE_RSF | (MODE_RTC_MASK << MODE_RTC_SHIFT));
 	reg |= (MODE_RTC_LEV32 << MODE_RTC_SHIFT);
+	if (sc->tx_dma_thresh_mode) {
+		reg &= ~(MODE_TSF | (MODE_TTC_MASK << MODE_TTC_SHIFT));
+		reg |= MODE_TTC_LEV128 << MODE_TTC_SHIFT;
+	} else {
+		reg |= MODE_TSF | MODE_OSF;
+	}
 	WRITE4(sc, OPERATION_MODE, reg);
 
 	WRITE4(sc, INTERRUPT_ENABLE, INT_EN_DEFAULT);
