@@ -807,7 +807,6 @@ dwc_setup_rxbuf(struct dwc_softc *sc, int idx, struct mbuf *m)
 
 	m_adj(m, ETHER_ALIGN);
 
-	dprintf("dwc_setup_rxbuf: idx=%d, mbuf=%p\n", idx, m);
 	error = bus_dmamap_load_mbuf_sg(sc->rxbuf_tag, sc->rxbuf_map[idx].map,
 	    m, &seg, &nsegs, 0);
 	if (error != 0)

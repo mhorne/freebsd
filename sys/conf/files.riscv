@@ -75,7 +75,10 @@ riscv/riscv/uio_machdep.c	standard
 riscv/riscv/uma_machdep.c	standard
 riscv/riscv/unwind.c		optional	ddb | kdtrace_hooks | stack
 riscv/riscv/vm_machdep.c	standard
+
 riscv/starfive/starfive_if_dwc.c optional       fdt dwc_starfive
+riscv/starfive/jh7100_clk.c	standard
+riscv/starfive/jh7100_clkgen.c	standard
 
 # Zstd
 contrib/zstd/lib/freebsd/zstd_kfreebsd.c		optional zstdio compile-with ${ZSTD_C}
