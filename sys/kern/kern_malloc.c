@@ -1205,7 +1205,7 @@ restart:
 }
 
 #ifdef DDB
-DB_SHOW_COMMAND(malloc, db_show_malloc)
+DB_SHOW_COMMAND_FLAGS(malloc, db_show_malloc, DB_CMD_MEMSAFE)
 {
 	struct malloc_type_internal *mtip;
 	struct malloc_type_stats *mtsp;

@@ -4285,7 +4285,7 @@ uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 #endif /* INVARIANTS */
 
 #ifdef DDB
-DB_SHOW_COMMAND(uma, db_show_uma)
+DB_SHOW_COMMAND_FLAGS(uma, db_show_uma, DB_CMD_MEMSAFE)
 {
 	uma_keg_t kz;
 	uma_zone_t z;
@@ -4321,7 +4321,7 @@ DB_SHOW_COMMAND(uma, db_show_uma)
 	}
 }
 
-DB_SHOW_COMMAND(umacache, db_show_umacache)
+DB_SHOW_COMMAND_FLAGS(umacache, db_show_umacache, DB_CMD_MEMSAFE)
 {
 	uma_zone_t z;
 	uint64_t allocs, frees;

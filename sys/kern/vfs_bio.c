@@ -5359,7 +5359,7 @@ DB_SHOW_COMMAND(buffer, db_show_buffer)
 	db_printf(" ");
 }
 
-DB_SHOW_COMMAND(bufqueues, bufqueues)
+DB_SHOW_COMMAND_FLAGS(bufqueues, bufqueues, DB_CMD_MEMSAFE)
 {
 	struct bufdomain *bd;
 	struct buf *bp;
@@ -5421,7 +5421,7 @@ DB_SHOW_COMMAND(bufqueues, bufqueues)
 	}
 }
 
-DB_SHOW_COMMAND(lockedbufs, lockedbufs)
+DB_SHOW_COMMAND_FLAGS(lockedbufs, lockedbufs, DB_CMD_MEMSAFE)
 {
 	struct buf *bp;
 	int i;
@@ -5459,7 +5459,7 @@ DB_SHOW_COMMAND(vnodebufs, db_show_vnodebufs)
 	}
 }
 
-DB_COMMAND(countfreebufs, db_coundfreebufs)
+DB_COMMAND_FLAGS(countfreebufs, db_coundfreebufs, DB_CMD_MEMSAFE)
 {
 	struct buf *bp;
 	int i, used = 0, nfree = 0;

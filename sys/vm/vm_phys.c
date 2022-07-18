@@ -1428,7 +1428,7 @@ done:
 /*
  * Show the number of physical pages in each of the free lists.
  */
-DB_SHOW_COMMAND(freepages, db_show_freepages)
+DB_SHOW_COMMAND_FLAGS(freepages, db_show_freepages, DB_CMD_MEMSAFE)
 {
 	struct vm_freelist *fl;
 	int flind, oind, pind, dom;

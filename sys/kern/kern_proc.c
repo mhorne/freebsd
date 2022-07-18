@@ -823,8 +823,7 @@ sess_release(struct session *s)
 }
 
 #ifdef DDB
-
-DB_SHOW_COMMAND(pgrpdump, pgrpdump)
+DB_SHOW_COMMAND_FLAGS(pgrpdump, pgrpdump, DB_CMD_MEMSAFE)
 {
 	struct pgrp *pgrp;
 	struct proc *p;
