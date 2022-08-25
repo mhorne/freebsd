@@ -3182,6 +3182,15 @@ pmap_enter_l2(pmap_t pmap, vm_offset_t va, pd_entry_t new_l2, u_int flags,
 	if ((oldl2 = pmap_load(l2)) != 0) {
 		KASSERT(l2pg->ref_count > 1,
 		    ("pmap_enter_l2: l2pg's ref count is too low"));
+		if ((oldl2 & ~(PTE_D | PTE_A)) == new_l2) {
+			/* Mapping exists; it doesn't need a new reference. */
+			l2pg->ref_count--;
+			CTR2(KTR_PMAP,
+			    "pmap_enter_l2: success for va %#lx in pmap %p; "
+			    "pre-existing mapping\n",
+			    va, pmap);
+			return (KERN_SUCCESS);
+		}
 		if ((flags & PMAP_ENTER_NOREPLACE) != 0) {
 			l2pg->ref_count--;
 			CTR2(KTR_PMAP,
@@ -3372,6 +3381,9 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 			 * attempt fails, we don't retry.  Instead, we give up.
 			 */
 			if (l2 != NULL && pmap_load(l2) != 0) {
+				KASSERT((pmap_load(l2) & PTE_RWX) == 0,
+				    ("%s: unexpected L2 leaf for va %#lx",
+				    __func__, va));
 				phys = PTE_TO_PHYS(pmap_load(l2));
 				mpte = PHYS_TO_VM_PAGE(phys);
 				mpte->ref_count++;
