@@ -191,7 +191,7 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
  *	its max offset value is stored in map->header.start.  These
  *	values act as sentinels for any forward or backward address
  *	scan of the list.  The right and left fields of the map
- *	header point to the first and list map entries.  The map
+ *	header point to the first and last map entries.  The map
  *	header has a special value for the eflags field,
  *	MAP_ENTRY_HEADER, that is set initially, is never changed,
  *	and prevents an eflags match of the header with any other map
