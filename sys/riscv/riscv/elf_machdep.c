@@ -340,15 +340,25 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		break;
 
 	case R_RISCV_64:
-	case R_RISCV_JUMP_SLOT:
+		before64 = *where;
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		val = addr;
+		*where = addr + addend;
+		if (debug_kld)
+			printf("%p %c %-24s %016lx -> %016lx\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    before64, *where);
+		break;
+
+	case R_RISCV_JUMP_SLOT:
 		before64 = *where;
-		if (*where != val)
-			*where = val;
+		error = lookup(lf, symidx, 1, &addr);
+		if (error != 0)
+			return (-1);
+
+		*where = addr;
 		if (debug_kld)
 			printf("%p %c %-24s %016lx -> %016lx\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
