@@ -50,8 +50,6 @@
  * Machine dependent constants for AMD64.
  */
 
-#define __HAVE_ACPI
-
 #ifndef MACHINE
 #define	MACHINE		"amd64"
 #endif
