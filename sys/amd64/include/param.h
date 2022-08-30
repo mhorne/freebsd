@@ -51,7 +51,6 @@
  */
 
 #define __HAVE_ACPI
-#define __PCI_REROUTE_INTERRUPT
 
 #ifndef MACHINE
 #define	MACHINE		"amd64"
