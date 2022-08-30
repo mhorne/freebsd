@@ -266,6 +266,12 @@ fatal:
 			return;
 	}
 #endif
+#if KSTACK_GUARD_PAGES > 0
+	/* Be slightly more informative if we detect a kstack overflow. */
+	if (va < td->td_kstack &&
+	    va >= (td->td_kstack - KSTACK_GUARD_PAGES * PAGE_SIZE))
+		panic("Kernel stack overflow detected at %#lx", frame->tf_sepc);
+#endif
 	panic("Fatal page fault at %#lx: %#016lx", frame->tf_sepc, stval);
 }
 
