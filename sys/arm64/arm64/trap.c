@@ -361,6 +361,16 @@ bad_far:
 					return;
 			}
 #endif
+#if KSTACK_GUARD_PAGES > 0
+			/*
+			 * Be slightly more informative if we detect a kstack
+			 * overflow.
+			 */
+			if (far < td->td_kstack && far >= (td->td_kstack -
+			    KSTACK_GUARD_PAGES * PAGE_SIZE))
+				panic("Kernel stack overflow detected at %#lx",
+				    frame->tf_elr);
+#endif
 			panic("vm_fault failed: %lx error %d",
 			    frame->tf_elr, error);
 		}
