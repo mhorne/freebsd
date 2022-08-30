@@ -150,9 +150,6 @@
 #define	atop(x)			((x) >> PAGE_SHIFT)
 #define	ptoa(x)			((x) << PAGE_SHIFT)
 
-#define	powerpc_btop(x)		((x) >> PAGE_SHIFT)
-#define	powerpc_ptob(x)		((x) << PAGE_SHIFT)
-
 #define	pgtok(x)		((x) * (PAGE_SIZE / 1024UL))
 
 #define btoc(x)			((vm_offset_t)(((x)+PAGE_MASK)>>PAGE_SHIFT))

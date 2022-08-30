@@ -153,9 +153,6 @@
 #define atop(x)			((x) >> PAGE_SHIFT)
 #define ptoa(x)			((x) << PAGE_SHIFT)
 
-#define i386_btop(x)		((x) >> PAGE_SHIFT)
-#define i386_ptob(x)		((x) << PAGE_SHIFT)
-
 #define	pgtok(x)		((x) * (PAGE_SIZE / 1024))
 
 #define INKERNEL(va)		(TRUE)

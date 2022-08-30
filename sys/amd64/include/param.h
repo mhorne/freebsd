@@ -151,9 +151,6 @@
 #define	atop(x)		((unsigned long)(x) >> PAGE_SHIFT)
 #define	ptoa(x)		((unsigned long)(x) << PAGE_SHIFT)
 
-#define	amd64_btop(x)	((unsigned long)(x) >> PAGE_SHIFT)
-#define	amd64_ptob(x)	((unsigned long)(x) << PAGE_SHIFT)
-
 #define	pgtok(x)	((unsigned long)(x) * (PAGE_SIZE / 1024)) 
 
 #define	INKERNEL(va) (((va) >= DMAP_MIN_ADDRESS && (va) < DMAP_MAX_ADDRESS) \

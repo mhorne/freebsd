@@ -367,7 +367,7 @@ opalpci_attach(device_t dev)
 	 * segments of max_tce_size size
 	 */
 	tce_size = max_tce_size(dev);
-	maxmem = roundup2(powerpc_ptob(Maxmem), tce_size);
+	maxmem = roundup2(ptoa(Maxmem), tce_size);
 	entries = round_pow2(maxmem / tce_size);
 	tce_tbl_size = MAX(entries * sizeof(uint64_t), 4096);
 	if (entries > OPAL_PCI_TCE_MAX_ENTRIES)

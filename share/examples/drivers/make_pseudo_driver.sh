@@ -314,7 +314,7 @@ ${1}mmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 	if (offset > FRAMEBUFFERSIZE - PAGE_SIZE) {
 		return (-1);
 	}
-	return i386_btop((FRAMEBASE + offset));
+	return atop((FRAMEBASE + offset));
 #else
 	return (-1);
 #endif

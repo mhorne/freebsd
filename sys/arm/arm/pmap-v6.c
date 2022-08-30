@@ -1880,7 +1880,7 @@ pmap_pte2(pmap_t pmap, vm_offset_t va)
 			pte2_store(PMAP2, PTE2_KPT(pt2pg_pa));
 			tlb_flush((vm_offset_t)PADDR2);
 		}
-		return (PADDR2 + (arm32_btop(va) & (NPTE2_IN_PG - 1)));
+		return (PADDR2 + (atop(va) & (NPTE2_IN_PG - 1)));
 	}
 	return (NULL);
 }
@@ -1942,7 +1942,7 @@ pmap_pte2_quick(pmap_t pmap, vm_offset_t va)
 		} else
 #endif
 			PMAP1unchanged++;
-		return (PADDR1 + (arm32_btop(va) & (NPTE2_IN_PG - 1)));
+		return (PADDR1 + (atop(va) & (NPTE2_IN_PG - 1)));
 	}
 	return (NULL);
 }
@@ -6716,7 +6716,7 @@ pmap_pte2_ddb(pmap_t pmap, vm_offset_t va)
 		tlb_flush_local((vm_offset_t)PADDR3);
 	}
 #endif
-	return (PADDR3 + (arm32_btop(va) & (NPTE2_IN_PG - 1)));
+	return (PADDR3 + (atop(va) & (NPTE2_IN_PG - 1)));
 }
 
 static void

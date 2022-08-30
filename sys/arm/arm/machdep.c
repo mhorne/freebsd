@@ -189,11 +189,11 @@ cpu_startup(void *dummy)
 	 * Display the RAM layout.
 	 */
 	printf("real memory  = %ju (%ju MB)\n",
-	    (uintmax_t)arm32_ptob(realmem),
-	    (uintmax_t)arm32_ptob(realmem) / mbyte);
+	    (uintmax_t)ptoa(realmem),
+	    (uintmax_t)ptoa(realmem) / mbyte);
 	printf("avail memory = %ju (%ju MB)\n",
-	    (uintmax_t)arm32_ptob(vm_free_count()),
-	    (uintmax_t)arm32_ptob(vm_free_count()) / mbyte);
+	    (uintmax_t)ptoa(vm_free_count()),
+	    (uintmax_t)ptoa(vm_free_count()) / mbyte);
 	if (bootverbose) {
 		physmem_print_tables();
 		devmap_print_table();

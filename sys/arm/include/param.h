@@ -136,9 +136,6 @@
 #define	atop(x)			((unsigned)(x) >> PAGE_SHIFT)
 #define	ptoa(x)			((unsigned)(x) << PAGE_SHIFT)
 
-#define	arm32_btop(x)		((unsigned)(x) >> PAGE_SHIFT)
-#define	arm32_ptob(x)		((unsigned)(x) << PAGE_SHIFT)
-
 #define	pgtok(x)		((x) * (PAGE_SIZE / 1024))
 
 #endif /* !_ARM_INCLUDE_PARAM_H_ */

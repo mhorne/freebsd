@@ -943,7 +943,7 @@ moea_bootstrap(vm_offset_t kernelstart, vm_offset_t kernelend)
 	 */
 	for (i = 0; phys_avail[i + 2] != 0; i += 2)
 		;
-	Maxmem = powerpc_btop(phys_avail[i + 1]);
+	Maxmem = atop(phys_avail[i + 1]);
 
 	moea_cpu_bootstrap(0);
 	mtmsr(mfmsr() | PSL_DR | PSL_IR);

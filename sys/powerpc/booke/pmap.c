@@ -877,7 +877,7 @@ mmu_booke_bootstrap(vm_offset_t start, vm_offset_t kernelend)
 	/* Calculate the last available physical address. */
 	for (i = 0; phys_avail[i + 2] != 0; i += 2)
 		;
-	Maxmem = powerpc_btop(phys_avail[i + 1]);
+	Maxmem = atop(phys_avail[i + 1]);
 
 	debugf("Maxmem = 0x%08lx\n", Maxmem);
 	debugf("phys_avail_count = %d\n", phys_avail_count);

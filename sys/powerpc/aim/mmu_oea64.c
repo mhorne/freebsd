@@ -1163,7 +1163,7 @@ moea64_late_bootstrap(vm_offset_t kernelstart, vm_offset_t kernelend)
 	 */
 	Maxmem = 0;
 	for (i = 0; phys_avail[i + 1] != 0; i += 2)
-		Maxmem = MAX(Maxmem, powerpc_btop(phys_avail[i + 1]));
+		Maxmem = MAX(Maxmem, atop(phys_avail[i + 1]));
 
 	/*
 	 * Initialize MMU.

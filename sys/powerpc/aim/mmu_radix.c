@@ -2067,7 +2067,7 @@ mmu_radix_late_bootstrap(vm_offset_t start, vm_offset_t end)
 	 */
 	Maxmem = 0;
 	for (i = 0; phys_avail[i + 1] != 0; i += 2)
-		Maxmem = MAX(Maxmem, powerpc_btop(phys_avail[i + 1]));
+		Maxmem = MAX(Maxmem, atop(phys_avail[i + 1]));
 
 	/*
 	 * Remap any early IO mappings (console framebuffer, etc.)
@@ -2367,7 +2367,7 @@ mmu_radix_bootstrap(vm_offset_t start, vm_offset_t end)
 	if (bootverbose)
 		printf("%s done\n", __func__);
 	pmap_bootstrapped = 1;
-	dmaplimit = roundup2(powerpc_ptob(Maxmem), L2_PAGE_SIZE);
+	dmaplimit = roundup2(ptoa(Maxmem), L2_PAGE_SIZE);
 	PCPU_SET(flags, PCPU_GET(flags) | PC_FLAG_NOSRS);
 }
 
@@ -5850,9 +5850,9 @@ mmu_radix_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t attr)
 	ppa = trunc_page(pa);
 	offset = pa & PAGE_MASK;
 	size = roundup2(offset + size, PAGE_SIZE);
-	if (pa < powerpc_ptob(Maxmem))
+	if (pa < ptoa(Maxmem))
 		panic("bad pa: %#lx less than Maxmem %#lx\n",
-			  pa, powerpc_ptob(Maxmem));
+		    pa, ptoa(Maxmem));
 	va = kva_alloc(size);
 	if (bootverbose)
 		printf("%s(%#lx, %lu, %d)\n", __func__, pa, size, attr);

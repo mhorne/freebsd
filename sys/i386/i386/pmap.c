@@ -198,7 +198,7 @@ __FBSDID("$FreeBSD$");
  *
  * This macro may be used before pmap_bootstrap() is called.
  */
-#define	vtopte(va)	(PTmap + i386_btop(va))
+#define	vtopte(va)	(PTmap + atop(va))
 
 /*
  * Get PDEs and PTEs for user/kernel address space
@@ -1529,7 +1529,7 @@ __CONCAT(PMTYPE, pte)(pmap_t pmap, vm_offset_t va)
 			pmap_invalidate_page_int(kernel_pmap,
 			    (vm_offset_t)PADDR2);
 		}
-		return (PADDR2 + (i386_btop(va) & (NPTEPG - 1)));
+		return (PADDR2 + (atop(va) & (NPTEPG - 1)));
 	}
 	return (NULL);
 }
@@ -1602,7 +1602,7 @@ pmap_pte_quick(pmap_t pmap, vm_offset_t va)
 		} else
 #endif
 			PMAP1unchanged++;
-		return (PADDR1 + (i386_btop(va) & (NPTEPG - 1)));
+		return (PADDR1 + (atop(va) & (NPTEPG - 1)));
 	}
 	return (0);
 }
@@ -1636,7 +1636,7 @@ pmap_pte_quick3(pmap_t pmap, vm_offset_t va)
 		} else
 #endif
 			PMAP1unchanged++;
-		return (PADDR3 + (i386_btop(va) & (NPTEPG - 1)));
+		return (PADDR3 + (atop(va) & (NPTEPG - 1)));
 	}
 	return (0);
 }
@@ -1654,7 +1654,7 @@ pmap_pte_ufast(pmap_t pmap, vm_offset_t va, pd_entry_t pde)
 		*eh_ptep = pde | PG_RW | PG_V | PG_A | PG_M;
 		invlcaddr((void *)PCPU_GET(pmap_eh_va));
 	}
-	ptep = (pt_entry_t *)PCPU_GET(pmap_eh_va) + (i386_btop(va) &
+	ptep = (pt_entry_t *)PCPU_GET(pmap_eh_va) + (atop(va) &
 	    (NPTEPG - 1));
 	pte = *ptep;
 	critical_exit();
@@ -1682,7 +1682,7 @@ __CONCAT(PMTYPE, kextract)(vm_offset_t va)
 		 * however, safe to use the old PDE because the page table
 		 * page is preserved by the promotion.
 		 */
-		pa = KPTmap[i386_btop(va)];
+		pa = KPTmap[atop(va)];
 		pa = (pa & PG_FRAME) | (va & PAGE_MASK);
 	}
 	return (pa);
@@ -2806,7 +2806,7 @@ pmap_demote_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t va)
 	 * address space at either PADDR1 or PADDR2. 
 	 */
 	if (pmap == kernel_pmap)
-		firstpte = &KPTmap[i386_btop(trunc_4mpage(va))];
+		firstpte = &KPTmap[atop(trunc_4mpage(va))];
 	else if (curthread->td_pinned > 0 && rw_wowned(&pvh_global_lock)) {
 		if ((*PMAP1 & PG_FRAME) != mptepa) {
 			*PMAP1 = mptepa | PG_RW | PG_V | PG_A | PG_M;
@@ -2923,7 +2923,7 @@ pmap_remove_kernel_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t va)
 	 * contains valid mappings.  Zero it to invalidate those mappings.
 	 */
 	if (mpte->valid != 0)
-		pagezero((void *)&KPTmap[i386_btop(trunc_4mpage(va))]);
+		pagezero((void *)&KPTmap[atop(trunc_4mpage(va))]);
 
 	/*
 	 * Remove the mapping.
