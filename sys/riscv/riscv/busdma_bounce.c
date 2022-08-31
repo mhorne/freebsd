@@ -904,7 +904,7 @@ bounce_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map,
 		/*
 		 * Wait for any DMA operations to complete before the bcopy.
 		 */
-		fence();
+		mb();
 	}
 
 	if ((bpage = STAILQ_FIRST(&map->bpages)) != NULL) {
@@ -982,7 +982,7 @@ bounce_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map,
 		/*
 		 * Wait for the bcopy to complete before any DMA operations.
 		 */
-		fence();
+		mb();
 	}
 }
 
