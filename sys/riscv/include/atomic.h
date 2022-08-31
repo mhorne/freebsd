@@ -39,10 +39,30 @@
 
 #include <sys/atomic_common.h>
 
-#define	fence()	__asm __volatile("fence" ::: "memory");
-#define	mb()	fence()
-#define	rmb()	fence()
-#define	wmb()	fence()
+/*
+ * TODO: describe the fence instruction
+ */
+#define	_RISCV_FENCE(pred, succ)				\
+    __asm __volatile("fence " #pred "," #succ ::: "memory")
+
+/*
+ * Memory barriers imposing ordering on both processor and device memory.
+ * TODO: verify
+ */
+#define	mb()		_RISCV_FENCE(iorw,iorw)
+#define	rmb()		_RISCV_FENCE(ir,ir)
+#define	wmb()		_RISCV_FENCE(ow,ow)
+
+/*
+ * Barriers providing processor ordering constraints according to the semantics
+ * described in atomic(9). Does not impose ordering constraints on device
+ * memory.
+ * TODO: verify
+ */
+#define	fence()		_RISCV_FENCE(rw,rw)
+#define	fence_acq()	_RISCV_FENCE(r,rw)
+#define	fence_rel()	_RISCV_FENCE(rw,w)
+#define	fence_acq_rel()	_RISCV_FENCE(w,r)
 
 static __inline int atomic_cmpset_8(__volatile uint8_t *, uint8_t, uint8_t);
 static __inline int atomic_fcmpset_8(__volatile uint8_t *, uint8_t *, uint8_t);
