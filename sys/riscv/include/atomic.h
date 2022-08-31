@@ -75,13 +75,13 @@ static __inline  void							\
 atomic_##NAME##_acq_##WIDTH(__volatile uint##WIDTH##_t *p, uint##WIDTH##_t v)\
 {									\
 	atomic_##NAME##_##WIDTH(p, v);					\
-	fence(); 							\
+	fence_acq(); 							\
 }									\
 									\
 static __inline  void							\
 atomic_##NAME##_rel_##WIDTH(__volatile uint##WIDTH##_t *p, uint##WIDTH##_t v)\
 {									\
-	fence();							\
+	fence_rel();							\
 	atomic_##NAME##_##WIDTH(p, v);					\
 }
 
@@ -93,7 +93,7 @@ atomic_cmpset_acq_##WIDTH(__volatile uint##WIDTH##_t *p,		\
 	int retval;							\
 									\
 	retval = atomic_cmpset_##WIDTH(p, cmpval, newval);		\
-	fence();							\
+	fence_acq();							\
 	return (retval);						\
 }									\
 									\
@@ -101,7 +101,7 @@ static __inline  int							\
 atomic_cmpset_rel_##WIDTH(__volatile uint##WIDTH##_t *p,		\
     uint##WIDTH##_t cmpval, uint##WIDTH##_t newval)			\
 {									\
-	fence();							\
+	fence_rel();							\
 	return (atomic_cmpset_##WIDTH(p, cmpval, newval));		\
 }
 
@@ -113,7 +113,7 @@ atomic_fcmpset_acq_##WIDTH(__volatile uint##WIDTH##_t *p,		\
 	int retval;							\
 									\
 	retval = atomic_fcmpset_##WIDTH(p, cmpval, newval);		\
-	fence();							\
+	fence_acq();							\
 	return (retval);						\
 }									\
 									\
@@ -121,7 +121,7 @@ static __inline  int							\
 atomic_fcmpset_rel_##WIDTH(__volatile uint##WIDTH##_t *p,		\
     uint##WIDTH##_t *cmpval, uint##WIDTH##_t newval)			\
 {									\
-	fence();							\
+	fence_rel();							\
 	return (atomic_fcmpset_##WIDTH(p, cmpval, newval));		\
 }
 
@@ -284,8 +284,7 @@ atomic_load_acq_32(volatile uint32_t *p)
 	uint32_t ret;
 
 	ret = *p;
-
-	fence();
+	fence_acq();
 
 	return (ret);
 }
@@ -294,8 +293,7 @@ static __inline void
 atomic_store_rel_32(volatile uint32_t *p, uint32_t val)
 {
 
-	fence();
-
+	fence_rel();
 	*p = val;
 }
 
@@ -494,8 +492,7 @@ atomic_load_acq_64(volatile uint64_t *p)
 	uint64_t ret;
 
 	ret = *p;
-
-	fence();
+	fence_acq();
 
 	return (ret);
 }
@@ -504,8 +501,7 @@ static __inline void
 atomic_store_rel_64(volatile uint64_t *p, uint64_t val)
 {
 
-	fence();
-
+	fence_rel();
 	*p = val;
 }
 
@@ -531,21 +527,21 @@ static __inline void
 atomic_thread_fence_acq(void)
 {
 
-	fence();
+	fence_acq();
 }
 
 static __inline void
 atomic_thread_fence_rel(void)
 {
 
-	fence();
+	fence_rel();
 }
 
 static __inline void
 atomic_thread_fence_acq_rel(void)
 {
 
-	fence();
+	fence_acq_rel();
 }
 
 static __inline void
