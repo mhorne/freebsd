@@ -4572,7 +4572,7 @@ pmap_enter_l2(pmap_t pmap, vm_offset_t va, pd_entry_t new_l2, u_int flags,
 	 */
 	if ((new_l2 & ATTR_SW_WIRED) != 0)
 		pmap->pm_stats.wired_count += L2_SIZE / PAGE_SIZE;
-	pmap->pm_stats.resident_count += L2_SIZE / PAGE_SIZE;
+	pmap_resident_count_inc(pmap, L2_SIZE / PAGE_SIZE);
 
 	/*
 	 * Conditionally sync the icache.  See pmap_enter() for details.
