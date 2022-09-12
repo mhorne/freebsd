@@ -2367,7 +2367,7 @@ pmap_release(pmap_t pmap)
 	if (pmap->pm_levels != 4) {
 		PMAP_ASSERT_STAGE2(pmap);
 		KASSERT(pmap->pm_stats.resident_count == 1,
-		    ("pmap_release: pmap resident count %ld != 0",
+		    ("pmap_release: pmap resident count %ld != 1",
 		    pmap->pm_stats.resident_count));
 		KASSERT((pmap->pm_l0[0] & ATTR_DESCR_VALID) == ATTR_DESCR_VALID,
 		    ("pmap_release: Invalid l0 entry: %lx", pmap->pm_l0[0]));
