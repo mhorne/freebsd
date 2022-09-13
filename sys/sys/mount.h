@@ -660,16 +660,6 @@ struct xvfsconf {
 	struct	vfsconf *vfc_next;	/* next in list */
 };
 
-#ifndef BURN_BRIDGES
-struct ovfsconf {
-	void	*vfc_vfsops;
-	char	vfc_name[32];
-	int	vfc_index;
-	int	vfc_refcount;
-	int	vfc_flags;
-};
-#endif
-
 /*
  * NB: these flags refer to IMPLEMENTATION properties, not properties of
  * any actual mounts; i.e., it does not make sense to change the flags.
