@@ -50,6 +50,7 @@ struct clk_div_def {
 	struct clk_div_table	*div_table;	/* Divider table */
 };
 
-int clknode_div_register(struct clkdom *clkdom, struct clk_div_def *clkdef);
+int clknode_div_register(struct clkdom *clkdom,
+    const struct clk_div_def *clkdef);
 
 #endif /*_DEV_EXTRES_CLK_DIV_H_*/

@@ -38,6 +38,7 @@ struct clk_mux_def {
 	int			mux_flags;
 };
 
-int clknode_mux_register(struct clkdom *clkdom, struct clk_mux_def *clkdef);
+int clknode_mux_register(struct clkdom *clkdom,
+    const struct clk_mux_def *clkdef);
 
 #endif /* _DEV_EXTRESF_CLK_MUX_H_ */
