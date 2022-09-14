@@ -40,6 +40,7 @@
 .Nm namei ,
 .Nm NDINIT ,
 .Nm NDFREE
+.Nm NDFREE_PNBUF
 .Nd pathname translation and lookup operations
 .Sh SYNOPSIS
 .In sys/param.h
@@ -54,6 +55,8 @@
 .Fc
 .Ft void
 .Fn NDFREE "struct nameidata *ndp" "const uint flags"
+.Ft void
+.Fn NDFREE_PNBUF "struct nameidata *ndp"
 .Sh DESCRIPTION
 The
 .Nm
@@ -109,6 +112,14 @@ or in the kernel address space
 Pointer to the component's pathname buffer
 (the file or directory name that will be looked up).
 .El
+.Pp
+The
+.Fn NDFREE
+function frees the
+.Vt struct nameidata
+pointed to by
+.Fa ndp ,
+including its associated components.
 .Sh NAMEI OPERATION FLAGS
 The
 .Fn namei
