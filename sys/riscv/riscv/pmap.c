@@ -782,6 +782,9 @@ pmap_init(void)
 
 	/*
 	 * Calculate the size of the pv head table for superpages.
+	 *
+	 * XXX: physical memory may be sparsely allocated, and need not begin
+	 * at zero; this calculation does not take that into account.
 	 */
 	pv_npg = howmany(vm_phys_segs[vm_phys_nsegs - 1].end, L2_SIZE);
 
@@ -1258,6 +1261,7 @@ _pmap_unwire_ptp(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 		pd_entry_t *l1;
 		vm_page_t pdpg;
 
+		/* We just released an L2 table, unhold the matching L1. */
 		l1 = pmap_l1(pmap, va);
 		phys = PTE_TO_PHYS(pmap_load(l1));
 		pdpg = PHYS_TO_VM_PAGE(phys);
@@ -1266,6 +1270,7 @@ _pmap_unwire_ptp(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 		pd_entry_t *l0;
 		vm_page_t pdpg;
 
+		/* We just released an L1 table, unhold the matching L0. */
 		MPASS(pmap_mode != PMAP_MODE_SV39);
 		l0 = pmap_l0(pmap, va);
 		phys = PTE_TO_PHYS(pmap_load(l0));
@@ -1847,7 +1852,7 @@ retry:
 	pc = TAILQ_FIRST(&pmap->pm_pvchunk);
 	if (pc != NULL) {
 		for (field = 0; field < _NPCM; field++) {
-			if (pc->pc_map[field]) {
+			if (pc->pc_map[field] != 0) {
 				bit = ffsl(pc->pc_map[field]) - 1;
 				break;
 			}
@@ -1855,7 +1860,12 @@ retry:
 		if (field < _NPCM) {
 			pv = &pc->pc_pventry[field * 64 + bit];
 			pc->pc_map[field] &= ~(1ul << bit);
-			/* If this was the last item, move it to tail */
+
+			/*
+			 * If this was the last free entry in the chunk, move
+			 * the chunk to the end of the list, for faster lookups
+			 * the next time this function is called.
+			 */
 			if (pc->pc_map[0] == 0 && pc->pc_map[1] == 0 &&
 			    pc->pc_map[2] == 0) {
 				TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
@@ -2431,6 +2441,10 @@ pmap_remove_all(vm_page_t m)
 	    pa_to_pvh(VM_PAGE_TO_PHYS(m));
 
 	rw_wlock(&pvh_global_lock);
+
+	/*
+	 * Demote any L2 superpages, XXX freeing their associated PV entries.
+	 */
 	while ((pv = TAILQ_FIRST(&pvh->pv_list)) != NULL) {
 		pmap = PV_PMAP(pv);
 		PMAP_LOCK(pmap);
@@ -2439,6 +2453,11 @@ pmap_remove_all(vm_page_t m)
 		(void)pmap_demote_l2(pmap, l2, va);
 		PMAP_UNLOCK(pmap);
 	}
+
+	/*
+	 * Now, walk the list of pv entries. For each we clear and invalidate
+	 * the underlying PTEs, and free the pv_entry.
+	 */
 	while ((pv = TAILQ_FIRST(&m->md.pv_list)) != NULL) {
 		pmap = PV_PMAP(pv);
 		PMAP_LOCK(pmap);
