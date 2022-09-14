@@ -50,7 +50,7 @@
 .Ft void
 .Fo NDINIT
 .Fa "struct nameidata *ndp" "u_long op" "u_long flags"
-.Fa "enum uio_seg segflg" "const char *namep" "struct thread *td"
+.Fa "enum uio_seg segflg" "const char *namep"
 .Fc
 .Ft void
 .Fn NDFREE "struct nameidata *ndp" "const uint flags"
@@ -108,10 +108,6 @@ or in the kernel address space
 .It Fa namep
 Pointer to the component's pathname buffer
 (the file or directory name that will be looked up).
-.It Fa td
-The thread context to use for
-.Nm
-operations and locks.
 .El
 .Sh NAMEI OPERATION FLAGS
 The
