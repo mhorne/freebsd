@@ -53,21 +53,18 @@
 
 #endif
 
-#define	pmap_page_get_memattr(m)	((m)->md.pv_memattr)
-#define	pmap_page_is_write_mapped(m)	(((m)->a.flags & PGA_WRITEABLE) != 0)
-void pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma);
-
 /*
  * Pmap stuff
  */
 
+/* PV list tracking embedded in each vm_page_t. */
 struct md_page {
 	TAILQ_HEAD(,pv_entry)	pv_list;
 	int			pv_gen;
 	vm_memattr_t		pv_memattr;
 };
 
-struct pmap {
+typedef struct pmap {
 	struct mtx		pm_mtx;
 	struct pmap_statistics	pm_stats;	/* pmap statictics */
 	pd_entry_t		*pm_top;	/* top-level page table page */
@@ -75,8 +72,10 @@ struct pmap {
 	cpuset_t		pm_active;	/* active on cpus */
 	TAILQ_HEAD(,pv_chunk)	pm_pvchunk;	/* list of mappings in pmap */
 	LIST_ENTRY(pmap)	pm_list;	/* List of all pmaps */
-	struct vm_radix		pm_root;
-};
+	struct vm_radix		pm_root;	/* 'idle' page table
+						   vm_page_t's belonging to the
+						   pmap. */
+} *pmap_t;
 
 typedef struct pv_entry {
 	vm_offset_t		pv_va;	/* virtual address for mapping */
@@ -86,6 +85,11 @@ typedef struct pv_entry {
 /*
  * pv_entries are allocated in chunks per-process.  This avoids the
  * need to track per-pmap assignments.
+ *
+ * Each chunk is a PAGE_SIZE'd allocation, so define _NPCPV ("Number of PV
+ * entries in a PV Chunk") as the size of the pc_pventry[] array. In other
+ * words, as many struct pv_entry's as can fit in PAGE_SIZE minus the
+ * preceeding fields.
  */
 #define	_NPCPV	168
 #define	_NPCM	howmany(_NPCPV, 64)
@@ -97,8 +101,6 @@ struct pv_chunk {
 	TAILQ_ENTRY(pv_chunk)	pc_lru;
 	struct pv_entry		pc_pventry[_NPCPV];
 };
-
-typedef struct pmap *pmap_t;
 
 #ifdef _KERNEL
 extern struct pmap	kernel_pmap_store;
@@ -142,6 +144,9 @@ extern enum pmap_mode pmap_mode;
 
 struct thread;
 
+#define	pmap_page_get_memattr(m)	((m)->md.pv_memattr)
+#define	pmap_page_is_write_mapped(m)	(((m)->a.flags & PGA_WRITEABLE) != 0)
+
 #define	pmap_vm_page_alloc_check(m)
 
 void	pmap_activate_boot(pmap_t);
@@ -155,6 +160,7 @@ void	pmap_kremove(vm_offset_t);
 void	pmap_kremove_device(vm_offset_t, vm_size_t);
 void	*pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma);
 bool	pmap_page_is_mapped(vm_page_t m);
+void	pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma);
 bool	pmap_ps_enabled(pmap_t);
 
 void	*pmap_mapdev(vm_paddr_t, vm_size_t);
