@@ -110,7 +110,7 @@ clknode_mux_set_mux(struct clknode *clk, int idx)
 }
 
 int
-clknode_mux_register(struct clkdom *clkdom, struct clk_mux_def *clkdef)
+clknode_mux_register(struct clkdom *clkdom, const struct clk_mux_def *clkdef)
 {
 	struct clknode *clk;
 	struct clknode_mux_sc *sc;

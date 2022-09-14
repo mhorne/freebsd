@@ -40,6 +40,7 @@ struct clk_link_def {
 
 };
 
-int clknode_link_register(struct clkdom *clkdom, struct clk_link_def *clkdef);
+int clknode_link_register(struct clkdom *clkdom,
+    const struct clk_link_def *clkdef);
 
 #endif	/*_DEV_CLK_LINK_H_*/

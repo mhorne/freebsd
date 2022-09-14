@@ -117,7 +117,8 @@ clknode_fixed_set_freq(struct clknode *clk, uint64_t fin, uint64_t *fout,
 }
 
 int
-clknode_fixed_register(struct clkdom *clkdom, struct clk_fixed_def *clkdef)
+clknode_fixed_register(struct clkdom *clkdom,
+    const struct clk_fixed_def *clkdef)
 {
 	struct clknode *clk;
 	struct clknode_fixed_sc *sc;

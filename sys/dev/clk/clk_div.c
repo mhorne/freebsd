@@ -237,7 +237,7 @@ clknode_div_set_freq(struct clknode *clk, uint64_t fin, uint64_t *fout,
 }
 
 int
-clknode_div_register(struct clkdom *clkdom, struct clk_div_def *clkdef)
+clknode_div_register(struct clkdom *clkdom, const struct clk_div_def *clkdef)
 {
 	struct clknode *clk;
 	struct clknode_div_sc *sc;

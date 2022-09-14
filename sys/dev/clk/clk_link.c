@@ -102,7 +102,7 @@ clknode_link_set_gate(struct clknode *clk, bool enable)
 }
 
 int
-clknode_link_register(struct clkdom *clkdom, struct clk_link_def *clkdef)
+clknode_link_register(struct clkdom *clkdom, const struct clk_link_def *clkdef)
 {
 	struct clknode *clk;
 	struct clknode_init_def tmp;
