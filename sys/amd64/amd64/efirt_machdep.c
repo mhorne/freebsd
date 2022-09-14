@@ -95,7 +95,7 @@ vm_offset_t
 efi_phys_to_kva(vm_paddr_t paddr)
 {
 
-	if (paddr >= dmaplimit)
+	if (!PHYS_IN_DMAP(paddr))
 		return (0);
 	return (PHYS_TO_DMAP(paddr));
 }

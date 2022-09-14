@@ -107,8 +107,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			 * PAGE_SIZE, the uiomove() call does not
 			 * access past the end of the direct map.
 			 */
-			if (v >= DMAP_MIN_ADDRESS &&
-			    v < DMAP_MIN_ADDRESS + dmaplimit) {
+			if (VIRT_IN_DMAP(v)) {
 				error = uiomove((void *)v, c, uio);
 				break;
 			}
@@ -137,7 +136,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			}
 			/* FALLTHROUGH */
 		case CDEV_MINOR_MEM:
-			if (v < dmaplimit) {
+			if (PHYS_IN_DMAP(v)) {
 				vd = PHYS_TO_DMAP(v);
 				error = uiomove((void *)vd, c, uio);
 				break;

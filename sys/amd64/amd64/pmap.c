@@ -2514,7 +2514,8 @@ pmap_init(void)
 		if (ppim->va == 0)
 			continue;
 		/* Make the direct map consistent */
-		if (ppim->pa < dmaplimit && ppim->pa + ppim->sz <= dmaplimit) {
+		if (PHYS_IN_DMAP(ppim->pa) &&
+		    PHYS_IN_DMAP(ppim->pa + ppim->sz)) {
 			(void)pmap_change_attr(PHYS_TO_DMAP(ppim->pa),
 			    ppim->sz, ppim->mode);
 		}
@@ -3735,7 +3736,7 @@ pmap_flush_cache_phys_range(vm_paddr_t spa, vm_paddr_t epa, vm_memattr_t mattr)
 	KASSERT((epa & PAGE_MASK) == 0,
 	    ("pmap_flush_cache_phys_range: epa not page-aligned"));
 
-	if (spa < dmaplimit) {
+	if (PHYS_IN_DMAP(spa)) {
 		pmap_flush_cache_range(PHYS_TO_DMAP(spa), PHYS_TO_DMAP(MIN(
 		    dmaplimit, epa)));
 		if (dmaplimit >= epa)
@@ -10881,7 +10882,7 @@ pmap_large_map_wb(void *svap, vm_size_t len)
 	sva = (vm_offset_t)svap;
 	eva = sva + len;
 	pmap_large_map_wb_fence();
-	if (sva >= DMAP_MIN_ADDRESS && eva <= DMAP_MIN_ADDRESS + dmaplimit) {
+	if (VIRT_IN_DMAP(sva)) {
 		pmap_large_map_flush_range(sva, len);
 	} else {
 		KASSERT(sva >= LARGEMAP_MIN_ADDRESS &&
