@@ -969,7 +969,7 @@ pmap_kextract(vm_offset_t va)
 	pt_entry_t *l3;
 	vm_paddr_t pa;
 
-	if (va >= DMAP_MIN_ADDRESS && va < DMAP_MAX_ADDRESS) {
+	if (VIRT_IN_DMAP(va)) {
 		pa = DMAP_TO_PHYS(va);
 	} else {
 		l2 = pmap_l2(kernel_pmap, va);
