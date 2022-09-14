@@ -86,10 +86,10 @@ Devices can be in one of several states:
 the device has not been probed for existence or the probe failed
 .It Dv DS_ALIVE
 the device probe succeeded but not yet attached
+.It Dv DS_ATTACHING
+the device is in the process of attaching
 .It Dv DS_ATTACHED
 the device has been successfully attached
-.It Dv DS_BUSY
-the device is currently open
 .El
 .Pp
 The current state of the device can be determined by calling

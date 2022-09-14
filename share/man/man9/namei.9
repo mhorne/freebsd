@@ -38,6 +38,7 @@
 .Nm namei ,
 .Nm NDINIT ,
 .Nm NDFREE
+.Nm NDFREE_PNBUF
 .Nd pathname translation and lookup operations
 .Sh SYNOPSIS
 .In sys/param.h
@@ -52,6 +53,8 @@
 .Fc
 .Ft void
 .Fn NDFREE "struct nameidata *ndp" "const uint flags"
+.Ft void
+.Fn NDFREE_PNBUF "struct nameidata *ndp"
 .Sh DESCRIPTION
 The
 .Nm
@@ -111,6 +114,14 @@ The thread context to use for
 .Nm
 operations and locks.
 .El
+.Pp
+The
+.Fn NDFREE
+function frees the
+.Vt struct nameidata
+pointed to by
+.Fa ndp ,
+including its associated components.
 .Sh NAMEI OPERATION FLAGS
 The
 .Fn namei

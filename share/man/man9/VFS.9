@@ -35,12 +35,13 @@
 .Sh DESCRIPTION
 Calls used to set or query file systems for settings or information.
 .Pp
-File systems that do not implement a VFS operation should use the appropriate
-.Fa vfs_std
-function from
-.Pa src/sys/kern/vfs_default.c
-rather than implementing empty functions or casting to
-.Fa eopnotsupp .
+File systems that do not implement certain VFS operations should abstain from
+assigning empty functions or casting to
+.Fn eopnotsupp .
+Instead, they will be initialized to the
+.Fn vfs_std*
+operations defined in
+.Pa sys/kern/vfs_default.c .
 .Sh SEE ALSO
 .Xr VFS_CHECKEXP 9 ,
 .Xr VFS_FHTOVP 9 ,
