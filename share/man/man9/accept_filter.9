@@ -23,7 +23,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\" "
-.Dd June 25, 2000
+.Dd September 14, 2022
 .Dt ACCEPT_FILTER 9
 .Os
 .Sh NAME
@@ -32,6 +32,7 @@
 .Nm accept_filt_del ,
 .Nm accept_filt_generic_mod_event ,
 .Nm accept_filt_get
+.Nm ACCEPT_FILTER_DEFINE,
 .Nd filter incoming connections
 .Sh SYNOPSIS
 .In sys/types.h
@@ -47,6 +48,14 @@
 .Fn accept_filt_generic_mod_event "module_t mod" "int event" "void *data"
 .Ft struct accept_filter *
 .Fn accept_filt_get "char *name"
+.Fo ACCEPT_FILTER_DEFINE
+.Fa "modname"
+.Fa "char *filtname"
+.Fa "void (*cb)(struct socket *so, void *arg, int waitflag)"
+.Fa "void *(*create)(struct socket *so, char *arg)"
+.Fa "void (*destroy)(struct socket *so)"
+.Fa "int ver"
+.Fc
 .Sh DESCRIPTION
 Accept filters allow an application to request
 that the kernel pre-process incoming connections.
@@ -125,6 +134,11 @@ This function can be used in the
 .Vt moduledata_t
 struct for the
 .Xr DECLARE_MODULE 9
+macro.
+.Pp
+Modules wishing to define themselves as an accept filter can do so more simply
+by using the
+.Fn ACCEPT_FILTER_DEFINE
 macro.
 .Sh SEE ALSO
 .Xr setsockopt 2 ,
