@@ -224,6 +224,10 @@ void	cpu_desc_init(void);
 #define	CPU_CURRENT_SOCKET				\
     (CPU_AFF2(CPU_AFFINITY(PCPU_GET(cpuid))))
 
+/*
+ * get_cyclecount(9): Return contents of in-cpu fast counter as a sort
+ * of "bogo-time" for random-harvesting purposes.
+ */
 static __inline uint64_t
 get_cyclecount(void)
 {

@@ -98,6 +98,10 @@ void	fork_trampoline(void);
 void	identify_cpu(u_int cpu);
 void	printcpuinfo(u_int cpu);
 
+/*
+ * get_cyclecount(9): Return contents of in-cpu fast counter as a sort
+ * of "bogo-time" for random-harvesting purposes.
+ */
 static __inline uint64_t
 get_cyclecount(void)
 {

@@ -110,6 +110,10 @@ extern u_long cpu_features2;
  */
 #define	CPU_CACHELINE	1
 
+/*
+ * get_cyclecount(9): Return contents of in-cpu fast counter as a sort
+ * of "bogo-time" for random-harvesting purposes.
+ */
 static __inline u_int64_t
 get_cyclecount(void)
 {

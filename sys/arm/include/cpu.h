@@ -683,6 +683,10 @@ cp15_ats1cuw_check(vm_offset_t addr)
 	return (cp15_par_get() & 0x01 ? EFAULT : 0);
 }
 
+/*
+ * get_cyclecount(9): Return contents of in-cpu fast counter as a sort
+ * of "bogo-time" for random-harvesting purposes. Depending
+ */
 static __inline uint64_t
 get_cyclecount(void)
 {
