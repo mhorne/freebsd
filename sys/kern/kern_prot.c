@@ -1458,11 +1458,12 @@ cr_cansee(struct ucred *u1, struct ucred *u2)
 	return (0);
 }
 
-/*-
- * Determine if td "can see" the subject specified by p.
+/*
+ * p_cansee(9): Determine if td "can see" the subject specified by p.
+ *
  * Returns: 0 for permitted, an errno value otherwise
- * Locks: Sufficient locks to protect p->p_ucred must be held.  td really
- *        should be curthread.
+ * Locks: Sufficient locks to protect p->p_ucred must be held.  td must
+ *        be curthread.
  * References: td and p must be valid for the lifetime of the call
  */
 int
