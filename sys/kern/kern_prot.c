@@ -1676,11 +1676,12 @@ SYSCTL_PROC(_security_bsd, OID_AUTO, unprivileged_proc_debug,
     CTLFLAG_MPSAFE, 0, 0, sysctl_unprivileged_proc_debug, "I",
     "Unprivileged processes may use process debugging facilities");
 
-/*-
- * Determine whether td may debug p.
+/*
+ * p_candebug(9): Determine whether td may debug p.
+ *
  * Returns: 0 for permitted, an errno value otherwise
  * Locks: Sufficient locks to protect various components of td and p
- *        must be held.  td must be curthread, and a lock must
+ *        must be held.  td must be curthread, and the process lock must
  *        be held for p.
  * References: td and p must be valid for the lifetime of the call
  */
