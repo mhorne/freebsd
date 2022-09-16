@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/ctype.h>
 #include <sys/kernel.h>
 #include <sys/pcpu.h>
 #include <sys/sysctl.h>
@@ -134,28 +135,168 @@ const struct mvendorid_implementers mvendorid_implementers[] = {
  * indicating the presence of the 26 possible standard extensions. Therefore 32
  * characters will be sufficient.
  */
-#define	ISA_NAME_MAXLEN		32
 #define	ISA_PREFIX		("rv" __XSTRING(__riscv_xlen))
 #define	ISA_PREFIX_LEN		(sizeof(ISA_PREFIX) - 1)
+
+static __inline int
+parse_ext_s(char *isa, int idx, int len)
+{
+	/*
+	 * Proceed to the next multi-letter extension or the end of the
+	 * string.
+	 *
+	 * TODO: parse these once we gain support
+	 */
+	printf("multi-letter ext: ");
+	while (isa[idx] != '_' && idx < len) {
+		cnputc(isa[idx]);
+		idx++;
+	}
+	cnputc('\n');
+
+	return (idx);
+}
+
+static __inline int
+parse_ext_x(char *isa, int idx, int len)
+{
+	/*
+	 * Proceed to the next multi-letter extension or the end of the
+	 * string.
+	 */
+	printf("multi-letter ext: ");
+	while (isa[idx] != '_' && idx < len) {
+		cnputc(isa[idx]);
+		idx++;
+	}
+	cnputc('\n');
+
+	return (idx);
+}
+
+static __inline int
+parse_ext_z(char *isa, int idx, int len)
+{
+	/*
+	 * Proceed to the next multi-letter extension or the end of the
+	 * string.
+	 *
+	 * TODO: parse some of these.
+	 */
+	printf("multi-letter ext: ");
+	while (isa[idx] != '_' && idx < len) {
+		cnputc(isa[idx]);
+		idx++;
+	}
+	cnputc('\n');
+
+	return (idx);
+}
+
+static __inline int
+parse_ext_version(char *isa, int idx, u_int *majorp __unused,
+    u_int *minorp __unused)
+{
+	/* Major version. */
+	while (isdigit(isa[idx]))
+		idx++;
+
+	if (isa[idx] != 'p')
+		return (idx);
+	else
+		idx++;
+
+	/* Minor version. */
+	while (isdigit(isa[idx]))
+		idx++;
+
+	return (idx);
+}
+
+/*
+ * Parse the ISA string
+ *
+ * The st
+ */
+static void
+parse_riscv_isa(char *isa, int len, u_long *hwcapp)
+{
+	u_long hwcap;
+	char c;
+	int i;
+
+	hwcap = 0;
+	i = ISA_PREFIX_LEN;
+	while (i < len) {
+		switch(isa[i]) {
+		case 'a':
+		case 'c':
+#ifdef FPE
+		case 'd':
+		case 'f':
+#endif
+		case 'i':
+		case 'm':
+			hwcap |= HWCAP_ISA_BIT(isa[i]);
+			i++;
+			break;
+		case 'g':
+			hwcap |= HWCAP_ISA_G;
+			i++;
+			break;
+		case 's':
+			/*
+			 * XXX: older versions of this string erroneously
+			 * indicated supervisor and user mode support as
+			 * single-letter extensions. Detect and skip both 's'
+			 * and 'u'.
+			 */
+			if (isa[i - 1] != '_' && isa[i + 1] == 'u') {
+				i += 2;
+				continue;
+			}
+
+			/*
+			 * Supervisor-level extension namespace.
+			 */
+			i = parse_ext_s(isa, i, len);
+			break;
+		case 'x':
+			/*
+			 * Custom extension namespace. For now, we ignore
+			 * these.
+			 */
+			i = parse_ext_x(isa, i, len);
+			break;
+		case 'z':
+			/*
+			 * Multi-letter standard extension namespace.
+			 */
+			i = parse_ext_z(isa, i, len);
+			break;
+		case '_':
+			i++;
+			continue;
+		default:
+			/* Unrecognized/unsupported. */
+			i++;
+			break;
+		}
+
+		i = parse_ext_version(isa, i, NULL, NULL);
+	}
+
+	if (hwcapp != NULL)
+		*hwcapp = hwcap;
+}
 
 static void
 fill_elf_hwcap(void *dummy __unused)
 {
-	u_long caps[256] = {0};
-	char isa[ISA_NAME_MAXLEN];
+	char isa[2048];
 	u_long hwcap;
 	phandle_t node;
 	ssize_t len;
-	int i;
-
-	caps['i'] = caps['I'] = HWCAP_ISA_I;
-	caps['m'] = caps['M'] = HWCAP_ISA_M;
-	caps['a'] = caps['A'] = HWCAP_ISA_A;
-#ifdef FPE
-	caps['f'] = caps['F'] = HWCAP_ISA_F;
-	caps['d'] = caps['D'] = HWCAP_ISA_D;
-#endif
-	caps['c'] = caps['C'] = HWCAP_ISA_C;
 
 	node = OF_finddevice("/cpus");
 	if (node == -1) {
@@ -176,7 +317,7 @@ fill_elf_hwcap(void *dummy __unused)
 			continue;
 
 		len = OF_getprop(node, "riscv,isa", isa, sizeof(isa));
-		KASSERT(len <= ISA_NAME_MAXLEN, ("ISA string truncated"));
+		KASSERT(len <= sizeof(isa), ("ISA string truncated"));
 		if (len == -1) {
 			if (bootverbose)
 				printf("fill_elf_hwcap: "
@@ -189,14 +330,13 @@ fill_elf_hwcap(void *dummy __unused)
 			return;
 		}
 
-		hwcap = 0;
-		for (i = ISA_PREFIX_LEN; i < len; i++)
-			hwcap |= caps[(unsigned char)isa[i]];
-
+		parse_riscv_isa(isa, len, &hwcap);
 		if (elf_hwcap != 0)
 			elf_hwcap &= hwcap;
 		else
 			elf_hwcap = hwcap;
+
+		OF_prop_free(isa);
 	}
 }
 
