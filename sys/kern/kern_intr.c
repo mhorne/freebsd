@@ -1049,8 +1049,8 @@ swi_assign_cpu(void *arg, int cpu)
 }
 
 /*
- * Add a software interrupt handler to a specified event.  If a given event
- * is not specified, then a new event is created.
+ * swi_add(9): Add a software interrupt handler to a specified event.  If a
+ * given event is not specified, then a new event is created.
  */
 int
 swi_add(struct intr_event **eventp, const char *name, driver_intr_t handler,
@@ -1083,7 +1083,7 @@ swi_add(struct intr_event **eventp, const char *name, driver_intr_t handler,
 }
 
 /*
- * Schedule a software interrupt thread.
+ * swi_sched(9): Schedule a software interrupt thread.
  */
 void
 swi_sched(void *cookie, int flags)
@@ -1126,9 +1126,9 @@ swi_sched(void *cookie, int flags)
 }
 
 /*
- * Remove a software interrupt handler.  Currently this code does not
- * remove the associated interrupt event if it becomes empty.  Calling code
- * may do so manually via intr_event_destroy(), but that's not really
+ * swi_remove(9): Remove a software interrupt handler.  Currently this code
+ * does not remove the associated interrupt event if it becomes empty.  Calling
+ * code may do so manually via intr_event_destroy(), but that's not really
  * an optimal interface.
  */
 int
