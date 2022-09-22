@@ -377,6 +377,13 @@ do_trap_user(struct trapframe *frame)
 		    exception);
 		userret(td, frame);
 		break;
+	case SCAUSE_LOAD_MISALIGNED:
+	case SCAUSE_STORE_MISALIGNED:
+	case SCAUSE_INST_MISALIGNED:
+		call_trapsignal(td, SIGBUS, BUS_ADRALN, (void *)frame->tf_sepc,
+		    exception);
+		userret(td, frame);
+		break;
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
