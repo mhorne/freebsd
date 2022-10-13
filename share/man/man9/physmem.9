@@ -1,0 +1,91 @@
+.\" Copyright (c) 2022 The FreeBSD Foundation
+.\"
+.\" Portions of this documentation were written by Mitchell Horne
+.\" under sponsorship from the FreeBSD Foundation.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE DEVELOPERS ``AS IS'' AND ANY EXPRESS OR
+.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+.\" OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+.\" IN NO EVENT SHALL THE DEVELOPERS BE LIABLE FOR ANY DIRECT, INDIRECT,
+.\" INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+.\" NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+.\" DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+.\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+.\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+.\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.\"
+.Dd October 13, 2022
+.Dt PHYSMEM 9
+.Os
+.Sh NAME
+.Nm physmem ,
+.Nm physmem_hardware_region ,
+.Nm physmem_exclude_region ,
+.Nm physmem_avail ,
+.Nm physmem_init_kernel_globals ,
+.Nm physmem_print_tables
+.Nd "Physical memory enumeration API"
+.Sh SYNOPSIS
+.In sys/param.h
+.In sys/physmem.h
+.Ft void
+.Fn physmem_hardware_region "uint64_t pa" "uint64_t sz"
+.Ft void
+.Fn physmem_exclude_region "uint64_t pa" "uint64_t sz"
+.Ft size_t
+.Fn physmem_avail "vm_paddr_t *avail" "size_t maxavail"
+.Ft void
+.Fn physmem_init_kernel_globals "void"
+.Ft void
+.Fn physmem_print_tables "void"
+.Sh DESCRIPTION
+The
+.Nm
+module builds a list of ranges which contain physical memory, as well as ranges
+which are excluded from allocation.
+.Pp
+The
+.Nm
+module is used by some, but not all, architectures supported by
+.Fx .
+.Sh RETURN VALUES
+The
+.Fn physmem_avail
+function returns the count of valid elements in
+.Fa avail .
+.Sh FILES
+.Bl -tag -width ".Pa tests/sys/kern/subr_physmem_test.c"
+.It Pa sys/kern/subr_physmem.c
+is the main source file
+.It Pa tests/sys/kern/subr_physmem_test.c
+contains unit tests
+.El
+.Sh SEE ALSO
+.Xr pmap_bootstrap 9
+.Sh HISTORY
+The
+.Nm
+module was written for the arm architecture by
+.An Ian Lepore Aq Mt ian@FreeBSD.org
+first appearing in
+.Fx 5.0 . \" check
+It was extended to work with arm64 by
+.An Andrew Turner Aq Mt andrew@FreeBSD.org
+in
+.Fx 9.0 . \" check
+In
+.Fx 13.0 ,
+it was converted to a machine-independent interface in order to support riscv by
+.An Mitchell Horne Aq Mt mhorne@FreeBSD.org .
+.Sh AUTHORS
+This man page was written by
+.An Mitchell Horne Aq Mt mhorne@FreeBSD.org .

@@ -260,6 +260,7 @@ MAN=	accept_filter.9 \
 	pgfind.9 \
 	PHOLD.9 \
 	physio.9 \
+	physmem.9 \
 	pmap.9 \
 	pmap_activate.9 \
 	pmap_clear_modify.9 \
@@ -1803,6 +1804,11 @@ MLINKS+=PHOLD.9 PRELE.9 \
 	PHOLD.9 _PRELE.9 \
 	PHOLD.9 PROC_ASSERT_HELD.9 \
 	PHOLD.9 PROC_ASSERT_NOT_HELD.9
+MLINKS+=physmem.9 physmem_hardware_region.9 \
+	physmem.9 physmem_exclude_region.9 \
+	physmem.9 physmem_avail.9 \
+	physmem.9 physmem_init_kernel_globals.9 \
+	physmem.9 physmem_print_tables.9
 MLINKS+=pmap_copy.9 pmap_copy_page.9
 MLINKS+=pmap_extract.9 pmap_extract_and_hold.9
 MLINKS+=pmap_init.9 pmap_init2.9
