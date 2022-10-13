@@ -51,6 +51,9 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20230920: fix name of pmap_zero_page_area(9)
+OLD_FILES+=usr/share/man/man9/pmap_zero_area.9.gz
+
 # 20230905
 OLD_FILES+=usr/share/doc/legal/realtek_rtw88_firmware.LICENCE
 
