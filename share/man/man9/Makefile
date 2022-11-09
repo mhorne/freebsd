@@ -212,6 +212,7 @@ MAN=	accept_filter.9 \
 	mac.9 \
 	make_dev.9 \
 	malloc.9 \
+	mb.9 \
 	mbchain.9 \
 	mbuf.9 \
 	mbuf_tags.9 \
@@ -1452,6 +1453,8 @@ MLINKS+=malloc.9 free.9 \
 	malloc.9 realloc.9 \
 	malloc.9 reallocf.9 \
 	malloc.9 zfree.9
+MLINKS+=mb.9 rmb.9 \
+	mb.9 wmb.9
 MLINKS+=mbchain.9 mb_detach.9 \
 	mbchain.9 mb_done.9 \
 	mbchain.9 mb_fixhdr.9 \
