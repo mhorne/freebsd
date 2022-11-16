@@ -108,6 +108,15 @@
 #define	 SBI_SRST_REASON_NONE		0
 #define	 SBI_SRST_REASON_SYSTEM_FAILURE	1
 
+/* Performance Monitoring Unit (PMU) Extension */
+#define	SBI_EXT_ID_PMU			0x504D55
+#define	SBI_PMU_NUM_COUNTERS		0
+#define	SBI_PMU_COUNTER_GET_INFO	1
+#define	SBI_PMU_COUNTER_CONFIG		2
+#define	SBI_PMU_COUNTER_START		3
+#define	SBI_PMU_COUNTER_STOP		4
+#define	SBI_PMU_COUNTER_FW_READ		5
+
 /* Legacy Extensions */
 #define	SBI_SET_TIMER			0
 #define	SBI_CONSOLE_PUTCHAR		1
