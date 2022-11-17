@@ -127,8 +127,8 @@
 #define	SBI_CALL5(e, f, p1, p2, p3, p4, p5)	sbi_call(e, f, p1, p2, p3, p4, p5)
 
 /*
- * Documentation available at
- * https://github.com/riscv/riscv-sbi-doc/blob/master/riscv-sbi.adoc
+ * Documentation available at:
+ * https://github.com/riscv-non-isa/riscv-sbi-doc/blob/master/riscv-sbi.adoc
  */
 
 struct sbi_ret {
