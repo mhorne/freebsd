@@ -468,7 +468,7 @@ cpu_init_fdt(u_int id, phandle_t node, u_int addr_size, pcell_t *reg)
 	 * Depending on the SBI implementation, APs are waiting either in
 	 * locore.S or to be activated explicitly, via SBI call.
 	 */
-	if (sbi_probe_extension(SBI_EXT_ID_HSM) != 0) {
+	if (sbi_has_extension(SBI_EXT_ID_HSM)) {
 		start_addr = pmap_kextract((vm_offset_t)mpentry);
 		error = sbi_hsm_hart_start(hart, start_addr, 0);
 		if (error != 0) {
