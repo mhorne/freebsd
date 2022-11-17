@@ -283,37 +283,37 @@ sbi_init(void)
 	mimpid = sbi_get_mimpid().value;
 
 	/* Probe for legacy replacement extensions. */
-	if (sbi_probe_extension(SBI_EXT_ID_TIME) != 0)
+	if (sbi_has_extension(SBI_EXT_ID_TIME))
 		has_time_extension = true;
-	if (sbi_probe_extension(SBI_EXT_ID_IPI) != 0)
+	if (sbi_has_extension(SBI_EXT_ID_IPI))
 		has_ipi_extension = true;
-	if (sbi_probe_extension(SBI_EXT_ID_RFNC) != 0)
+	if (sbi_has_extension(SBI_EXT_ID_RFNC))
 		has_rfnc_extension = true;
-	if (sbi_probe_extension(SBI_EXT_ID_SRST) != 0)
+	if (sbi_has_extension(SBI_EXT_ID_SRST))
 		has_srst_extension = true;
 
 	/*
 	 * Probe for legacy extensions. We still rely on many of them to be
 	 * implemented, but this is not guaranteed by the spec.
 	 */
-	KASSERT(has_time_extension || sbi_probe_extension(SBI_SET_TIMER) != 0,
+	KASSERT(has_time_extension || sbi_has_extension(SBI_SET_TIMER),
 	    ("SBI doesn't implement sbi_set_timer()"));
-	KASSERT(sbi_probe_extension(SBI_CONSOLE_PUTCHAR) != 0,
+	KASSERT(sbi_has_extension(SBI_CONSOLE_PUTCHAR),
 	    ("SBI doesn't implement sbi_console_putchar()"));
-	KASSERT(sbi_probe_extension(SBI_CONSOLE_GETCHAR) != 0,
+	KASSERT(sbi_has_extension(SBI_CONSOLE_GETCHAR),
 	    ("SBI doesn't implement sbi_console_getchar()"));
-	KASSERT(has_ipi_extension || sbi_probe_extension(SBI_SEND_IPI) != 0,
+	KASSERT(has_ipi_extension || sbi_has_extension(SBI_SEND_IPI),
 	    ("SBI doesn't implement sbi_send_ipi()"));
 	KASSERT(has_rfnc_extension ||
-	    sbi_probe_extension(SBI_REMOTE_FENCE_I) != 0,
+	    sbi_has_extension(SBI_REMOTE_FENCE_I),
 	    ("SBI doesn't implement sbi_remote_fence_i()"));
 	KASSERT(has_rfnc_extension ||
-	    sbi_probe_extension(SBI_REMOTE_SFENCE_VMA) != 0,
+	    sbi_has_extension(SBI_REMOTE_SFENCE_VMA),
 	    ("SBI doesn't implement sbi_remote_sfence_vma()"));
 	KASSERT(has_rfnc_extension ||
-	    sbi_probe_extension(SBI_REMOTE_SFENCE_VMA_ASID) != 0,
+	    sbi_has_extension(SBI_REMOTE_SFENCE_VMA_ASID),
 	    ("SBI doesn't implement sbi_remote_sfence_vma_asid()"));
-	KASSERT(has_srst_extension || sbi_probe_extension(SBI_SHUTDOWN) != 0,
+	KASSERT(has_srst_extension || sbi_has_extension(SBI_SHUTDOWN),
 	    ("SBI doesn't implement a shutdown or reset extension"));
 }
 

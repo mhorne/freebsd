@@ -166,10 +166,10 @@ extern u_long sbi_spec_version;
 extern u_long sbi_impl_id;
 extern u_long sbi_impl_version;
 
-static __inline long
-sbi_probe_extension(long id)
+static __inline bool
+sbi_has_extension(long id)
 {
-	return (SBI_CALL1(SBI_EXT_ID_BASE, SBI_BASE_PROBE_EXTENSION, id).value);
+	return (SBI_CALL1(SBI_EXT_ID_BASE, SBI_BASE_PROBE_EXTENSION, id).value != 0);
 }
 
 /* TIME extension functions. */
