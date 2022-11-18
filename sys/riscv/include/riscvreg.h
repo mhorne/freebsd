@@ -75,75 +75,12 @@
 #define	SSTATUS_SD			(1 << 31)
 #endif
 
-#define	MSTATUS_UIE			(1 << 0)
-#define	MSTATUS_SIE			(1 << 1)
-#define	MSTATUS_HIE			(1 << 2)
-#define	MSTATUS_MIE			(1 << 3)
-#define	MSTATUS_UPIE			(1 << 4)
-#define	MSTATUS_SPIE			(1 << 5)
-#define	MSTATUS_SPIE_SHIFT		5
-#define	MSTATUS_HPIE			(1 << 6)
-#define	MSTATUS_MPIE			(1 << 7)
-#define	MSTATUS_MPIE_SHIFT		7
-#define	MSTATUS_SPP			(1 << 8)
-#define	MSTATUS_SPP_SHIFT		8
-#define	MSTATUS_HPP_MASK		0x3
-#define	MSTATUS_HPP_SHIFT		9
-#define	MSTATUS_MPP_MASK		0x3
-#define	MSTATUS_MPP_SHIFT		11
-#define	MSTATUS_FS_MASK			0x3
-#define	MSTATUS_FS_SHIFT		13
-#define	MSTATUS_XS_MASK			0x3
-#define	MSTATUS_XS_SHIFT		15
-#define	MSTATUS_MPRV			(1 << 17)
-#define	MSTATUS_PUM			(1 << 18)
-#define	MSTATUS_VM_MASK			0x1f
-#define	MSTATUS_VM_SHIFT		24
-#define	 MSTATUS_VM_MBARE		0
-#define	 MSTATUS_VM_MBB			1
-#define	 MSTATUS_VM_MBBID		2
-#define	 MSTATUS_VM_SV32		8
-#define	 MSTATUS_VM_SV39		9
-#define	 MSTATUS_VM_SV48		10
-#define	 MSTATUS_VM_SV57		11
-#define	 MSTATUS_VM_SV64		12
-#if __riscv_xlen == 64
-#define	MSTATUS_SD			(1ul << 63)
-#else
-#define	MSTATUS_SD			(1 << 31)
-#endif
-
-#define	MSTATUS_PRV_U			0	/* user */
-#define	MSTATUS_PRV_S			1	/* supervisor */
-#define	MSTATUS_PRV_H			2	/* hypervisor */
-#define	MSTATUS_PRV_M			3	/* machine */
-
-#define	MIE_USIE	(1 << 0)
-#define	MIE_SSIE	(1 << 1)
-#define	MIE_HSIE	(1 << 2)
-#define	MIE_MSIE	(1 << 3)
-#define	MIE_UTIE	(1 << 4)
-#define	MIE_STIE	(1 << 5)
-#define	MIE_HTIE	(1 << 6)
-#define	MIE_MTIE	(1 << 7)
-
-#define	MIP_USIP	(1 << 0)
-#define	MIP_SSIP	(1 << 1)
-#define	MIP_HSIP	(1 << 2)
-#define	MIP_MSIP	(1 << 3)
-#define	MIP_UTIP	(1 << 4)
-#define	MIP_STIP	(1 << 5)
-#define	MIP_HTIP	(1 << 6)
-#define	MIP_MTIP	(1 << 7)
-
 #define	SIE_USIE	(1 << 0)
 #define	SIE_SSIE	(1 << 1)
 #define	SIE_UTIE	(1 << 4)
 #define	SIE_STIE	(1 << 5)
 #define	SIE_UEIE	(1 << 8)
 #define	SIE_SEIE	(1 << 9)
-
-#define	MIP_SEIP	(1 << 9)
 
 /* Note: sip register has no SIP_STIP bit in Spike simulator */
 #define	SIP_SSIP	(1 << 1)
