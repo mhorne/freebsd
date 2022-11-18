@@ -88,13 +88,6 @@ extern char pmc_cpuid[PMC_CPUID_LEN];
 #define	__PMC_CPUS()						\
 	__PMC_CPU(AMD_K7,	0x00,	"AMD K7")		\
 	__PMC_CPU(AMD_K8,	0x01,	"AMD K8")		\
-	__PMC_CPU(INTEL_P5,	0x80,	"Intel Pentium")	\
-	__PMC_CPU(INTEL_P6,	0x81,	"Intel Pentium Pro")	\
-	__PMC_CPU(INTEL_CL,	0x82,	"Intel Celeron")	\
-	__PMC_CPU(INTEL_PII,	0x83,	"Intel Pentium II")	\
-	__PMC_CPU(INTEL_PIII,	0x84,	"Intel Pentium III")	\
-	__PMC_CPU(INTEL_PM,	0x85,	"Intel Pentium M")	\
-	__PMC_CPU(INTEL_PIV,	0x86,	"Intel Pentium IV")	\
 	__PMC_CPU(INTEL_CORE,	0x87,	"Intel Core Solo/Duo")	\
 	__PMC_CPU(INTEL_CORE2,	0x88,	"Intel Core2")		\
 	__PMC_CPU(INTEL_CORE2EXTREME,	0x89,	"Intel Core2 Extreme")	\
