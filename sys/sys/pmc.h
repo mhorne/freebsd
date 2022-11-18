@@ -35,11 +35,14 @@
 #ifndef _SYS_PMC_H_
 #define	_SYS_PMC_H_
 
-#include <dev/hwpmc/pmc_events.h>
 #include <sys/proc.h>
 #include <sys/counter.h>
+
 #include <machine/pmc_mdep.h>
 #include <machine/profile.h>
+
+#include <dev/hwpmc/pmc_events.h>
+
 #ifdef _KERNEL
 #include <sys/epoch.h>
 #include <ck_queue.h>
@@ -82,7 +85,6 @@ extern char pmc_cpuid[PMC_CPUID_LEN];
  *
  * Please keep the pmc(3) manual page in sync with this list.
  */
-
 #define	__PMC_CPUS()						\
 	__PMC_CPU(AMD_K7,	0x00,	"AMD K7")		\
 	__PMC_CPU(AMD_K8,	0x01,	"AMD K8")		\
@@ -1225,9 +1227,8 @@ MALLOC_DECLARE(M_PMC);
 /*
  * Functions
  */
-
-struct pmc_mdep *pmc_md_initialize(void);	/* MD init function */
-void	pmc_md_finalize(struct pmc_mdep *_md);	/* MD fini function */
+struct pmc_mdep *pmc_md_initialize(void);
+void	pmc_md_finalize(struct pmc_mdep *_md);
 int	pmc_getrowdisp(int _ri);
 int	pmc_process_interrupt(int _ring, struct pmc *_pm, struct trapframe *_tf);
 int	pmc_save_kernel_callchain(uintptr_t *_cc, int _maxsamples,
@@ -1238,7 +1239,7 @@ void	pmc_restore_cpu_binding(struct pmc_binding *pb);
 void	pmc_save_cpu_binding(struct pmc_binding *pb);
 void	pmc_select_cpu(int cpu);
 struct pmc_mdep *pmc_mdep_alloc(int nclasses);
-void pmc_mdep_free(struct pmc_mdep *md);
+void	pmc_mdep_free(struct pmc_mdep *md);
 uint64_t pmc_rdtsc(void);
 #endif /* _KERNEL */
 #endif /* _SYS_PMC_H_ */
