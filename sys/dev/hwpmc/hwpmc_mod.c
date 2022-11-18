@@ -3761,6 +3761,80 @@ pmc_do_op_pmcrw(const struct pmc_op_pmcrw *prw, pmc_value_t *valp)
 	return (error);
 }
 
+/*
+ * PMC_OP_GETPMCINFO helper
+ */
+static int
+pmc_op_getpmcinfo(struct pmc_op_getpmcinfo *gpi)
+{
+	struct pmc *pm;
+	struct pmc_owner *po;
+	struct pmc_binding pb;
+	struct pmc_classdep *pcd;
+	struct pmc_info *p, *pmcinfo;
+	size_t pmcinfo_size;
+	uint32_t cpu, n, npmc;
+	int error, ari;
+
+	/* Validate requested CPU */
+	error = copyin(&gpi->pm_cpu, &cpu, sizeof(cpu));
+	if (error != 0)
+		return (error);
+	if (cpu >= pmc_cpu_max())
+		return (EINVAL);
+	if (!pmc_cpu_is_active(cpu))
+		return (ENXIO);
+
+	/* switch to CPU 'cpu' */
+	pmc_save_cpu_binding(&pb);
+	pmc_select_cpu(cpu);
+
+	npmc = md->pmd_npmc;
+	pmcinfo_size = npmc * sizeof(struct pmc_info);
+	pmcinfo = malloc(pmcinfo_size, M_PMC, M_WAITOK | M_ZERO);
+	for (n = 0, p = pmcinfo; n < npmc; n++, p++) {
+		pcd = pmc_ri_to_classdep(md, n, &ari);
+		KASSERT(pcd != NULL, ("[pmc,%d] null pcd ri=%d", __LINE__, n));
+
+		if ((error = pcd->pcd_describe(cpu, ari, p, &pm)) != 0)
+			break;
+
+		if (PMC_ROW_DISP_IS_STANDALONE(n))
+			p->pm_rowdisp = PMC_DISP_STANDALONE;
+		else if (PMC_ROW_DISP_IS_THREAD(n))
+			p->pm_rowdisp = PMC_DISP_THREAD;
+		else
+			p->pm_rowdisp = PMC_DISP_FREE;
+
+		p->pm_ownerpid = -1;
+
+		/* No associated PMC */
+		if (pm == NULL)
+			continue;
+
+		po = pm->pm_owner;
+		KASSERT(po->po_owner != NULL,
+		    ("[pmc,%d] pmc_owner had a null proc pointer", __LINE__));
+
+		p->pm_ownerpid = po->po_owner->p_pid;
+		p->pm_mode     = PMC_TO_MODE(pm);
+		p->pm_event    = pm->pm_event;
+		p->pm_flags    = pm->pm_flags;
+
+		if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
+			p->pm_reloadcount =
+			    pm->pm_sc.pm_reloadcount;
+	}
+	pmc_restore_cpu_binding(&pb);
+
+	/* now copy out the PMC info collected */
+	if (error == 0)
+		error = copyout(pmcinfo, &gpi->pm_pmcs, pmcinfo_size);
+	free(pmcinfo, M_PMC);
+
+	return (error);
+}
+
 static int
 pmc_syscall_handler(struct thread *td, void *syscall_args)
 {
@@ -4025,95 +4099,10 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 	 * Retrieve the state of all the PMCs on a given
 	 * CPU.
 	 */
-
 	case PMC_OP_GETPMCINFO:
-	{
-		int ari;
-		struct pmc *pm;
-		size_t pmcinfo_size;
-		uint32_t cpu, n, npmc;
-		struct pmc_owner *po;
-		struct pmc_binding pb;
-		struct pmc_classdep *pcd;
-		struct pmc_info *p, *pmcinfo;
-		struct pmc_op_getpmcinfo *gpi;
-
 		PMC_DOWNGRADE_SX();
-
-		gpi = (struct pmc_op_getpmcinfo *) arg;
-
-		if ((error = copyin(&gpi->pm_cpu, &cpu, sizeof(cpu))) != 0)
-			break;
-
-		if (cpu >= pmc_cpu_max()) {
-			error = EINVAL;
-			break;
-		}
-
-		if (!pmc_cpu_is_active(cpu)) {
-			error = ENXIO;
-			break;
-		}
-
-		/* switch to CPU 'cpu' */
-		pmc_save_cpu_binding(&pb);
-		pmc_select_cpu(cpu);
-
-		npmc = md->pmd_npmc;
-
-		pmcinfo_size = npmc * sizeof(struct pmc_info);
-		pmcinfo = malloc(pmcinfo_size, M_PMC, M_WAITOK | M_ZERO);
-
-		p = pmcinfo;
-
-		for (n = 0; n < md->pmd_npmc; n++, p++) {
-
-			pcd = pmc_ri_to_classdep(md, n, &ari);
-
-			KASSERT(pcd != NULL,
-			    ("[pmc,%d] null pcd ri=%d", __LINE__, n));
-
-			if ((error = pcd->pcd_describe(cpu, ari, p, &pm)) != 0)
-				break;
-
-			if (PMC_ROW_DISP_IS_STANDALONE(n))
-				p->pm_rowdisp = PMC_DISP_STANDALONE;
-			else if (PMC_ROW_DISP_IS_THREAD(n))
-				p->pm_rowdisp = PMC_DISP_THREAD;
-			else
-				p->pm_rowdisp = PMC_DISP_FREE;
-
-			p->pm_ownerpid = -1;
-
-			if (pm == NULL)	/* no PMC associated */
-				continue;
-
-			po = pm->pm_owner;
-
-			KASSERT(po->po_owner != NULL,
-			    ("[pmc,%d] pmc_owner had a null proc pointer",
-				__LINE__));
-
-			p->pm_ownerpid = po->po_owner->p_pid;
-			p->pm_mode     = PMC_TO_MODE(pm);
-			p->pm_event    = pm->pm_event;
-			p->pm_flags    = pm->pm_flags;
-
-			if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
-				p->pm_reloadcount =
-				    pm->pm_sc.pm_reloadcount;
-		}
-
-		pmc_restore_cpu_binding(&pb);
-
-		/* now copy out the PMC info collected */
-		if (error == 0)
-			error = copyout(pmcinfo, &gpi->pm_pmcs, pmcinfo_size);
-
-		free(pmcinfo, M_PMC);
-	}
-	break;
-
+		error = pmc_op_getpmcinfo(arg);
+		break;
 
 	/*
 	 * Set the administrative state of a PMC.  I.e. whether
