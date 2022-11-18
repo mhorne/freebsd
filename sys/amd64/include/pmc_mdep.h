@@ -109,8 +109,7 @@ union pmc_md_pmc {
 	((PC) >= (uintptr_t) start_exceptions &&	\
 	 (PC) < (uintptr_t) end_exceptions)
 
-#define	PMC_IN_KERNEL_STACK(S,START,END)		\
-	((S) >= (START) && (S) < (END))
+#define	PMC_IN_KSTACK(S)  kstack_contains(curthread, (S), sizeof(S))
 #define	PMC_IN_KERNEL(va) INKERNEL(va)
 
 #define	PMC_IN_USERSPACE(va) ((va) <= VM_MAXUSER_ADDRESS)

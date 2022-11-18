@@ -125,8 +125,7 @@ struct pmc_mdep;
 #define	PMC_TRAPFRAME_TO_USER_SP(TF)	((TF)->tf_esp)
 #define	PMC_TRAPFRAME_TO_KERNEL_SP(TF)	((uintptr_t) &((TF)->tf_esp))
 
-#define	PMC_IN_KERNEL_STACK(S,START,END)		\
-	((S) >= (START) && (S) < (END))
+#define	PMC_IN_KSTACK(S)	kstack_contains(curthread, (S), sizeof(S))
 #define	PMC_IN_KERNEL(va)	INKERNEL(va)
 
 #define	PMC_IN_USERSPACE(va) ((va) <= VM_MAXUSER_ADDRESS)
