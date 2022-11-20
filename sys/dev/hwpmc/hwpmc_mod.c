@@ -5379,7 +5379,6 @@ static int
 pmc_initialize(void)
 {
 	struct pcpu *pc;
-	struct pmc_binding pb;
 	struct pmc_classdep *pcd;
 	struct pmc_sample *ps;
 	struct pmc_samplebuffer *sb;
@@ -5493,13 +5492,12 @@ pmc_initialize(void)
 	pmc_pcpu_saved = malloc(sizeof(pmc_value_t) * maxcpu * md->pmd_npmc,
 	    M_PMC, M_WAITOK);
 
-	/* Perform CPU-dependent initialization. */
-	pmc_save_cpu_binding(&pb);
+	/* Perform CPU-dependent allocations. */
 	error = 0;
-	for (cpu = 0; error == 0 && cpu < maxcpu; cpu++) {
+	for (cpu = 0; cpu < maxcpu; cpu++) {
 		if (!pmc_cpu_is_active(cpu))
 			continue;
-		pmc_select_cpu(cpu);
+
 		pmc_pcpu[cpu] = malloc(sizeof(struct pmc_cpu) +
 		    md->pmd_npmc * sizeof(struct pmc_hw *), M_PMC,
 		    M_WAITOK|M_ZERO);
@@ -5508,10 +5506,6 @@ pmc_initialize(void)
 				error = md->pmd_classdep[n].pcd_pcpu_init(md,
 				    cpu);
 	}
-	pmc_restore_cpu_binding(&pb);
-
-	if (error)
-		return (error);
 
 	/* allocate space for the sample array */
 	for (cpu = 0; cpu < maxcpu; cpu++) {
@@ -5637,6 +5631,31 @@ pmc_initialize(void)
 
 	return (error);
 }
+
+static void
+pmc_smp_init(void)
+{
+	struct pmc_binding pb;
+	u_int cpu;
+	int error;
+
+	/* Call the class-dependent PCPU initialization functions. */
+	pmc_save_cpu_binding(&pb);
+	error = 0;
+	for (cpu = 0; error == 0 && cpu < pmc_cpu_max(); cpu++) {
+		if (!pmc_cpu_is_active(cpu))
+			continue;
+
+		pmc_select_cpu(cpu);
+		for (int n = 0; error == 0 && n < md->pmd_nclass; n++) {
+			if (md->pmd_classdep[n].pcd_num > 0)
+				error = md->pmd_classdep[n].pcd_pcpu_init(md,
+				    cpu);
+		}
+	}
+	pmc_restore_cpu_binding(&pb);
+}
+SYSINIT(pmc_init, SI_SUB_LAST, SI_ORDER_ANY, pmc_smp_init, NULL);
 
 /* prepare to be unloaded */
 static void
