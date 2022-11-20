@@ -5760,12 +5760,14 @@ pmc_cleanup(void)
 	maxcpu = pmc_cpu_max();
 
 	PMCDBG0(MOD,INI,3, "md cleanup");
-	if (md) {
+	if (md != NULL) {
+		/*
+		 * Per-class PCPU finalization. This is the analogue to
+		 * pmc_smp_init().
+		 */
 		pmc_save_cpu_binding(&pb);
 		for (cpu = 0; cpu < maxcpu; cpu++) {
-			PMCDBG2(MOD,INI,1,"pmc-cleanup cpu=%d pcs=%p",
-			    cpu, pmc_pcpu[cpu]);
-			if (!pmc_cpu_is_active(cpu) || pmc_pcpu[cpu] == NULL)
+			if (!pmc_cpu_is_active(cpu))
 				continue;
 
 			pmc_select_cpu(cpu);
@@ -5775,6 +5777,7 @@ pmc_cleanup(void)
 				}
 			}
 		}
+		pmc_restore_cpu_binding(&pb);
 
 		if (md->pmd_cputype == PMC_CPU_GENERIC)
 			pmc_generic_cpu_finalize(md);
@@ -5783,7 +5786,6 @@ pmc_cleanup(void)
 
 		pmc_mdep_free(md);
 		md = NULL;
-		pmc_restore_cpu_binding(&pb);
 	}
 
 	/* Free per-cpu descriptors. */
