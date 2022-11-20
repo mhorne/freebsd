@@ -212,7 +212,7 @@ static int	pmc_attach_one_process(struct proc *p, struct pmc *pm);
 static bool	pmc_can_allocate_row(int ri, enum pmc_mode mode);
 static bool	pmc_can_allocate_rowindex(struct proc *p, unsigned int ri,
     int cpu);
-static int	pmc_can_attach(struct pmc *pm, struct proc *p);
+static bool	pmc_can_attach(struct pmc *pm, struct proc *p);
 static void	pmc_capture_user_callchain(int cpu, int soft,
     struct trapframe *tf);
 static void	pmc_cleanup(void);
@@ -1035,20 +1035,19 @@ pmc_unlink_target_process(struct pmc *pm, struct pmc_process *pp)
 /*
  * Check if PMC 'pm' may be attached to target process 't'.
  */
-
-static int
+static bool
 pmc_can_attach(struct pmc *pm, struct proc *t)
 {
 	struct proc *o;		/* pmc owner */
 	struct ucred *oc, *tc;	/* owner, target credentials */
-	int decline_attach, i;
+	int i;
+	bool can_attach;
 
 	/*
 	 * A PMC's owner can always attach that PMC to itself.
 	 */
-
 	if ((o = pm->pm_owner->po_owner) == t)
-		return 0;
+		return (true);
 
 	PROC_LOCK(o);
 	oc = o->p_ucred;
@@ -1064,27 +1063,24 @@ pmc_can_attach(struct pmc *pm, struct proc *t)
 	 * The effective uid of the PMC owner should match at least one
 	 * of the {effective,real,saved} uids of the target process.
 	 */
-
-	decline_attach = oc->cr_uid != tc->cr_uid &&
-	    oc->cr_uid != tc->cr_svuid &&
-	    oc->cr_uid != tc->cr_ruid;
+	can_attach = oc->cr_uid == tc->cr_uid || oc->cr_uid == tc->cr_svuid ||
+	    oc->cr_uid == tc->cr_ruid;
 
 	/*
 	 * Every one of the target's group ids, must be in the owner's
 	 * group list.
 	 */
-	for (i = 0; !decline_attach && i < tc->cr_ngroups; i++)
-		decline_attach = !groupmember(tc->cr_groups[i], oc);
+	for (i = 0; can_attach && i < tc->cr_ngroups; i++)
+		can_attach = groupmember(tc->cr_groups[i], oc);
 
 	/* check the read and saved gids too */
-	if (decline_attach == 0)
-		decline_attach = !groupmember(tc->cr_rgid, oc) ||
-		    !groupmember(tc->cr_svgid, oc);
+	if (can_attach)
+		can_attach = groupmember(tc->cr_rgid, oc) ||
+		    groupmember(tc->cr_svgid, oc);
 
 	crfree(tc);
 	crfree(oc);
-
-	return !decline_attach;
+	return (can_attach);
 }
 
 /*
@@ -2143,7 +2139,7 @@ pmc_hook_handler(struct thread *td, int function, void *arg)
 		 */
 		for (ri = 0; ri < md->pmd_npmc; ri++)
 			if ((pm = pp->pp_pmcs[ri].pp_pmc) != NULL)
-				if (pmc_can_attach(pm, td->td_proc) != 0)
+				if (!pmc_can_attach(pm, td->td_proc))
 					pmc_detach_one_process(td->td_proc,
 					    pm, PMC_FLAG_NONE);
 
