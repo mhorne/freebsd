@@ -243,7 +243,7 @@ static struct syscall_module_data name##_syscall_mod = {	\
 };								\
 								\
 static moduledata_t name##_mod = {				\
-	"sys/" #name,						\
+	#name,							\
 	syscall_module_handler,					\
 	&name##_syscall_mod					\
 };								\

@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sx.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
+#include <sys/sysproto.h>
 #include <sys/syslog.h>
 #include <sys/taskqueue.h>
 #include <sys/vnode.h>
@@ -95,11 +96,6 @@ enum pmc_flags {
 	PMC_FLAG_ALLOCATE = 0x02, /* add entry to hash if not found */
 	PMC_FLAG_NOWAIT   = 0x04, /* do not wait for mallocs */
 };
-
-/*
- * The offset in sysent where the syscall is allocated.
- */
-static int pmc_syscall_num = NO_SYSCALL;
 
 struct pmc_cpu		**pmc_pcpu;	 /* per-cpu state */
 pmc_value_t		*pmc_pcpu_saved; /* saved PMC values: CSW handling */
@@ -195,13 +191,13 @@ static struct pmc_classdep **pmc_rowindex_to_classdep;
 /*
  * Prototypes
  */
+static int	pmc_load(struct module *module, int cmd, void *arg);
 
 #ifdef HWPMC_DEBUG
 static int	pmc_debugflags_sysctl_handler(SYSCTL_HANDLER_ARGS);
 static int	pmc_debugflags_parse(char *newstr, char *fence);
 #endif
 
-static int	load(struct module *module, int cmd, void *arg);
 static int	pmc_add_sample(ring_type_t ring, struct pmc *pm,
     struct trapframe *tf);
 static void	pmc_add_thread_descriptors_from_proc(struct proc *p,
@@ -411,8 +407,11 @@ SYSCTL_INT(_security_bsd, OID_AUTO, unprivileged_syspmcs, CTLFLAG_RWTUN,
 #define	PMC_HASH_PTR(P,M)	((((unsigned long) (P) >> 2) * _PMC_HM) & (M))
 
 /*
- * Syscall structures
+ * Syscall structures + module declaration.
  */
+
+/* The offset in sysent where the syscall is allocated. */
+static int pmc_syscall_num = NO_SYSCALL;
 
 /* The `sysent' for the new syscall */
 static struct sysent pmc_sysent = {
@@ -420,26 +419,7 @@ static struct sysent pmc_sysent = {
 	.sy_call =	pmc_syscall_handler,
 };
 
-static struct syscall_module_data pmc_syscall_mod = {
-	.chainevh =	load,
-	.chainarg =	NULL,
-	.offset =	&pmc_syscall_num,
-	.new_sysent =	&pmc_sysent,
-	.old_sysent =	{ .sy_narg = 0, .sy_call = NULL },
-	.flags =	SY_THR_STATIC_KLD,
-};
-
-static moduledata_t pmc_mod = {
-	.name =		PMC_MODULE_NAME,
-	.evhand =	syscall_module_handler,
-	.priv =		&pmc_syscall_mod,
-};
-
-#ifdef EARLY_AP_STARTUP
-DECLARE_MODULE(pmc, pmc_mod, SI_SUB_SYSCALLS, SI_ORDER_ANY);
-#else
-DECLARE_MODULE(pmc, pmc_mod, SI_SUB_SMP, SI_ORDER_ANY);
-#endif
+SYSCALL_MODULE(hwpmc, &pmc_syscall_num, &pmc_sysent, pmc_load, NULL);
 MODULE_VERSION(pmc, PMC_VERSION);
 
 #ifdef HWPMC_DEBUG
@@ -5844,7 +5824,7 @@ pmc_cleanup(void)
  * The function called at load/unload.
  */
 static int
-load(struct module *module __unused, int cmd, void *arg __unused)
+pmc_load(struct module *module __unused, int cmd, void *arg __unused)
 {
 	int error;
 
