@@ -106,6 +106,48 @@ read_hpmcounter(int idx)
 }
 
 static int
+riscv_sbi_intr(struct trapframe *tf)
+{
+	struct pmc *pm;
+	u_int cpu, ri;
+	int error;
+	bool found_interrupt = false;
+
+	cpu = curcpu;
+	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
+	    ("[riscv-sbi,%d] CPU %d out of range", __LINE__, cpu));
+
+	PMCDBG3(MDP, INT, 1, "cpu=%d tf=%p um=%d", cpu, tf, TRAPF_USERMODE(tf));
+
+	/* TODO: check Sscomfpf support and do proper overflow detection, etc. */
+	if (PMC_PROFCLOCK_SAMPLING()) {
+		/* Process all sampling PMCs at this time. */
+		for (ri = 0; ri < riscv_sbi_npmcs; ri++) {
+			pm = riscv_sbi_pcpu[cpu]->pc_phws[ri].phw_pmc;
+			if (pm == NULL)
+				continue;
+
+			if (!PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
+				continue;
+
+			found_interrupt = true;
+			error = pmc_process_interrupt(PMC_HR, pm, tf);
+			if (error != 0)
+				riscv_sbi_stop_pmc(cpu, ri, pm);
+
+			/* No reloading required. */
+		}
+	}
+
+	if (found_interrupt)
+		counter_u64_add(pmc_stats.pm_intr_processed, 1);
+	else
+		counter_u64_add(pmc_stats.pm_intr_ignored, 1);
+
+	return (0);
+}
+
+static int
 riscv_sbi_allocate_pmc(int cpu, int ri, struct pmc *pm,
     const struct pmc_op_pmcallocate *a)
 {
@@ -303,6 +345,9 @@ riscv_sbi_start_pmc(int cpu __diagused, int ri, struct pmc *pm)
 
 	/* TODO: check/return error? */
 	error = sbi_pmu_counter_start(ri, pm->pm_md.pm_riscv.pm_riscv_startval);
+	if (error == 0 && PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm))) {
+		atomic_add_acq_int(&pmc_profclock_sampling, 1);
+	}
 
 	return (error);
 }
@@ -316,6 +361,9 @@ riscv_sbi_stop_pmc(int cpu __diagused, int ri, struct pmc *pm)
 	KASSERT(ri >= 0 && ri < riscv_sbi_npmcs,
 	    ("[riscv-sbi,%d] illegal row-index %d", __LINE__, ri));
 
+	if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm))) {
+		atomic_subtract_rel_int(&pmc_profclock_sampling, 1);
+	}
 	/* TODO: check/return error? */
 	sbi_pmu_counter_stop(ri);
 

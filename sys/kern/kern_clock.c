@@ -764,6 +764,10 @@ statclock(int cnt, int usermode)
 #ifdef HWPMC_HOOKS
 	if (td->td_intr_frame != NULL)
 		PMC_SOFT_CALL_TF( , , clock, stat, td->td_intr_frame);
+	/* TODO: this is pretty yucky. */
+	if ((PMC_PROC_IS_USING_PMCS(td->td_proc) ||
+	    PMC_SYSTEM_SAMPLING_ACTIVE()) && PMC_PROFCLOCK_SAMPLING())
+		pmc_intr(td->td_intr_frame);
 #endif
 }
 

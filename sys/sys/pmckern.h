@@ -68,10 +68,10 @@
 #define	PMC_FN_PROC_CREATE_LOG		17
 
 typedef enum ring_type {
-        PMC_HR = 0,	/* Hardware ring buffer */
-		PMC_SR = 1,	/* Software ring buffer */
-        PMC_UR = 2,	/* userret ring buffer */
-		PMC_NUM_SR = PMC_UR+1
+	PMC_HR = 0,	/* Hardware ring buffer */
+	PMC_SR = 1,	/* Software ring buffer */
+	PMC_UR = 2,	/* userret ring buffer */
+	PMC_NUM_SR = PMC_UR+1
 } ring_type_t;
 
 struct pmckern_procexec {
@@ -189,6 +189,8 @@ DPCPU_DECLARE(uint8_t, pmc_sampled);
 /* Count of system-wide sampling PMCs in existence */
 extern volatile int pmc_ss_count;
 
+extern volatile int pmc_profclock_sampling;
+
 /* kernel version number */
 extern const int pmc_kernel_version;
 
@@ -244,6 +246,8 @@ do {						\
 	(__predict_false((p)->td_pflags & TDP_CALLCHAIN))
 
 #define	PMC_SYSTEM_SAMPLING_ACTIVE()		(pmc_ss_count > 0)
+
+#define	PMC_PROFCLOCK_SAMPLING()	(pmc_profclock_sampling > 0)
 
 /* Check if a CPU has recorded samples. */
 #define	PMC_CPU_HAS_SAMPLES(C)	(__predict_false(DPCPU_ID_GET((C), pmc_sampled)))
