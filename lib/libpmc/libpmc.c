@@ -77,6 +77,10 @@ static int soft_allocate_pmc(enum pmc_event _pe, char *_ctrspec,
 static int powerpc_allocate_pmc(enum pmc_event _pe, char* ctrspec,
 			     struct pmc_op_pmcallocate *_pmc_config);
 #endif /* __powerpc__ */
+#if defined(__riscv)
+static int riscv_sbi_allocate_pmc(enum pmc_event _pe, char* ctrspec,
+    struct pmc_op_pmcallocate *_pmc_config);
+#endif
 
 #define PMC_CALL(cmd, params)				\
 	syscall(pmc_syscall, PMC_OP_##cmd, (params))
@@ -190,6 +194,12 @@ static const struct pmc_event_descr tsc_event_table[] =
 	__PMC_EV_ALIAS_TSC()
 };
 
+static const struct pmc_event_descr riscv_sbi_event_table[] =
+{
+	__PMC_EV_RISCV_SBI_HW()
+	__PMC_EV_RISCV_SBI_FW()
+};
+
 #undef	PMC_CLASS_TABLE_DESC
 #define	PMC_CLASS_TABLE_DESC(NAME, CLASS, EVENTS, ALLOCATOR)	\
 static const struct pmc_class_descr NAME##_class_table_descr =	\
@@ -225,6 +235,9 @@ PMC_CLASS_TABLE_DESC(dmc620_pmu_c, DMC620_PMU_C, dmc620_pmu_c, dmc620_pmu);
 PMC_CLASS_TABLE_DESC(ppc7450, PPC7450, ppc7450, powerpc);
 PMC_CLASS_TABLE_DESC(ppc970, PPC970, ppc970, powerpc);
 PMC_CLASS_TABLE_DESC(e500, E500, e500, powerpc);
+#endif
+#if defined(__riscv)
+PMC_CLASS_TABLE_DESC(riscv_sbi, RISCV_SBI, riscv_sbi, riscv_sbi);
 #endif
 
 static struct pmc_class_descr soft_class_table_descr =
@@ -984,6 +997,22 @@ powerpc_allocate_pmc(enum pmc_event pe, char *ctrspec __unused,
 
 #endif /* __powerpc__ */
 
+#if defined(__riscv)
+static struct pmc_event_alias riscv_sbi_aliases[] = {
+	EV_ALIAS("instructions",	"HW_INSTR"),
+	EV_ALIAS("cycles",		"HW_CPU_CYCLES"),
+	EV_ALIAS(NULL, NULL)
+};
+
+static int
+riscv_sbi_allocate_pmc(enum pmc_event pe, char *ctrspec __unused,
+    struct pmc_op_pmcallocate *pmc_config __unused)
+{
+
+	/* Always succeed. */
+	return (0);
+}
+#endif
 
 /*
  * Match an event name `name' with its canonical form.
@@ -1552,6 +1581,11 @@ pmc_init(void)
 			break;
 #endif
 
+#if defined(__riscv)
+		case PMC_CLASS_RISCV_SBI:
+			pmc_class_table[n++] = &riscv_sbi_class_table_descr;
+			break;
+#endif
 		default:
 #if defined(DEBUG)
 			printf("pm_class: 0x%x\n",
@@ -1601,6 +1635,11 @@ pmc_init(void)
 		break;
 	case PMC_CPU_PPC_E500:
 		PMC_MDEP_INIT(e500);
+		break;
+#endif
+#if defined(__riscv)
+	case PMC_CPU_RISCV_SBI:
+		PMC_MDEP_INIT(riscv_sbi);
 		break;
 #endif
 	default:
