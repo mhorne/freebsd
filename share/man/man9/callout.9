@@ -59,8 +59,9 @@
 .In sys/types.h
 .In sys/callout.h
 .Bd -literal
-typedef void callout_func_t (void *);
+typedef void callout_func_t(void *);
 .Ed
+.Pp
 .Ft int
 .Fn callout_active "struct callout *c"
 .Ft void
