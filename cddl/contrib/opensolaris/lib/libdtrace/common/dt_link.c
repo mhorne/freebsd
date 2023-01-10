@@ -403,7 +403,11 @@ prepare_elf64(dtrace_hdl_t *dtp, const dof_hdr_t *dof, dof_elf64_t *dep)
 			rel->r_info = ELF64_R_INFO(count + dep->de_global,
 			    R_PPC64_REL64);
 #elif defined(__riscv)
-/* XXX */
+			rel->r_offset = s->dofs_offset +
+			    dofr[j].dofr_offset;
+			rel->r_info = ELF64_R_INFO(count + dep->de_global,
+			    R_RISCV_RELATIVE);
+			    	/* TODO */
 #elif defined(__i386) || defined(__amd64)
 			rel->r_offset = s->dofs_offset +
 			    dofr[j].dofr_offset;
@@ -504,6 +508,8 @@ dump_elf32(dtrace_hdl_t *dtp, const dof_hdr_t *dof, int fd)
 	elf_file.ehdr.e_machine = EM_386;
 #elif defined(__aarch64__)
 	elf_file.ehdr.e_machine = EM_AARCH64;
+#elif defined(__riscv)
+	elf_file.ehdr.e_machine = EM_RISCV;
 #endif
 	elf_file.ehdr.e_version = EV_CURRENT;
 	elf_file.ehdr.e_shoff = sizeof (Elf32_Ehdr);
@@ -645,6 +651,8 @@ dump_elf64(dtrace_hdl_t *dtp, const dof_hdr_t *dof, int fd)
 	elf_file.ehdr.e_machine = EM_AMD64;
 #elif defined(__aarch64__)
 	elf_file.ehdr.e_machine = EM_AARCH64;
+#elif defined(__riscv)
+	elf_file.ehdr.e_machine = EM_RISCV;
 #endif
 	elf_file.ehdr.e_version = EV_CURRENT;
 	elf_file.ehdr.e_shoff = sizeof (Elf64_Ehdr);
@@ -1155,6 +1163,8 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 		emachine1 = emachine2 = EM_AMD64;
 #elif defined(__aarch64__)
 		emachine1 = emachine2 = EM_AARCH64;
+#elif defined(__riscv)
+		emachine1 = emachine2 = EM_RISCV;
 #endif
 		symsize = sizeof (Elf64_Sym);
 	} else {
