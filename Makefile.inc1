@@ -2623,6 +2623,7 @@ _btxld=		usr.sbin/btxld
 .if ${MK_CDDL} != "no"
 _dtrace_tools= cddl/lib/libctf cddl/lib/libspl cddl/usr.bin/ctfconvert \
     cddl/usr.bin/ctfmerge
+_dtrace_tools+= cddl/lib/libdtrace cddl/usr.sbin/dtrace
 .endif
 
 # If we're given an XAS, don't build binutils.
