@@ -266,10 +266,6 @@ struct tdq {
 #endif
 };
 
-/* Idle thread states and config. */
-#define	TDQ_RUNNING	1
-#define	TDQ_IDLE	2
-
 /* Lockless accessors. */
 #define	TDQ_LOAD(tdq)		atomic_load_int(&(tdq)->tdq_load)
 #define	TDQ_TRANSFERABLE(tdq)	atomic_load_int(&(tdq)->tdq_transferable)
