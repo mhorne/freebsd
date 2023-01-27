@@ -37,33 +37,27 @@
 #define _SYS_PRIORITY_H_
 
 /*
- * Process priority specifications.
+ * Thread priority specifications. This file is the source of truth for these
+ * values, and is documented primarily in scheduler(9).
  */
 
 /*
  * Priority classes.
  */
-
 #define	PRI_ITHD		1	/* Interrupt thread. */
-#define	PRI_REALTIME		2	/* Real time process. */
-#define	PRI_TIMESHARE		3	/* Time sharing process. */
-#define	PRI_IDLE		4	/* Idle process. */
+#define	PRI_REALTIME		2	/* Real time thread. */
+#define	PRI_TIMESHARE		3	/* Time sharing thread. */
+#define	PRI_IDLE		4	/* Idle thread. */
 
 /*
  * PRI_FIFO is POSIX.1B SCHED_FIFO.
  */
-
 #define	PRI_FIFO_BIT		8
 #define	PRI_FIFO		(PRI_FIFO_BIT | PRI_REALTIME)
 
 #define	PRI_BASE(P)		((P) & ~PRI_FIFO_BIT)
 #define	PRI_IS_REALTIME(P)	(PRI_BASE(P) == PRI_REALTIME)
 #define	PRI_NEED_RR(P)		((P) != PRI_FIFO)
-
-/*
- * Priorities.  Note that with 64 run queues, differences less than 4 are
- * insignificant.
- */
 
 /*
  * Priorities range from 0 to 255, but differences of less then 4 (RQ_PPQ)
@@ -74,9 +68,6 @@
  * Top half kernel threads:	48 - 87
  * Time sharing user threads:	88 - 223
  * Idle user threads:		224 - 255
- *
- * XXX If/When the specific interrupt thread and top half thread ranges
- * disappear, a larger range can be used for user processes.
  */
 
 #define	PRI_MIN			(0)		/* Highest priority. */
