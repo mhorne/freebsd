@@ -1177,7 +1177,6 @@ void	kern_yield(int);
 void 	kick_proc0(void);
 void	killjobc(void);
 int	leavepgrp(struct proc *p);
-int	maybe_preempt(struct thread *td);
 void	maybe_yield(void);
 void	mi_switch(int flags);
 int	p_candebug(struct thread *td, struct proc *p);

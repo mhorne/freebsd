@@ -316,7 +316,7 @@ maybe_resched(struct thread *td)
  * determines if the new thread should preempt the current thread.  If so,
  * it sets td_owepreempt to request a preemption.
  */
-int
+static bool
 maybe_preempt(struct thread *td)
 {
 #ifdef PREEMPTION
@@ -353,17 +353,17 @@ maybe_preempt(struct thread *td)
 	cpri = ctd->td_priority;
 	if (KERNEL_PANICKED() || pri >= cpri /* || dumping */ ||
 	    TD_IS_INHIBITED(ctd))
-		return (0);
+		return (false);
 #ifndef FULL_PREEMPTION
 	if (pri > PRI_MAX_ITHD && cpri < PRI_MIN_IDLE)
-		return (0);
+		return (false);
 #endif
 
 	CTR0(KTR_PROC, "maybe_preempt: scheduling preemption");
 	ctd->td_owepreempt = 1;
-	return (1);
+	return (true);
 #else
-	return (0);
+	return (false);
 #endif
 }
 
