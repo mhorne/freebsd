@@ -3805,7 +3805,6 @@ kern/kern_sendfile.c		standard
 kern/kern_sharedpage.c		standard
 kern/kern_shutdown.c		standard
 kern/kern_sig.c			standard
-kern/kern_switch.c		standard
 kern/kern_sx.c			standard
 kern/kern_synch.c		standard
 kern/kern_syscalls.c		standard
@@ -3884,6 +3883,7 @@ kern/subr_rman.c		standard
 kern/subr_rtc.c			standard
 kern/subr_sbuf.c		standard
 kern/subr_scanf.c		standard
+kern/subr_sched.c		standard
 kern/subr_sglist.c		standard
 kern/subr_sleepqueue.c		standard
 kern/subr_smp.c			standard

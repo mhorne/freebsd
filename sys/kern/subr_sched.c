@@ -32,12 +32,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_sched.h"
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/kdb.h>
-#include <sys/kernel.h>
 #include <sys/ktr.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
 #include <sys/sched.h>
