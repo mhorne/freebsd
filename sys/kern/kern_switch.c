@@ -46,13 +46,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/cpu.h>
 
-/* Uncomment this to enable logging of critical_enter/exit. */
-#if 0
-#define	KTR_CRITICAL	KTR_SCHED
-#else
-#define	KTR_CRITICAL	0
-#endif
-
 #ifdef FULL_PREEMPTION
 #ifndef PREEMPTION
 #error "The FULL_PREEMPTION option requires the PREEMPTION option"
@@ -184,72 +177,6 @@ choosethread(void)
 
 	TD_SET_RUNNING(td);
 	return (td);
-}
-
-/*
- * Kernel thread preemption implementation.  Critical sections mark
- * regions of code in which preemptions are not allowed.
- *
- * It might seem a good idea to inline critical_enter() but, in order
- * to prevent instructions reordering by the compiler, a __compiler_membar()
- * would have to be used here (the same as sched_pin()).  The performance
- * penalty imposed by the membar could, then, produce slower code than
- * the function call itself, for most cases.
- */
-void
-critical_enter_KBI(void)
-{
-#ifdef KTR
-	struct thread *td = curthread;
-#endif
-	critical_enter();
-	CTR4(KTR_CRITICAL, "critical_enter by thread %p (%ld, %s) to %d", td,
-	    (long)td->td_proc->p_pid, td->td_name, td->td_critnest);
-}
-
-void __noinline
-critical_exit_preempt(void)
-{
-	struct thread *td;
-	int flags;
-
-	/*
-	 * If td_critnest is 0, it is possible that we are going to get
-	 * preempted again before reaching the code below. This happens
-	 * rarely and is harmless. However, this means td_owepreempt may
-	 * now be unset.
-	 */
-	td = curthread;
-	if (td->td_critnest != 0)
-		return;
-	if (kdb_active)
-		return;
-
-	/*
-	 * Microoptimization: we committed to switch,
-	 * disable preemption in interrupt handlers
-	 * while spinning for the thread lock.
-	 */
-	td->td_critnest = 1;
-	thread_lock(td);
-	td->td_critnest--;
-	flags = SW_INVOL | SW_PREEMPT;
-	if (TD_IS_IDLETHREAD(td))
-		flags |= SWT_IDLE;
-	else
-		flags |= SWT_OWEPREEMPT;
-	mi_switch(flags);
-}
-
-void
-critical_exit_KBI(void)
-{
-#ifdef KTR
-	struct thread *td = curthread;
-#endif
-	critical_exit();
-	CTR4(KTR_CRITICAL, "critical_exit by thread %p (%ld, %s) to %d", td,
-	    (long)td->td_proc->p_pid, td->td_name, td->td_critnest);
 }
 
 /************************************************************************
