@@ -129,6 +129,16 @@ static int	realstathz = 127; /* stathz is sometimes 0 and run off of hz. */
 static int	sched_tdcnt;	/* Total runnable threads in the system. */
 static int	sched_slice = 12; /* Thread run time before rescheduling. */
 
+#ifdef PREEMPTION
+#ifdef FULL_PREEMPTION
+static int __read_mostly preempt_thresh = PRI_MAX_IDLE;
+#else
+static int __read_mostly preempt_thresh = PRI_MIN_REALTIME;
+#endif /* !FULL_PREEMPTION */
+#else
+static int __read_mostly preempt_thresh = 0;
+#endif /* !PREEMPTION */
+
 static void	setup_runqs(void);
 static void	schedcpu(void);
 static void	schedcpu_thread(void);
@@ -220,6 +230,9 @@ SYSCTL_PROC(_kern_sched, OID_AUTO, quantum,
     "Quantum for timeshare threads in microseconds");
 SYSCTL_INT(_kern_sched, OID_AUTO, slice, CTLFLAG_RW, &sched_slice, 0,
     "Quantum for timeshare threads in stathz ticks");
+SYSCTL_INT(_kern_sched, OID_AUTO, preempt_thresh, CTFLAG_RW,
+    &preempt_thresh, 0
+    "Maximal (lowest) priority for preemption");
 #ifdef SMP
 /* Enable forwarding of wakeups to all other cpus */
 static SYSCTL_NODE(_kern_sched, OID_AUTO, ipiwakeup,
@@ -327,7 +340,7 @@ maybe_preempt(struct thread *td)
 	 * The new thread should not preempt the current thread if any of the
 	 * following conditions are true:
 	 *
-	 *  - The kernel is in the throes of crashing (panicstr).
+	 *  - The kernel is in the throes of crashing (KERNEL_PANICKED).
 	 *  - The current thread has a higher (numerically lower) or
 	 *    equivalent priority.  Note that this prevents curthread from
 	 *    trying to preempt to itself.
@@ -351,13 +364,12 @@ maybe_preempt(struct thread *td)
 			("maybe_preempt: trying to run inhibited thread"));
 	pri = td->td_priority;
 	cpri = ctd->td_priority;
-	if (KERNEL_PANICKED() || pri >= cpri /* || dumping */ ||
-	    TD_IS_INHIBITED(ctd))
+	if (KERNEL_PANICKED() || pri >= cpri || TD_IS_INHIBITED(ctd))
 		return (false);
-#ifndef FULL_PREEMPTION
-	if (pri > PRI_MAX_ITHD && cpri < PRI_MIN_IDLE)
+	if (preempt_thresh == 0)
 		return (false);
-#endif
+	if (pri > preempt_thresh && cpri < PRI_MIN_IDLE)
+		return (false);
 
 	CTR0(KTR_PROC, "maybe_preempt: scheduling preemption");
 	ctd->td_owepreempt = 1;
@@ -1273,10 +1285,7 @@ kick_other_cpu(int pri, int cpuid)
 		return;
 
 #if defined(IPI_PREEMPTION) && defined(PREEMPTION)
-#if !defined(FULL_PREEMPTION)
-	if (pri <= PRI_MAX_ITHD)
-#endif /* ! FULL_PREEMPTION */
-	{
+	if (pri <= preempt_thresh) {
 		ipi_cpu(cpuid, IPI_PREEMPT);
 		return;
 	}
