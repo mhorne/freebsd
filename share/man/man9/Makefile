@@ -336,6 +336,7 @@ MAN=	accept_filter.9 \
 	SYSINIT.9 \
 	taskqueue.9 \
 	tcp_functions.9 \
+	tdfind.9 \
 	thread_exit.9 \
 	time.9 \
 	tvtohz.9 \
