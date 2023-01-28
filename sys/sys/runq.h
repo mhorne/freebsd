@@ -28,19 +28,20 @@
  * $FreeBSD$
  */
 
-#ifndef	_RUNQ_H_
-#define	_RUNQ_H_
+#ifndef _SYS_RUNQ_H_
+#define	_SYS_RUNQ_H_
 
 #include <machine/runq.h>
-
-struct thread;
 
 /*
  * Run queue parameters.
  */
-
 #define	RQ_NQS		(64)		/* Number of run queues. */
 #define	RQ_PPQ		(4)		/* Priorities per queue. */
+
+#ifdef _KERNEL
+
+struct thread;
 
 /*
  * Head of run queues.
@@ -74,4 +75,6 @@ void	runq_init(struct runq *);
 void	runq_remove(struct runq *, struct thread *);
 void	runq_remove_idx(struct runq *, struct thread *, u_char *);
 
-#endif
+#endif /* _KERNEL */
+
+#endif /* !_SYS_RUNQ_H_ */
