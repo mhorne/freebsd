@@ -1,5 +1,9 @@
 .\" Copyright (c) 2001 Evan Sarmiento.
 .\" All rights reserved.
+.\" Copyright (c) 2023 The FreeBSD Foundation
+.\"
+.\" Portions of this documentation were written by Mitchell Horne
+.\" under sponsorship from the FreeBSD Foundation.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
@@ -24,64 +28,52 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd July 11, 2001
+.Dd January 28, 2023
 .Dt PFIND 9
 .Os
 .Sh NAME
-.Nm pfind , zpfind
-.Nd locate a process by number
+.Nm pfind ,
+.Nm pfind_any
+.Nd locate a process by numeric ID
 .Sh SYNOPSIS
 .In sys/param.h
 .In sys/proc.h
 .Ft "struct proc *"
 .Fn pfind "pid_t pid"
 .Ft "struct proc *"
-.Fn zpfind "pid_t pid"
+.Fn pfind_any "pid_t pid"
 .Sh DESCRIPTION
+The
 .Fn pfind
-takes a
-.Fa pid
-as its argument and returns a pointer to the
-.Vt proc
-structure whose PID is specified in the argument only if the
-.Fa pid
-is on the
-.Va allproc
-list.
+function walks the list of processes in the system, looking for the one with a
+process ID of
+.Fa pid .
+If the process exists, and is not in the zombie state, a pointer to the process
+structure will be returned.
 .Pp
-.Fn zpfind
-takes a
-.Fa pid
-as its argument.
-If
-.Fn zpfind
-finds a process whose PID is equal to that of argument
-and is a zombie process, meaning that it must reside on the
-.Va zombproc
-list,
-.Fn zpfind
-returns a pointer to that
-.Vt proc
-structure.
+The
+.Fn pfind_any
+function behaves identically to
+.Fn pfind ,
+except that the lookup does not exclude processes in the zombie state.
 .Pp
 Both
 .Fn pfind
 and
-.Fn zpfind
-lock the
-.Vt proc
-structure that is returned using
+.Fn pfind_any
+lock the returned process using
 .Fn PROC_LOCK "p" .
 .Sh RETURN VALUES
 .Fn pfind
 and
-.Fn zpfind
+.Fn pfind_any
 return a pointer to a
-.Vt proc
-structure on success and a
+.Vt struct proc
+after a successful lookup, and
 .Dv NULL
-on failure.
+otherwise.
 .Sh SEE ALSO
+.Xr pget 9 ,
 .Xr pgfind 9 ,
 .Xr tdfind 9
 .Sh AUTHORS

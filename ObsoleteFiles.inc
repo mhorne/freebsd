@@ -52,6 +52,9 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20230405: zpfind.9 alias to pfind.9 removed
+OLD_FILES+=usr/share/man/man9/zpfind.9
+
 # 20230329: libcasper libraries moved to /lib
 MOVED_LIBS+=lib/casper/libcap_dns.so.2
 MOVED_LIBS+=lib/casper/libcap_fileargs.so.1
