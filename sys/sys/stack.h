@@ -37,6 +37,9 @@
 MALLOC_DECLARE(M_STACK);
 #endif
 
+#define	STACK_FOREACH(stp, pc)		\
+    for (int _i = 0, (pc) = (stp)->pcs[0]; _i < (stp)->depth; (pc) = (stp)->pcs[++_i])
+
 struct sbuf;
 
 enum stack_sbuf_fmt {
@@ -51,6 +54,7 @@ void		 stack_destroy(struct stack *);
 int		 stack_put(struct stack *, vm_offset_t);
 void		 stack_copy(const struct stack *, struct stack *);
 void		 stack_zero(struct stack *);
+int		 stack_depth(struct stack *);
 void		 stack_print(const struct stack *);
 void		 stack_print_ddb(const struct stack *);
 void		 stack_print_short(const struct stack *);

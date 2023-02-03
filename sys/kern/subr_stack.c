@@ -92,6 +92,13 @@ stack_zero(struct stack *st)
 	bzero(st, sizeof *st);
 }
 
+int
+stack_depth(struct stack *st)
+{
+
+	return (st->depth);
+}
+
 void
 stack_print(const struct stack *st)
 {
