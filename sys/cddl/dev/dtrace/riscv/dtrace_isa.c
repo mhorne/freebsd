@@ -63,10 +63,9 @@ void
 dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
     uint32_t *intrpc)
 {
-	struct unwind_state state;
+	struct stack st;
 	uintptr_t caller;
-	register_t sp;
-	int scp_offset;
+	vm_offset_t pc;
 	int depth;
 
 	depth = 0;
@@ -76,22 +75,9 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 		pcstack[depth++] = (pc_t)intrpc;
 	}
 
-	/*
-	 * Construct the unwind state, starting from this function. This frame,
-	 * and 'aframes' others will be skipped.
-	 */
-	__asm __volatile("mv %0, sp" : "=&r" (sp));
-
-	state.fp = (uintptr_t)__builtin_frame_address(0);
-	state.sp = (uintptr_t)sp;
-	state.pc = (uintptr_t)dtrace_getpcstack;
-
-	while (depth < pcstack_limit) {
-		if (!unwind_frame(curthread, &state))
-			break;
-
-		if (!INKERNEL(state.pc) || !kstack_contains(curthread,
-		    (vm_offset_t)state.fp, sizeof(uintptr_t)))
+	stack_save(&st);
+	STACK_FOREACH(&st, pc) {
+		if (depth >= pcstack_limit)
 			break;
 
 		if (aframes > 0) {
@@ -106,7 +92,7 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 			if (aframes == 0 && caller != 0)
 				pcstack[depth++] = caller;
 		} else {
-			pcstack[depth++] = state.pc;
+			pcstack[depth++] = pc;
 		}
 	}
 
@@ -280,27 +266,12 @@ dtrace_getarg(int arg, int aframes)
 int
 dtrace_getstackdepth(int aframes)
 {
-	struct unwind_state state;
-	int scp_offset;
-	register_t sp;
+	struct stack st;
+	vm_offset_t pc;
 	int depth;
-	bool done;
 
-	depth = 1;
-	done = false;
-
-	__asm __volatile("mv %0, sp" : "=&r" (sp));
-
-	state.fp = (uintptr_t)__builtin_frame_address(0);
-	state.sp = sp;
-	state.pc = (uintptr_t)dtrace_getstackdepth;
-
-	do {
-		done = !unwind_frame(curthread, &state);
-		if (!INKERNEL(state.pc) || !INKERNEL(state.fp))
-			break;
-		depth++;
-	} while (!done);
+	stack_save(&st);
+	depth = stack_depth(&st);
 
 	if (depth < aframes)
 		return (0);
