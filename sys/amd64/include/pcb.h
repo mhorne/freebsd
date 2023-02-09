@@ -39,16 +39,26 @@
 #ifndef _AMD64_PCB_H_
 #define _AMD64_PCB_H_
 
-/*
- * AMD64 process control block
- */
 #include <machine/fpu.h>
 #include <machine/segments.h>
 
 #ifdef __amd64__
 /*
- * NB: The fields marked with (*) are used by kernel debuggers.  Their
- * ABI should be preserved.
+ * AMD64 Process Control Block (PCB).
+ *
+ * This stores the per-thread kernel state (mostly registers) that is saved and
+ * restored during a context switch. Userspace register state is always
+ * contained in the user trapframe.
+ *
+ * We need one PCB per runnable context. Historically, this was the process,
+ * hence the name of the struct. Today this is the thread, or light-weight
+ * process (LWP). So, the PCB is allocated per-thread, and pointed to by the
+ * td_pcb member of struct thread.
+ *
+ * On this platform the PCB is embedded within struct mdthread.
+ *
+ * NB: The fields marked with (*) are used by kernel debuggers. Their ABI
+ * should be preserved.
  */
 struct pcb {
 	register_t	pcb_r15;	/* (*) */

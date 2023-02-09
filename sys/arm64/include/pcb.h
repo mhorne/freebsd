@@ -36,6 +36,25 @@
 
 struct trapframe;
 
+/*
+ * ARM64 Process Control Block (PCB).
+ *
+ * This stores the per-thread kernel state (mostly registers) that is saved and
+ * restored during a context switch. Userspace register state is always
+ * contained in the user trapframe.
+ *
+ * We need one PCB per runnable context. Historically, this was the process,
+ * hence the name of the struct. Today this is the thread, or light-weight
+ * process (LWP). So, the PCB is allocated per-thread, and pointed to by the
+ * td_pcb member of struct thread.
+ *
+ * On this platform the PCB is allocated from the bottom (high-address) of the
+ * kernel stack.
+ *
+ * NB: This structure is consumed by kernel debuggers, and its ABI should be
+ * preserved.
+ */
+
 /* The first register in pcb_x is x19 */
 #define	PCB_X_START	19
 

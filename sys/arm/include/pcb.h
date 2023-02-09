@@ -44,8 +44,22 @@
 #include <machine/vfp.h>
 
 /*
- * WARNING!
- * Keep pcb_regs first for faster access in switch.S
+ * ARM Process Control Block (PCB).
+ *
+ * This stores the per-thread kernel state (mostly registers) that is saved and
+ * restored during a context switch. Userspace register state is always
+ * contained in the user trapframe.
+ *
+ * We need one PCB per runnable context. Historically, this was the process,
+ * hence the name of the struct. Today this is the thread, or light-weight
+ * process (LWP). So, the PCB is allocated per-thread, and pointed to by the
+ * td_pcb member of struct thread.
+ *
+ * On this platform the PCB is allocated from the bottom (high-address) of the
+ * kernel stack.
+ *
+ * NB: This structure is consumed by kernel debuggers, and its ABI should be
+ * preserved.
  */
 struct pcb {
 	struct switchframe pcb_regs;		/* CPU state */
@@ -76,13 +90,6 @@ struct pcb {
 		 * access it using ldrd/strd, and ARM ABI require it
 		 * to by aligned on 8 bytes.
 		 */
-
-/*
- * No additional data for core dumps.
- */
-struct md_coredump {
-	int	md_empty;
-};
 
 void	makectx(struct trapframe *tf, struct pcb *pcb);
 

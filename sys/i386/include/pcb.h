@@ -38,17 +38,28 @@
 #ifndef _I386_PCB_H_
 #define _I386_PCB_H_
 
-/*
- * Intel 386 process control block
- */
 #ifndef _KERNEL
 #include <machine/segments.h>
 #endif
 #include <machine/npx.h>
 
 /*
- * NB: The fields marked with (*) are used by kernel debuggers.  Their
- * ABI should be preserved.
+ * Intel 386 Process Control Block (PCB).
+ *
+ * This stores the per-thread kernel state (mostly registers) that is saved and
+ * restored during a context switch. Userspace register state is always
+ * contained in the user trapframe.
+ *
+ * We need one PCB per runnable context. Historically, this was the process,
+ * hence the name of the struct. Today this is the thread, or light-weight
+ * process (LWP). So, the PCB is allocated per-thread, and pointed to by the
+ * td_pcb member of struct thread.
+ *
+ * On this platform the PCB is allocated near the bottom (high-address) of the
+ * kernel stack, just above the XSAVE area.
+ *
+ * NB: The fields marked with (*) are used by kernel debuggers. Their ABI
+ * should be preserved.
  */
 struct pcb {
 	int	pcb_edi;	/* (*) */
