@@ -1268,7 +1268,7 @@ sys___setugid(struct thread *td, struct __setugid_args *uap)
 }
 
 /*
- * Check if gid is a member of the group set.
+ * Check if gid is a member of cred's group set.
  */
 int
 groupmember(gid_t gid, struct ucred *cred)

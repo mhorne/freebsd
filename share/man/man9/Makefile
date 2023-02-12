@@ -160,7 +160,6 @@ MAN=	accept_filter.9 \
 	g_geom.9 \
 	g_provider.9 \
 	g_provider_by_name.9 \
-	groupmember.9 \
 	g_wither_geom.9 \
 	gone_in.9 \
 	hardclock.9 \
