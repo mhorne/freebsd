@@ -50,6 +50,7 @@ static bool has_time_extension = false;
 static bool has_ipi_extension = false;
 static bool has_rfnc_extension = false;
 static bool has_srst_extension = false;
+static bool has_dbgcon_extension = false;
 
 static struct sbi_ret
 sbi_get_spec_version(void)
@@ -256,6 +257,49 @@ sbi_hsm_hart_status(u_long hart)
 	return (ret.error != 0 ? (int)ret.error : (int)ret.value);
 }
 
+/* Console functions. */
+int
+sbi_console_puts(char *str)
+{
+	if (!has_dbgcon_extension)
+		return (EOPNOTSUPP);
+
+	return (SBI_CALL2(SBI_EXT_ID_DBGCON, SBI_DBGCON_WRITE, strlen(str),
+	    (uint64_t)str).error);
+}
+
+void
+sbi_console_putchar(char ch)
+{
+	if (has_dbgcon_extension)
+		(void)SBI_CALL1(SBI_EXT_ID_DBGCON, SBI_DBGCON_WRITECHAR,
+		    (uint8_t)ch);
+	else
+		(void)SBI_CALL1(SBI_CONSOLE_PUTCHAR, 0, ch);
+}
+
+char
+sbi_console_getchar(void)
+{
+	struct sbi_ret ret;
+	char ch;
+
+	if (has_dbgcon_extension) {
+		ret = SBI_CALL3(SBI_EXT_ID_DBGCON, SBI_DBGCON_READ, 1, (u_long)&ch,
+		    (u_long)&ch);
+		ch = (char)ret.value;
+	} else {
+		/*
+		 * XXX: The "error" is returned here because legacy SBI
+		 * functions continue to return their value in a0.
+		 */
+		ret = SBI_CALL0(SBI_CONSOLE_GETCHAR, 0);
+		ch = (char)ret.error;
+	}
+
+	return (ch);
+}
+
 void
 sbi_init(void)
 {
@@ -291,6 +335,8 @@ sbi_init(void)
 		has_rfnc_extension = true;
 	if (sbi_has_extension(SBI_EXT_ID_SRST))
 		has_srst_extension = true;
+	if (sbi_has_extension(SBI_EXT_ID_DBGCON))
+		has_dbgcon_extension = true;
 
 	/*
 	 * Probe for legacy extensions. We still rely on many of them to be
@@ -298,10 +344,8 @@ sbi_init(void)
 	 */
 	KASSERT(has_time_extension || sbi_has_extension(SBI_SET_TIMER),
 	    ("SBI doesn't implement sbi_set_timer()"));
-	KASSERT(sbi_has_extension(SBI_CONSOLE_PUTCHAR),
+	KASSERT(has_dbgcon_extension || sbi_has_extension(SBI_CONSOLE_PUTCHAR),
 	    ("SBI doesn't implement sbi_console_putchar()"));
-	KASSERT(sbi_has_extension(SBI_CONSOLE_GETCHAR),
-	    ("SBI doesn't implement sbi_console_getchar()"));
 	KASSERT(has_ipi_extension || sbi_has_extension(SBI_SEND_IPI),
 	    ("SBI doesn't implement sbi_send_ipi()"));
 	KASSERT(has_rfnc_extension ||

@@ -108,6 +108,12 @@
 #define	 SBI_SRST_REASON_NONE		0
 #define	 SBI_SRST_REASON_SYSTEM_FAILURE	1
 
+/* Debug Console (DBCN) Extension */
+#define	SBI_EXT_ID_DBGCON		0x4442434E
+#define	SBI_DBGCON_WRITE		0
+#define	SBI_DBGCON_READ			1
+#define	SBI_DBGCON_WRITECHAR		2
+
 /* Legacy Extensions */
 #define	SBI_SET_TIMER			0
 #define	SBI_CONSOLE_PUTCHAR		1
@@ -220,24 +226,10 @@ int sbi_hsm_hart_status(u_long hart);
  */
 void sbi_system_reset(u_long reset_type, u_long reset_reason);
 
-/* Legacy extension functions. */
-static __inline void
-sbi_console_putchar(int ch)
-{
-
-	(void)SBI_CALL1(SBI_CONSOLE_PUTCHAR, 0, ch);
-}
-
-static __inline int
-sbi_console_getchar(void)
-{
-
-	/*
-	 * XXX: The "error" is returned here because legacy SBI functions
-	 * continue to return their value in a0.
-	 */
-	return (SBI_CALL0(SBI_CONSOLE_GETCHAR, 0).error);
-}
+/* Debug Console extension functions. */
+int  sbi_console_puts(char *str);
+void sbi_console_putchar(char ch);
+char sbi_console_getchar(void);
 
 void sbi_print_version(void);
 void sbi_init(void);
