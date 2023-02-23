@@ -750,7 +750,10 @@ cuda_shutdown(void *xsc, int howto)
 	struct cuda_softc *sc = xsc;
 	uint8_t cmd[] = {CUDA_PSEUDO, 0};
 
-	cmd[1] = (howto & RB_HALT) ? CMD_POWEROFF : CMD_RESET;
+	if ((howto & RB_HALT) != 0)
+		return;
+
+	cmd[1] = (howto & RB_POWEROFF) != 0 ? CMD_POWEROFF : CMD_RESET;
 	cuda_poll(sc->sc_dev);
 	cuda_send(sc, 1, 2, cmd);
 
