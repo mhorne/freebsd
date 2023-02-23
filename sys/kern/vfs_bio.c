@@ -69,6 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kthread.h>
 #include <sys/proc.h>
 #include <sys/racct.h>
+#include <sys/reboot.h>
 #include <sys/refcount.h>
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
@@ -761,12 +762,12 @@ bufspace_wait(struct bufdomain *bd, struct vnode *vp, int gbflags,
 }
 
 static void
-bufspace_daemon_shutdown(void *arg, int howto __unused)
+bufspace_daemon_shutdown(void *arg, int howto)
 {
 	struct bufdomain *bd = arg;
 	int error;
 
-	if (KERNEL_PANICKED())
+	if ((howto & RB_NOSYNC) != 0)
 		return;
 
 	BD_RUN_LOCK(bd);
@@ -3415,11 +3416,11 @@ buf_flush(struct vnode *vp, struct bufdomain *bd, int target)
 }
 
 static void
-buf_daemon_shutdown(void *arg __unused, int howto __unused)
+buf_daemon_shutdown(void *arg __unused, int howto)
 {
 	int error;
 
-	if (KERNEL_PANICKED())
+	if ((howto & RB_NOSYNC) != 0)
 		return;
 
 	mtx_lock(&bdlock);
