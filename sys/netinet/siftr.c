@@ -1493,6 +1493,9 @@ siftr_sysctl_enabled_handler(SYSCTL_HANDLER_ARGS)
 static void
 siftr_shutdown_handler(void *arg)
 {
+	if (SCHEDULER_STOPPED())
+		return;
+
 	if (siftr_enabled == 1) {
 		siftr_manage_ops(SIFTR_DISABLE);
 	}
