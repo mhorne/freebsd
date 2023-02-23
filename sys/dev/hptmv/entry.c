@@ -2157,7 +2157,6 @@ hpt_shutdown(device_t dev)
 	
 		pAdapter = device_get_softc(dev);
 
-		EVENTHANDLER_DEREGISTER(shutdown_final, pAdapter->eh);
 		mtx_lock(&pAdapter->lock);
 		FlushAdapter(pAdapter);
 		mtx_unlock(&pAdapter->lock);
