@@ -231,8 +231,8 @@ SYSCTL_INT(_kern, OID_AUTO, kerneldump_gzlevel, CTLFLAG_RWTUN,
 const char *panicstr;
 bool __read_frequently panicked;
 
-bool __read_mostly dumping;		/* system is dumping */
-bool rebooting;				/* system is rebooting */
+int __read_mostly dumping;		/* system is dumping */
+int rebooting;				/* system is rebooting */
 
 /*
  * Used to serialize between sysctl kern.shutdown.dumpdevname and list
@@ -504,7 +504,7 @@ kern_reboot(int howto)
 	EVENTHANDLER_INVOKE(shutdown_pre_sync, howto);
 	BOOTTRACE("shutdown pre sync complete");
 
-	/* 
+	/*
 	 * Now sync filesystems
 	 */
 	if (!cold && (howto & RB_NOSYNC) == 0 && once == 0) {
