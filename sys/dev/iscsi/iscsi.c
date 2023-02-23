@@ -2713,10 +2713,10 @@ iscsi_shutdown_pre(struct iscsi_softc *sc)
 }
 
 static void
-iscsi_shutdown_post(struct iscsi_softc *sc)
+iscsi_shutdown_post(struct iscsi_softc *sc, int howto)
 {
 
-	if (!KERNEL_PANICKED()) {
+	if ((howto & RB_NOSYNC) == 0) {
 		ISCSI_DEBUG("removing all sessions due to shutdown");
 		iscsi_terminate_sessions(sc);
 	}

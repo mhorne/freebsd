@@ -31,31 +31,34 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/bio.h>
+#include <sys/eventhandler.h>
 #include <sys/kernel.h>
-#include <sys/module.h>
+#include <sys/kthread.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
-#include <sys/mutex.h>
-#include <sys/bio.h>
-#include <sys/sysctl.h>
+#include <sys/module.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
-#include <sys/eventhandler.h>
+#include <sys/mutex.h>
 #include <sys/proc.h>
-#include <sys/kthread.h>
+#include <sys/reboot.h>
+#include <sys/sbuf.h>
 #include <sys/sched.h>
+#include <sys/sysctl.h>
 #include <sys/taskqueue.h>
 #include <sys/vnode.h>
-#include <sys/sbuf.h>
+
 #ifdef GJ_MEMDEBUG
 #include <sys/stack.h>
 #include <sys/kdb.h>
 #endif
+
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
+
 #include <geom/geom.h>
 #include <geom/geom_dbg.h>
-
 #include <geom/journal/g_journal.h>
 
 FEATURE(geom_journal, "GEOM journaling support");
@@ -2656,13 +2659,14 @@ static eventhandler_tag g_journal_event_shutdown = NULL;
 static eventhandler_tag g_journal_event_lowmem = NULL;
 
 static void
-g_journal_shutdown(void *arg, int howto __unused)
+g_journal_shutdown(void *arg, int howto)
 {
 	struct g_class *mp;
 	struct g_geom *gp, *gp2;
 
-	if (KERNEL_PANICKED())
+	if ((howto & RB_NOSYNC) != 0)
 		return;
+
 	mp = arg;
 	g_topology_lock();
 	LIST_FOREACH_SAFE(gp, &mp->geom, geom, gp2) {
