@@ -815,7 +815,7 @@ axp2xx_shutdown(void *devp, int howto)
 {
 	device_t dev;
 
-	if (!(howto & RB_POWEROFF))
+	if ((howto & RB_POWEROFF) == 0)
 		return;
 	dev = (device_t)devp;
 

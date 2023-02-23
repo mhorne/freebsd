@@ -229,7 +229,7 @@ bcmwd_reboot_system(void *sc, int howto)
 	int cmd, error = 0;
 
 	/* Only handle reset. */
-	if (howto & RB_HALT || howto & RB_POWEROFF)
+	if ((howto & (RB_HALT | RB_POWEROFF)) != 0)
 		return;
 
 	printf("Resetting system ... ");

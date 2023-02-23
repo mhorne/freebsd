@@ -231,8 +231,9 @@ SYSCTL_INT(_kern, OID_AUTO, kerneldump_gzlevel, CTLFLAG_RWTUN,
 const char *panicstr;
 bool __read_frequently panicked;
 
-int __read_mostly dumping;		/* system is dumping */
-int rebooting;				/* system is rebooting */
+bool __read_mostly dumping;		/* system is dumping */
+bool rebooting;				/* system is rebooting */
+
 /*
  * Used to serialize between sysctl kern.shutdown.dumpdevname and list
  * modifications via ioctl.
@@ -279,10 +280,10 @@ SYSINIT(shutdown_conf, SI_SUB_INTRINSIC, SI_ORDER_ANY, shutdown_conf, NULL);
  * used by reroot code in init(8) as a mountpoint for tmpfs.
  */
 static void
-reroot_conf(void *unused)
+reroot_conf(void *unused __unused)
 {
-	int error;
 	struct cdev *cdev;
+	int error;
 
 	error = make_dev_p(MAKEDEV_CHECKNAME | MAKEDEV_WAITOK, &cdev,
 	    &reroot_cdevsw, NULL, UID_ROOT, GID_WHEEL, 0600, "reroot/reroot");
@@ -297,7 +298,6 @@ SYSINIT(reroot_conf, SI_SUB_DEVFS, SI_ORDER_ANY, reroot_conf, NULL);
 /*
  * The system call that results in a reboot.
  */
-/* ARGSUSED */
 int
 sys_reboot(struct thread *td, struct reboot_args *uap)
 {
@@ -314,6 +314,7 @@ sys_reboot(struct thread *td, struct reboot_args *uap)
 			error = kern_reroot();
 		else
 			kern_reboot(uap->opt);
+			/* NOTREACHED */
 	}
 	return (error);
 }
@@ -395,7 +396,7 @@ print_uptime(void)
 int
 doadump(boolean_t textdump)
 {
-	boolean_t coredump;
+	bool coredump;
 	int error;
 
 	error = 0;
@@ -405,12 +406,12 @@ doadump(boolean_t textdump)
 		return (ENXIO);
 
 	dump_savectx();
-	dumping++;
+	dumping = true;
 
-	coredump = TRUE;
+	coredump = true;
 #ifdef DDB
 	if (textdump && textdump_pending) {
-		coredump = FALSE;
+		coredump = false;
 		textdump_dumpsys(TAILQ_FIRST(&dumper_configs));
 	}
 #endif
@@ -424,7 +425,7 @@ doadump(boolean_t textdump)
 		}
 	}
 
-	dumping--;
+	dumping = false;
 	return (error);
 }
 
@@ -525,7 +526,7 @@ kern_reboot(int howto)
 	BOOTTRACE("shutdown post sync complete");
 
 	if ((howto & (RB_HALT|RB_DUMP)) == RB_DUMP && !cold && !dumping) 
-		doadump(TRUE);
+		doadump(true);
 
 	/* Now that we're going to really halt the system... */
 	BOOTTRACE("shutdown final begin");
@@ -645,10 +646,10 @@ kern_reroot(void)
  * If the shutdown was a clean halt, behave accordingly.
  */
 static void
-shutdown_halt(void *junk, int howto)
+shutdown_halt(void *junk __unused, int howto)
 {
 
-	if (howto & RB_HALT) {
+	if ((howto & RB_HALT) != 0) {
 		printf("\n");
 		printf("The operating system has halted.\n");
 		printf("Please press any key to reboot.\n\n");
@@ -670,11 +671,11 @@ shutdown_halt(void *junk, int howto)
  * according to the specified delay.
  */
 static void
-shutdown_panic(void *junk, int howto)
+shutdown_panic(void *junk __unused, int howto)
 {
 	int loop;
 
-	if (howto & RB_DUMP) {
+	if ((howto & RB_DUMP) != 0) {
 		if (panic_reboot_wait_time != 0) {
 			if (panic_reboot_wait_time != -1) {
 				printf("Automatic reboot in %d seconds - "
@@ -703,7 +704,7 @@ shutdown_panic(void *junk, int howto)
  * Everything done, now reset
  */
 static void
-shutdown_reset(void *junk, int howto)
+shutdown_reset(void *junk __unused, int howto __unused)
 {
 
 	printf("Rebooting...\n");
@@ -960,9 +961,7 @@ vpanic(const char *fmt, va_list ap)
 	else if (!newpanic && debugger_on_recursive_panic)
 		kdb_enter(KDB_WHY_PANIC, "re-panic");
 #endif
-	/*thread_lock(td); */
 	td->td_flags |= TDF_INPANIC;
-	/* thread_unlock(td); */
 	if (!sync_on_panic)
 		bootopt |= RB_NOSYNC;
 	if (poweroff_on_panic)

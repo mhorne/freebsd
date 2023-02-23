@@ -302,7 +302,7 @@ am335x_pmic_attach(device_t dev)
 static void
 am335x_pmic_shutdown(void *xdev, int howto)
 {
-	if (!(howto & RB_POWEROFF))
+	if ((howto & RB_POWEROFF) == 0)
 		return;
 
 	/* Toggle pmic_pwr_enable to shutdown the PMIC. */

@@ -92,12 +92,13 @@ module_init(void *arg)
 SYSINIT(module, SI_SUB_KLD, SI_ORDER_FIRST, module_init, NULL);
 
 static void
-module_shutdown(void *arg1, int arg2)
+module_shutdown(void *arg __unused, int howto)
 {
 	module_t mod;
 
-	if (arg2 & RB_NOSYNC)
+	if ((howto & RB_NOSYNC) != 0)
 		return;
+
 	mtx_lock(&Giant);
 	MOD_SLOCK;
 	TAILQ_FOREACH_REVERSE(mod, &modules, modulelist, link)
