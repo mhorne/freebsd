@@ -330,12 +330,6 @@ aac_attach(struct aac_softc *sc)
 		   &sc->aifthread, 0, 0, "aac%daif", unit))
 		panic("Could not create AIF thread");
 
-	/* Register the shutdown method to only be called post-dump */
-	if ((sc->eh = EVENTHANDLER_REGISTER(shutdown_final, aac_shutdown,
-	    sc->aac_dev, SHUTDOWN_PRI_DEFAULT)) == NULL)
-		device_printf(sc->aac_dev,
-			      "shutdown event registration failed\n");
-
 	/* Register with CAM for the non-DASD devices */
 	if ((sc->flags & AAC_FLAGS_ENABLE_CAM) != 0) {
 		TAILQ_INIT(&sc->aac_sim_tqh);
@@ -703,9 +697,7 @@ aac_detach(device_t dev)
 	}
 
 	if ((error = aac_shutdown(dev)))
-		return(error);
-
-	EVENTHANDLER_DEREGISTER(shutdown_final, sc->eh);
+		return (error);
 
 	aac_free(sc);
 

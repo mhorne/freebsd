@@ -69,6 +69,7 @@ static device_method_t aacraid_methods[] = {
 	DEVMETHOD(device_probe,		aacraid_pci_probe),
 	DEVMETHOD(device_attach,	aacraid_pci_attach),
 	DEVMETHOD(device_detach,	aacraid_detach),
+	DEVMETHOD(device_shutdown,	aacraid_shutdown),
 	DEVMETHOD(device_suspend,	aacraid_suspend),
 	DEVMETHOD(device_resume,	aacraid_resume),
 

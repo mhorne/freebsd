@@ -71,6 +71,7 @@ static device_method_t aac_methods[] = {
 	DEVMETHOD(device_probe,		aac_pci_probe),
 	DEVMETHOD(device_attach,	aac_pci_attach),
 	DEVMETHOD(device_detach,	aac_detach),
+	DEVMETHOD(device_shutdown,	aac_shutdown),
 	DEVMETHOD(device_suspend,	aac_suspend),
 	DEVMETHOD(device_resume,	aac_resume),
 

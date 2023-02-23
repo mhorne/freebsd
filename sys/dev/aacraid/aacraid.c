@@ -308,12 +308,6 @@ aacraid_attach(struct aac_softc *sc)
 		   &sc->aifthread, 0, 0, "aacraid%daif", unit))
 		panic("Could not create AIF thread");
 
-	/* Register the shutdown method to only be called post-dump */
-	if ((sc->eh = EVENTHANDLER_REGISTER(shutdown_final, aacraid_shutdown,
-	    sc->aac_dev, SHUTDOWN_PRI_DEFAULT)) == NULL)
-		device_printf(sc->aac_dev,
-			      "shutdown event registration failed\n");
-
 	/* Find containers */
 	mtx_lock(&sc->aac_io_lock);
 	aac_alloc_sync_fib(sc, &fib);
@@ -767,9 +761,7 @@ aacraid_detach(device_t dev)
 		panic("Cannot shutdown AIF thread");
 
 	if ((error = aacraid_shutdown(dev)))
-		return(error);
-
-	EVENTHANDLER_DEREGISTER(shutdown_final, sc->eh);
+		return (error);
 
 	aacraid_free(sc);
 

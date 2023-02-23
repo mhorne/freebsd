@@ -338,7 +338,6 @@ struct aac_softc
 	int			aac_irq_rid[AAC_MAX_MSIX];
 	void			*aac_intr[AAC_MAX_MSIX]; /* interrupt handle */
 	struct aac_msix_ctx	aac_msix[AAC_MAX_MSIX]; /* context */
-	eventhandler_tag	eh;
 	struct callout	aac_daemontime;		/* clock daemon callout */
 
 	/* controller features, limits and status */
