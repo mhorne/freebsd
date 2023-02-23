@@ -350,6 +350,9 @@ wakeup(const void *ident)
 {
 	int wakeup_swapper;
 
+	KASSERT(!SCHEDULER_STOPPED(),
+	    ("wakeup() called from a panic/debugger context"));
+
 	sleepq_lock(ident);
 	wakeup_swapper = sleepq_broadcast(ident, SLEEPQ_SLEEP, 0, 0);
 	sleepq_release(ident);
@@ -370,6 +373,9 @@ wakeup_one(const void *ident)
 {
 	int wakeup_swapper;
 
+	KASSERT(!SCHEDULER_STOPPED(),
+	    ("wakeup_one() called from a panic/debugger context"));
+
 	sleepq_lock(ident);
 	wakeup_swapper = sleepq_signal(ident, SLEEPQ_SLEEP | SLEEPQ_DROP, 0, 0);
 	if (wakeup_swapper)
@@ -380,6 +386,9 @@ void
 wakeup_any(const void *ident)
 {
 	int wakeup_swapper;
+
+	KASSERT(!SCHEDULER_STOPPED(),
+	    ("wakeup_any() called from a panic/debugger context"));
 
 	sleepq_lock(ident);
 	wakeup_swapper = sleepq_signal(ident, SLEEPQ_SLEEP | SLEEPQ_UNFAIR |
