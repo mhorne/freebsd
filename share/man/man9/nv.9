@@ -646,7 +646,7 @@ resource should not be modified - they still belong to the nvlist.
 If an element of the given name does not exist, the program will be aborted.
 To avoid this, the caller should check for the existence of the name before
 trying to obtain the value, or use the
-.Xr dnvlist 3
+.Xr dnvlist 9
 extension, which can provide a default value in the case of a missing element.
 The nvlist must not be in error state.
 .Pp
@@ -701,7 +701,7 @@ system call.
 If an element of the given name does not exist, the program will be aborted.
 To avoid that the caller should check for the existence of the given name
 before trying to obtain the value, or use the
-.Xr dnvlist 3
+.Xr dnvlist 9
 extension, which can provide a default value in the case of a missing element.
 In the case of an array of strings or binary values, the caller is responsible
 for freeing every element of the array using the
@@ -952,7 +952,8 @@ do {
 .Xr err 3 ,
 .Xr free 3 ,
 .Xr printf 3 ,
-.Xr unix 4
+.Xr unix 4 ,
+.Xr dnv 9
 .Sh HISTORY
 The
 .Nm libnv

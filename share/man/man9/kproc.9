@@ -180,7 +180,7 @@ The
 .Fa ecode
 argument specifies the exit status of the process.
 While exiting, the function
-.Xr exit1 9
+.Fn exit1
 will initiate a call to
 .Xr wakeup 9
 on the process handle.
@@ -354,7 +354,6 @@ parameter.
 .El
 .Sh SEE ALSO
 .Xr rfork 2 ,
-.Xr exit1 9 ,
 .Xr kthread 9 ,
 .Xr SYSINIT 9 ,
 .Xr wakeup 9

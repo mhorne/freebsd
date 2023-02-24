@@ -106,8 +106,11 @@ accessed by a thread between operations.
 This requires additional care when reasoning about and protecting per-CPU
 variables.
 .Pp
-For example, it may be desirable to protect access using
-.Xr critical_section 9
+For example, it may be desirable to protect access using critical section
+.Po
+see
+.Xr critical 9
+.Pc
 to prevent both preemption and migration during use.
 Alternatively, it may be desirable to cache the CPU ID at the start of a
 sequence of accesses, using suitable synchronization to make non-atomic
