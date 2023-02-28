@@ -46,11 +46,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/mbuf.h>
 #include <sys/mutex.h>
 #include <sys/module.h>
+#include <sys/reboot.h>
 #include <sys/socket.h>
 #include <sys/sockopt.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/sx.h>
+
 #include <vm/uma.h>
 
 #include <cam/cam.h>
