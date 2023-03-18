@@ -64,6 +64,7 @@ struct eventtimer {
 	struct sysctl_oid	*et_sysctl;
 };
 .Ed
+.Pp
 .Ft int
 .Fn et_register "struct eventtimer *et"
 .Ft int
@@ -87,15 +88,15 @@ struct eventtimer {
 .Sh DESCRIPTION
 Event timers are responsible for generating interrupts at specified time
 or periodically, to run different time-based events.
-Subsystem consists of three main parts:
+The event timer subsystem consists of three main parts:
 .Bl -tag -width "Consumers"
 .It Drivers
 Manage hardware to generate requested time events.
 .It Consumers
 .Pa sys/kern/kern_clocksource.c
-uses event timers to supply kernel with
+uses event timers to supply the kernel with
 .Fn hardclock ,
-.Fn statclock
+.Fn statclock ,
 and
 .Fn profclock
 time events.
@@ -105,10 +106,10 @@ time events.
 provide APIs for event timer drivers and consumers.
 .El
 .Sh DRIVER API
-Driver API is built around eventtimer structure.
-To register its functionality driver allocates that structure and calls
+The driver API is built around the eventtimer structure.
+To register its functionality, a driver allocates the structure and calls
 .Fn et_register .
-Driver should fill following fields there:
+A timer driver should initialize the following fields:
 .Bl -tag -width Va
 .It Va et_name
 Unique name of the event timer for management purposes.
@@ -176,7 +177,7 @@ and
 .Va et_stop
 methods control timers associated with the current CPU.
 .Pp
-Driver may deregister its functionality by calling
+A timer driver may deregister its functionality by calling
 .Fn et_deregister .
 .Pp
 If the frequency of the clock hardware can change while it is
@@ -229,6 +230,7 @@ is the opposite to
 .Fn et_init .
 It releases the event timer for other consumers use.
 .Pp
+The
 .Fn ET_LOCK
 and
 .Fn ET_UNLOCK
@@ -248,6 +250,8 @@ and
 calls should be serialized in consumer's internal way to avoid concurrent
 timer hardware access.
 .Sh SEE ALSO
-.Xr eventtimers 4
+.Xr eventtimers 4 ,
+.Xr hardclock 9 ,
+.Xr hz 9
 .Sh AUTHORS
 .An Alexander Motin Aq Mt mav@FreeBSD.org
