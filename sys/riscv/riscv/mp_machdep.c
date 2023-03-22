@@ -282,6 +282,12 @@ init_secondary(uint64_t hart)
 		atomic_store_rel_int(&smp_started, 1);
 	}
 
+	/*
+	 * Announce the CPU. This is done inside the spinlock so that APs don't
+	 * trample on each others' output.
+	 */
+	printcpuinfo();
+
 	mtx_unlock_spin(&ap_boot_mtx);
 
 	/* Enter the scheduler */
