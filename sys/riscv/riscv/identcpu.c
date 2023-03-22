@@ -1,6 +1,10 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2015-2016 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
+ * Copyright (c) 2022 Mitchell Horne <mhorne@FreeBSD.org>
+ * Copyright (c) 2023 The FreeBSD Foundation
  *
  * Portions of this software were developed by SRI International and the
  * University of Cambridge Computer Laboratory under DARPA/AFRL contract
@@ -9,6 +13,9 @@
  * Portions of this software were developed by the University of Cambridge
  * Computer Laboratory as part of the CTSRD Project, with support from the
  * UK Higher Education Innovation Fund (HEIF).
+ *
+ * Portions of this software were developed by Mitchell Horne
+ * <mhorne@FreeBSD.org> under sponsorship from the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -68,11 +75,20 @@ register_t mimpid;	/* The implementation ID */
 
 u_int mmu_caps;
 
+/* Supervisor-level extension support. */
+bool has_sstc = true;
+bool has_svpbmt = true;
+bool has_svinval = true;
+
 struct cpu_desc {
 	const char	*cpu_mvendor_name;
 	const char	*cpu_march_name;
 	u_int		isa_extensions;		/* Single-letter extensions. */
 	u_int		mmu_caps;
+	u_int		smode_extensions;
+#define	 SV_SSTC	(1 << 0)
+#define	 SV_SVPBMT	(1 << 1)
+#define	 SV_SVINVAL	(1 << 2)
 };
 
 struct cpu_desc cpu_desc[MAXCPU];
@@ -151,13 +167,23 @@ static const struct {
 #define	ISA_PREFIX_LEN		(sizeof(ISA_PREFIX) - 1)
 
 static __inline int
-parse_ext_s(struct cpu_desc *desc __unused, char *isa, int idx, int len)
+parse_ext_s(struct cpu_desc *desc, char *isa, int idx, int len)
 {
+	/* Check for known/supported extensions. */
+	if (strncmp(&isa[idx], "sstc", len - idx) == 0) {
+		desc->smode_extensions |= SV_SSTC;
+		return (idx + 4);
+	} else if (strncmp(&isa[idx], "svpbmt", len - idx) == 0) {
+		desc->smode_extensions |= SV_SVPBMT;
+		return (idx + 6);
+	} else if (strncmp(&isa[idx], "svinval", len - idx) == 0) {
+		desc->smode_extensions |= SV_SVINVAL;
+		return (idx + 7);
+	}
+
 	/*
 	 * Proceed to the next multi-letter extension or the end of the
 	 * string.
-	 *
-	 * TODO: parse these once we gain support
 	 */
 	while (isa[idx] != '_' && idx < len) {
 		idx++;
@@ -281,6 +307,12 @@ parse_riscv_isa(struct cpu_desc *desc, char *isa, int len)
 
 		i = parse_ext_version(isa, i, NULL, NULL);
 	}
+
+	/* Update S-mode extension support. */
+	UPDATE_GLOBAL_CAP(has_sstc, (desc->smode_extensions & SV_SSTC) != 0);
+	UPDATE_GLOBAL_CAP(has_svpbmt, (desc->smode_extensions & SV_SSTC) != 0);
+	UPDATE_GLOBAL_CAP(has_svinval,
+	    (desc->smode_extensions & SV_SVINVAL) != 0);
 }
 
 static void
@@ -474,6 +506,14 @@ printcpuinfo(void)
 		    "\04Double"
 		    "\06Float"
 		    "\15Mult/Div");
+	}
+
+	if (SHOULD_PRINT(smode_extensions)) {
+		printf("  S-mode Extensions: %#b\n", desc->smode_extensions,
+		    "\020"
+		    "\01Sstc"		/* SV_SSTC */
+		    "\02Svpbmt"		/* SV_SVPBMT */
+		    "\03Svinval");	/* SV_SVINVAL */
 	}
 
 #undef SHOULD_PRINT
