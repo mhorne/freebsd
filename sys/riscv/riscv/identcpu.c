@@ -69,6 +69,7 @@ register_t mimpid;	/* The implementation ID */
 struct cpu_desc {
 	const char	*cpu_mvendor_name;
 	const char	*cpu_march_name;
+	u_int		isa_extensions;		/* Single-letter extensions. */
 };
 
 struct cpu_desc cpu_desc[MAXCPU];
@@ -216,12 +217,10 @@ parse_ext_version(char *isa, int idx, u_int *majorp __unused,
  * Parse the ISA string, building up the set of HWCAP bits as they are found.
  */
 static void
-parse_riscv_isa(struct cpu_desc *desc, char *isa, int len, u_long *hwcapp)
+parse_riscv_isa(struct cpu_desc *desc, char *isa, int len)
 {
-	u_long hwcap;
 	int i;
 
-	hwcap = 0;
 	i = ISA_PREFIX_LEN;
 	while (i < len) {
 		switch(isa[i]) {
@@ -231,11 +230,11 @@ parse_riscv_isa(struct cpu_desc *desc, char *isa, int len, u_long *hwcapp)
 		case 'f':
 		case 'i':
 		case 'm':
-			hwcap |= HWCAP_ISA_BIT(isa[i]);
+			desc->isa_extensions |= HWCAP_ISA_BIT(isa[i]);
 			i++;
 			break;
 		case 'g':
-			hwcap |= HWCAP_ISA_G;
+			desc->isa_extensions |= HWCAP_ISA_G;
 			i++;
 			break;
 		case 's':
@@ -279,9 +278,14 @@ parse_riscv_isa(struct cpu_desc *desc, char *isa, int len, u_long *hwcapp)
 
 		i = parse_ext_version(isa, i, NULL, NULL);
 	}
+}
 
-	if (hwcapp != NULL)
-		*hwcapp = hwcap;
+static void
+update_hwcap(struct cpu_desc *desc)
+{
+
+	/* Update the capabilities exposed to userspace via AT_HWCAP. */
+	UPDATE_GLOBAL_CAP(elf_hwcap, (u_long)desc->isa_extensions);
 }
 
 #ifdef FDT
@@ -289,7 +293,6 @@ static void
 identify_cpu_features_fdt(struct cpu_desc *desc)
 {
 	char isa[1024];
-	u_long hwcap;
 	phandle_t node;
 	ssize_t len;
 	pcell_t reg;
@@ -334,9 +337,10 @@ identify_cpu_features_fdt(struct cpu_desc *desc)
 		 */
 		for (int i = 0; i < len; i++)
 			isa[i] = tolower(isa[i]);
-		parse_riscv_isa(desc, isa, len, &hwcap);
+		parse_riscv_isa(desc, isa, len);
 
-		UPDATE_GLOBAL_CAP(elf_hwcap, hwcap);
+		/* Set up capabilities for userspace. */
+		update_hwcap(desc);
 
 		/* We are done. */
 		break;
@@ -414,6 +418,9 @@ printcpuinfo(void)
 	hart = PCPU_GET(hart);
 	desc = &cpu_desc[cpu];
 
+	KASSERT(desc->isa_extensions != 0,
+	    ("Empty extension set for CPU %u, did parsing fail?", cpu));
+
 	/* Print details for boot CPU or if we want verbose output */
 	if (cpu == 0 || bootverbose) {
 		/* Summary line. */
@@ -421,5 +428,12 @@ printcpuinfo(void)
 		    desc->cpu_mvendor_name, desc->cpu_march_name, hart);
 
 		printf("  marchid=%#lx, mimpid=%#lx\n", marchid, mimpid);
+		printf("  ISA: %#b\n", desc->isa_extensions,
+		    "\020"
+		    "\01Atomic"
+		    "\03Compressed"
+		    "\04Double"
+		    "\06Float"
+		    "\15Mult/Div");
 	}
 }
