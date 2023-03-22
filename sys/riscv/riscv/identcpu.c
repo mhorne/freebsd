@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/ctype.h>
 #include <sys/kernel.h>
+#include <sys/mutex.h>
 #include <sys/pcpu.h>
 #include <sys/sysctl.h>
 
@@ -48,7 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpufunc.h>
 #include <machine/elf.h>
 #include <machine/md_var.h>
-#include <machine/trap.h>
 
 #ifdef FDT
 #include <dev/fdt/fdt_common.h>
@@ -72,6 +72,25 @@ struct cpu_desc {
 };
 
 struct cpu_desc cpu_desc[MAXCPU];
+
+static struct mtx cap_mtx;
+MTX_SYSINIT(cap_mtx, &cap_mtx, "CPU feature mutex", MTX_SPIN);
+
+/*
+ * We only track features/capabilities that are common across all CPUs. When
+ * APs come online we can have multiple concurrent calls to identify_cpu(), so
+ * updates are protected with a mutex.
+ */
+#define	UPDATE_GLOBAL_CAP(t, v)						\
+	do {								\
+		if (PCPU_GET(cpuid) == 0) {				\
+			(t) = (v);					\
+		} else {						\
+			mtx_lock_spin(&cap_mtx);			\
+			(t) &= (v);					\
+			mtx_unlock_spin(&cap_mtx);			\
+		}							\
+	} while (0)
 
 /*
  * Micro-architecture tables.
@@ -267,29 +286,32 @@ parse_riscv_isa(char *isa, int len, u_long *hwcapp)
 
 #ifdef FDT
 static void
-fill_elf_hwcap(void *dummy __unused)
+identify_cpu_features_fdt(struct cpu_desc *desc)
 {
 	char isa[1024];
 	u_long hwcap;
 	phandle_t node;
 	ssize_t len;
+	pcell_t reg;
 
 	node = OF_finddevice("/cpus");
 	if (node == -1) {
-		if (bootverbose)
-			printf("fill_elf_hwcap: Can't find cpus node\n");
+		printf("%s: could not find /cpus node in FDT\n", __func__);
 		return;
 	}
 
 	/*
-	 * Iterate through the CPUs and examine their ISA string. While we
-	 * could assign elf_hwcap to be whatever the boot CPU supports, to
-	 * handle the (unusual) case of running a system with hetergeneous
-	 * ISAs, keep only the extension bits that are common to all harts.
+	 * Locate our current CPU's node in the device-tree, and parse its
+	 * contents to detect supported CPU/ISA features and extensions.
 	 */
 	for (node = OF_child(node); node > 0; node = OF_peer(node)) {
 		/* Skip any non-CPU nodes, such as cpu-map. */
 		if (!ofw_bus_node_is_compatible(node, "riscv"))
+			continue;
+
+		/* Find this CPU */
+		if (OF_getencprop(node, "reg", &reg, sizeof(reg)) <= 0 ||
+		    reg != PCPU_GET(hart))
 			continue;
 
 		len = OF_getprop(node, "riscv,isa", isa, sizeof(isa));
@@ -314,15 +336,25 @@ fill_elf_hwcap(void *dummy __unused)
 			isa[i] = tolower(isa[i]);
 		parse_riscv_isa(isa, len, &hwcap);
 
-		if (elf_hwcap != 0)
-			elf_hwcap &= hwcap;
-		else
-			elf_hwcap = hwcap;
+		UPDATE_GLOBAL_CAP(elf_hwcap, hwcap);
+
+		/* We are done. */
+		break;
+	}
+	if (node <= 0) {
+		printf("%s: could not find FDT node for CPU %u, hart %u\n",
+		    __func__, PCPU_GET(cpuid), PCPU_GET(hart));
 	}
 }
-
-SYSINIT(identcpu, SI_SUB_CPU, SI_ORDER_ANY, fill_elf_hwcap, NULL);
 #endif
+
+static void
+identify_cpu_features(struct cpu_desc *desc)
+{
+#ifdef FDT
+	identify_cpu_features_fdt(desc);
+#endif
+}
 
 static void
 identify_cpu_ids(struct cpu_desc *desc)
@@ -369,6 +401,7 @@ identify_cpu(void)
 	struct cpu_desc *desc = &cpu_desc[PCPU_GET(cpuid)];
 
 	identify_cpu_ids(desc);
+	identify_cpu_features(desc);
 }
 
 void
