@@ -3547,6 +3547,9 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	if (ic_used && (error = ieee80211_com_vincref(vap)) != 0)
 		return (error);
 
+	/* 100ms to allow for state transitions. */
+	pause("ieee80211pause", hz / 10);
+
 	switch (cmd) {
 	case SIOCSIFFLAGS:
 		IEEE80211_LOCK(ic);
