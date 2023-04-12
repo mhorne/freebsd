@@ -111,6 +111,15 @@ LDFLAGS+=	-Wl,-dead_strip
 LDFLAGS+=	-Wl,--gc-sections
 .endif
 
+#
+# PR 258358: workaround GC sections
+#
+# This is necessary for self-hosted riscv builds.
+#
+.if ${MACHINE_CPUARCH} == "riscv"
+LDFLAGS+=	-Wl,-melf64lriscv_fbsd
+.endif
+
 CXXSTD?=	c++14
 CXXFLAGS+=	-fno-exceptions
 CXXFLAGS+=	-fno-rtti
