@@ -3382,6 +3382,98 @@ static const char *pmc_op_to_name[] = {
 } while (0)
 
 static int
+pmc_op_pmcattach(struct thread *td, struct pmc_op_pmcattach a)
+{
+	struct pmc *pm;
+	struct proc *p;
+	int error = 0;
+
+	sx_assert(&pmc_sx, SX_XLOCKED);
+
+	if (a.pm_pid < 0) {
+		return (EINVAL);
+	} else if (a.pm_pid == 0) {
+		a.pm_pid = td->td_proc->p_pid;
+	}
+
+	if ((error = pmc_find_pmc(a.pm_pmc, &pm)) != 0) {
+		return (error);
+	}
+
+	if (PMC_IS_SYSTEM_MODE(PMC_TO_MODE(pm))) {
+		return (EINVAL);
+	}
+
+	/* PMCs may be (re)attached only when allocated or stopped */
+	if (pm->pm_state == PMC_STATE_RUNNING) {
+		return (EBUSY);
+	} else if (pm->pm_state != PMC_STATE_ALLOCATED &&
+	    pm->pm_state != PMC_STATE_STOPPED) {
+		return (EINVAL);
+	}
+
+	/* lookup pid */
+	if ((p = pfind(a.pm_pid)) == NULL) {
+		return (ESRCH);
+	}
+
+	/*
+	 * Ignore processes that are working on exiting.
+	 */
+	if (p->p_flag & P_WEXIT) {
+		PROC_UNLOCK(p);	/* pfind() returns a locked process */
+		return (ESRCH);
+	}
+
+	/*
+	 * we are allowed to attach a PMC to a process if
+	 * we can debug it.
+	 */
+	error = p_candebug(curthread, p);
+
+	PROC_UNLOCK(p);
+
+	if (error == 0)
+		error = pmc_attach_process(p, pm);
+	return (error);
+}
+
+static int
+pmc_op_pmcdetach(struct thread *td, struct pmc_op_pmcattach a)
+{
+	struct pmc *pm;
+	struct proc *p;
+	int error = 0;
+
+	if (a.pm_pid < 0) {
+		return (EINVAL);
+	} else if (a.pm_pid == 0)
+		a.pm_pid = td->td_proc->p_pid;
+
+	if ((error = pmc_find_pmc(a.pm_pmc, &pm)) != 0) {
+		return (error);
+	}
+
+	if ((p = pfind(a.pm_pid)) == NULL) {
+		return (ESRCH);
+	}
+
+	/*
+	 * Treat processes that are in the process of exiting
+	 * as if they were not present.
+	 */
+	if (p->p_flag & P_WEXIT) {
+		error = ESRCH;
+	}
+
+	PROC_UNLOCK(p);	/* pfind() returns a locked process */
+
+	if (error == 0)
+		error = pmc_detach_process(p, pm);
+	return (error);
+}
+
+static int
 pmc_syscall_handler(struct thread *td, void *syscall_args)
 {
 	int error, is_sx_downgraded, op;
@@ -4101,64 +4193,12 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 
 	case PMC_OP_PMCATTACH:
 	{
-		struct pmc *pm;
-		struct proc *p;
 		struct pmc_op_pmcattach a;
-
-		sx_assert(&pmc_sx, SX_XLOCKED);
 
 		if ((error = copyin(arg, &a, sizeof(a))) != 0)
 			break;
 
-		if (a.pm_pid < 0) {
-			error = EINVAL;
-			break;
-		} else if (a.pm_pid == 0)
-			a.pm_pid = td->td_proc->p_pid;
-
-		if ((error = pmc_find_pmc(a.pm_pmc, &pm)) != 0)
-			break;
-
-		if (PMC_IS_SYSTEM_MODE(PMC_TO_MODE(pm))) {
-			error = EINVAL;
-			break;
-		}
-
-		/* PMCs may be (re)attached only when allocated or stopped */
-		if (pm->pm_state == PMC_STATE_RUNNING) {
-			error = EBUSY;
-			break;
-		} else if (pm->pm_state != PMC_STATE_ALLOCATED &&
-		    pm->pm_state != PMC_STATE_STOPPED) {
-			error = EINVAL;
-			break;
-		}
-
-		/* lookup pid */
-		if ((p = pfind(a.pm_pid)) == NULL) {
-			error = ESRCH;
-			break;
-		}
-
-		/*
-		 * Ignore processes that are working on exiting.
-		 */
-		if (p->p_flag & P_WEXIT) {
-			error = ESRCH;
-			PROC_UNLOCK(p);	/* pfind() returns a locked process */
-			break;
-		}
-
-		/*
-		 * we are allowed to attach a PMC to a process if
-		 * we can debug it.
-		 */
-		error = p_candebug(curthread, p);
-
-		PROC_UNLOCK(p);
-
-		if (error == 0)
-			error = pmc_attach_process(p, pm);
+		error = pmc_op_pmcattach(td, a);
 	}
 	break;
 
@@ -4169,39 +4209,12 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 
 	case PMC_OP_PMCDETACH:
 	{
-		struct pmc *pm;
-		struct proc *p;
 		struct pmc_op_pmcattach a;
 
 		if ((error = copyin(arg, &a, sizeof(a))) != 0)
 			break;
 
-		if (a.pm_pid < 0) {
-			error = EINVAL;
-			break;
-		} else if (a.pm_pid == 0)
-			a.pm_pid = td->td_proc->p_pid;
-
-		if ((error = pmc_find_pmc(a.pm_pmc, &pm)) != 0)
-			break;
-
-		if ((p = pfind(a.pm_pid)) == NULL) {
-			error = ESRCH;
-			break;
-		}
-
-		/*
-		 * Treat processes that are in the process of exiting
-		 * as if they were not present.
-		 */
-
-		if (p->p_flag & P_WEXIT)
-			error = ESRCH;
-
-		PROC_UNLOCK(p);	/* pfind() returns a locked process */
-
-		if (error == 0)
-			error = pmc_detach_process(p, pm);
+		error = pmc_op_pmcdetach(td, a);
 	}
 	break;
 
