@@ -147,7 +147,7 @@ static const struct {
 #define	ISA_PREFIX_LEN		(sizeof(ISA_PREFIX) - 1)
 
 static __inline int
-parse_ext_s(char *isa, int idx, int len)
+parse_ext_s(struct cpu_desc *desc __unused, char *isa, int idx, int len)
 {
 	/*
 	 * Proceed to the next multi-letter extension or the end of the
@@ -163,7 +163,7 @@ parse_ext_s(char *isa, int idx, int len)
 }
 
 static __inline int
-parse_ext_x(char *isa, int idx, int len)
+parse_ext_x(struct cpu_desc *desc __unused, char *isa, int idx, int len)
 {
 	/*
 	 * Proceed to the next multi-letter extension or the end of the
@@ -177,7 +177,7 @@ parse_ext_x(char *isa, int idx, int len)
 }
 
 static __inline int
-parse_ext_z(char *isa, int idx, int len)
+parse_ext_z(struct cpu_desc *desc __unused, char *isa, int idx, int len)
 {
 	/*
 	 * Proceed to the next multi-letter extension or the end of the
@@ -216,7 +216,7 @@ parse_ext_version(char *isa, int idx, u_int *majorp __unused,
  * Parse the ISA string, building up the set of HWCAP bits as they are found.
  */
 static void
-parse_riscv_isa(char *isa, int len, u_long *hwcapp)
+parse_riscv_isa(struct cpu_desc *desc, char *isa, int len, u_long *hwcapp)
 {
 	u_long hwcap;
 	int i;
@@ -253,20 +253,20 @@ parse_riscv_isa(char *isa, int len, u_long *hwcapp)
 			/*
 			 * Supervisor-level extension namespace.
 			 */
-			i = parse_ext_s(isa, i, len);
+			i = parse_ext_s(desc, isa, i, len);
 			break;
 		case 'x':
 			/*
 			 * Custom extension namespace. For now, we ignore
 			 * these.
 			 */
-			i = parse_ext_x(isa, i, len);
+			i = parse_ext_x(desc, isa, i, len);
 			break;
 		case 'z':
 			/*
 			 * Multi-letter standard extension namespace.
 			 */
-			i = parse_ext_z(isa, i, len);
+			i = parse_ext_z(desc, isa, i, len);
 			break;
 		case '_':
 			i++;
@@ -334,7 +334,7 @@ identify_cpu_features_fdt(struct cpu_desc *desc)
 		 */
 		for (int i = 0; i < len; i++)
 			isa[i] = tolower(isa[i]);
-		parse_riscv_isa(isa, len, &hwcap);
+		parse_riscv_isa(desc, isa, len, &hwcap);
 
 		UPDATE_GLOBAL_CAP(elf_hwcap, hwcap);
 
