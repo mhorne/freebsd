@@ -150,6 +150,16 @@ riscv_sbi_allocate_pmc(int cpu, int ri, struct pmc *pm,
 		config = a->pm_ev - PMC_EV_RISCV_SBI_FW_FIRST;
 		config |= (SBI_PMU_EVENT_TYPE_FW << 16);
 		break;
+	case PMC_EV_RISCV_SBI_HW_RAW_EVENT:
+		/* Raw/user-specified event. The 64-bit CSR value should be in
+		 * $fieldname */
+		config = 0; /* event_code */
+		config |= (SBI_PMU_EVENT_TYPE_HW_RAW << 16); /* event_type */
+		data = a->pm_md.pm_riscv.pm_riscv_evsel; /* raw event value */
+
+		/* data has 48-bits only. */
+		if (data > 0xffffffffffff)
+			return (EINVAL);
 	default:
 		return (EINVAL);
 	}

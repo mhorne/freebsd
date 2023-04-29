@@ -51,6 +51,10 @@
 #define	RISCV_PERFCTR_VALUE_TO_RELOAD_COUNT(P)	(-(P))
 #define	EVENT_ID_MASK	0xFF
 
+struct pmc_md_riscv_op_pmcallocate {
+	uint64_t pm_riscv_evsel;
+};
+
 #ifdef _KERNEL
 /* MD extension for 'struct pmc' */
 struct pmc_md_riscv_pmc {

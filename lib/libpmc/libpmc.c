@@ -1001,15 +1001,32 @@ powerpc_allocate_pmc(enum pmc_event pe, char *ctrspec __unused,
 static struct pmc_event_alias riscv_sbi_aliases[] = {
 	EV_ALIAS("instructions",	"HW_INSTR"),
 	EV_ALIAS("cycles",		"HW_CPU_CYCLES"),
+	EV_ALIAS("raw",			"HW_RAW_EVENT"),
 	EV_ALIAS(NULL, NULL)
 };
 
 static int
-riscv_sbi_allocate_pmc(enum pmc_event pe, char *ctrspec __unused,
+riscv_sbi_allocate_pmc(enum pmc_event pe, char *ctrspec,
     struct pmc_op_pmcallocate *pmc_config __unused)
 {
+	uint64_t eventspec;
+	char *p;
 
-	/* Always succeed. */
+	/* Raw event, value provided as an argument. */
+	if (pe == PMC_EV_RISCV_SBI_HW_RAW_EVENT) {
+		p = strsep(&ctrspec, ",");
+		if (p == NULL)
+			return (-1);
+
+		eventspec = strtoll(p, NULL, 16);
+		if (eventspec == 0)
+			/* TODO: print errno? */
+			return (-1);
+
+		/* hwpmc allocate method will look for this. */
+		pmc_config->pm_md.pm_riscv.pm_riscv_evsel = eventspec;
+	}
+
 	return (0);
 }
 #endif

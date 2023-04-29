@@ -36,6 +36,7 @@
 #include <dev/hwpmc/hwpmc_riscv.h>
 
 union pmc_md_op_pmcallocate {
+	struct pmc_md_riscv_op_pmcallocate	pm_riscv;
 	uint64_t		__pad[4];
 };
 
