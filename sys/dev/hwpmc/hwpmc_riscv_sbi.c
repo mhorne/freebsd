@@ -187,6 +187,11 @@ riscv_sbi_allocate_pmc(int cpu, int ri, struct pmc *pm,
 		config = a->pm_ev - PMC_EV_RISCV_SBI_HW_FIRST;
 		config |= (SBI_PMU_EVENT_TYPE_HW_GENERAL << 16);
 		break;
+	case PMC_EV_RISCV_SBI_CACHE_FIRST ... PMC_EV_RISCV_SBI_CACHE_LAST:
+		/* HW cache event TODO: handling of different types. */
+		config = a->pm_ev - PMC_EV_RISCV_SBI_CACHE_FIRST;
+		config |= (SBI_PMU_EVENT_TYPE_HW_CACHE << 16);
+		break;
 	case PMC_EV_RISCV_SBI_FW_FIRST ... PMC_EV_RISCV_SBI_FW_LAST:
 		/* Firmware event */
 		config = a->pm_ev - PMC_EV_RISCV_SBI_FW_FIRST;
@@ -289,8 +294,10 @@ riscv_sbi_config_pmc(int cpu, int ri, struct pmc *pm)
 
 	if (pm != NULL) {
 		error = sbi_pmu_counter_get_info(ri, &info);
+		printf("counter info: %lx\n", info);
+		KASSERT(error == 0, ("unexpected get_info error %d", error));
 		if ((info & (0x1ul << 63)) == 0)
-			pm->pm_md.pm_riscv.pm_csr = (info & 0xfff) - 0xc00;
+			pm->pm_md.pm_riscv.pm_csr = COUNTER_INFO_CSR(info) - 0xc00;
 		else
 			pm->pm_md.pm_riscv.pm_csr = -1;
 	}
