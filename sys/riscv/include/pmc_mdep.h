@@ -29,7 +29,7 @@
 #ifndef _MACHINE_PMC_MDEP_H_
 #define	_MACHINE_PMC_MDEP_H_
 
-#define	PMC_MDEP_CLASS_INDEX_RISCV	1
+#define	PMC_MDEP_CLASS_INDEX_RISCV_SBI	1
 /*
  * On the RISC-V platform we don't support any PMCs yet.
  */
@@ -52,13 +52,14 @@ union pmc_md_pmc {
 #define	PMC_IN_KERNEL(va)		INKERNEL((va))
 #define	PMC_IN_USERSPACE(va)		((va) <= VM_MAXUSER_ADDRESS)
 #define	PMC_TRAPFRAME_TO_PC(TF)		((TF)->tf_ra)
-#define	PMC_TRAPFRAME_TO_FP(TF)		(0)	/* stub */
+#define	PMC_TRAPFRAME_TO_FP(TF)		((TF)->tf_s[0])
+#define	PMC_TRAPFRAME_TO_SP(TF)		((TF)->tf_sp)
 
 /*
  * Prototypes
  */
-struct pmc_mdep *pmc_riscv_initialize(void);
-void	pmc_riscv_finalize(struct pmc_mdep *_md);
+struct pmc_mdep	*pmc_riscv_sbi_initialize(void);
+void		 pmc_riscv_sbi_finalize(struct pmc_mdep *_md);
 #endif /* _KERNEL */
 
 #endif /* !_MACHINE_PMC_MDEP_H_ */

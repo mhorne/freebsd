@@ -39,4 +39,8 @@ SRCS+=	hwpmc_powerpc.c hwpmc_e500.c hwpmc_mpc7xxx.c hwpmc_ppc970.c \
 	hwpmc_power8.c
 .endif
 
+.if ${MACHINE_CPUARCH} == "riscv"
+SRCS+=	hwpmc_riscv.c hwpmc_riscv_sbi.c
+.endif
+
 .include <bsd.kmod.mk>

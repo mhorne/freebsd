@@ -1,9 +1,13 @@
 /*-
  * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
+ * Copyright (c) 2022,2023 The FreeBSD Foundation
  *
  * This software was developed by the University of Cambridge Computer
  * Laboratory with support from ARM Ltd.
+ *
+ * Portions of this software were developed by Mitchell Horne
+ * <mhorne@FreeBSD.org> under sponsorship from the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,11 +36,16 @@
 #ifndef _DEV_HWPMC_RISCV_H_
 #define	_DEV_HWPMC_RISCV_H_
 
+/* TODO: SBI extension might not have all of these caps */
+#if 0
 #define	RISCV_PMC_CAPS		(PMC_CAP_INTERRUPT | PMC_CAP_USER |	\
 				 PMC_CAP_SYSTEM | PMC_CAP_EDGE |	\
 				 PMC_CAP_THRESHOLD | PMC_CAP_READ |	\
 				 PMC_CAP_WRITE | PMC_CAP_INVERT |	\
 				 PMC_CAP_QUALIFIER)
+#endif
+#define	RISCV_PMC_CAPS		(PMC_CAP_INTERRUPT | PMC_CAP_SYSTEM |	\
+				 PMC_CAP_READ | PMC_CAP_WRITE)
 
 #define	RISCV_RELOAD_COUNT_TO_PERFCTR_VALUE(R)	(-(R))
 #define	RISCV_PERFCTR_VALUE_TO_RELOAD_COUNT(P)	(-(P))
@@ -45,7 +54,8 @@
 #ifdef _KERNEL
 /* MD extension for 'struct pmc' */
 struct pmc_md_riscv_pmc {
-	uint32_t	pm_riscv_evsel;
+	uint64_t	pm_riscv_startval;
+	int		pm_csr;
 };
 #endif /* _KERNEL */
 #endif /* _DEV_HWPMC_RISCV_H_ */
