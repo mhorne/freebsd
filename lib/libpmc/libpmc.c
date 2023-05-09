@@ -826,7 +826,7 @@ cmn600_pmu_allocate_pmc(enum pmc_event pe, char *ctrspec,
 				return (-1);
 
 			pmc_config->pm_md.pm_cmn600.pma_cmn600_nodeid |= nodeid;
-
+			pmc_config->pm_caps |= PMC_QUALIFIER;
 		} else if (KWPREFIXMATCH(p, "occupancy=")) {
 			q = strchr(p, '=');
 			if (*++q == '\0') /* skip '=' */
@@ -837,6 +837,7 @@ cmn600_pmu_allocate_pmc(enum pmc_event pe, char *ctrspec,
 				return (-1);
 
 			pmc_config->pm_md.pm_cmn600.pma_cmn600_occupancy = occupancy;
+			pmc_config->pm_caps |= PMC_QUALIFIER;
 		} else if (KWPREFIXMATCH(p, "xpport=")) {
 			q = strchr(p, '=');
 			if (*++q == '\0') /* skip '=' */
@@ -855,6 +856,7 @@ cmn600_pmu_allocate_pmc(enum pmc_event pe, char *ctrspec,
 			}
 
 			pmc_config->pm_md.pm_cmn600.pma_cmn600_config |= xpport << 2;
+			pmc_config->pm_caps |= PMC_QUALIFIER;
 		} else if (KWPREFIXMATCH(p, "xpchannel=")) {
 			q = strchr(p, '=');
 			if (*++q == '\0') /* skip '=' */
@@ -873,6 +875,7 @@ cmn600_pmu_allocate_pmc(enum pmc_event pe, char *ctrspec,
 			}
 
 			pmc_config->pm_md.pm_cmn600.pma_cmn600_config |= xpchannel << 5;
+			pmc_config->pm_caps |= PMC_QUALIFIER;
 		} else
 			return (-1);
 	}
@@ -903,6 +906,7 @@ dmc620_pmu_allocate_pmc(enum pmc_event pe, char *ctrspec,
 				return (-1);
 
 			pmc_config->pm_caps |= PMC_CAP_THRESHOLD;
+			pmc_config->pm_caps |= PMC_QUALIFIER;
 			pmc_config->pm_md.pm_dmc620.pm_dmc620_config |= count;
 
 		} else if (KWMATCH(p, "inv")) {

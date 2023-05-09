@@ -34,10 +34,7 @@
 #define _DEV_HWPMC_ARMV7_H_
 
 #define	ARMV7_PMC_CAPS		(PMC_CAP_INTERRUPT | PMC_CAP_USER |     \
-				 PMC_CAP_SYSTEM | PMC_CAP_EDGE |	\
-				 PMC_CAP_THRESHOLD | PMC_CAP_READ |	\
-				 PMC_CAP_WRITE | PMC_CAP_INVERT |	\
-				 PMC_CAP_QUALIFIER)
+				 PMC_CAP_SYSTEM | PMC_CAP_READ | PMC_CAP_WRITE)
 
 #define	ARMV7_PMNC_ENABLE	(1 << 0) /* Enable all counters */
 #define	ARMV7_PMNC_P		(1 << 1) /* Reset all counters */

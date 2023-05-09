@@ -573,8 +573,8 @@ pmc_dmc620_initialize_cd2(struct pmc_mdep *md)
 	pcd = &md->pmd_classdep[PMC_MDEP_CLASS_INDEX_DMC620_CD2];
 
 	pcd->pcd_caps		= PMC_CAP_SYSTEM | PMC_CAP_READ |
-	    PMC_CAP_WRITE | PMC_CAP_INVERT | PMC_CAP_QUALIFIER |
-	    PMC_CAP_INTERRUPT | PMC_CAP_DOMWIDE;
+	    PMC_CAP_WRITE | PMC_CAP_INVERT | PMC_CAP_INTERRUPT |
+	    PMC_CAP_DOMWIDE;
 	pcd->pcd_class	= PMC_CLASS_DMC620_PMU_CD2;
 	pcd->pcd_num	= npmc;
 	pcd->pcd_ri	= md->pmd_npmc;
@@ -633,8 +633,8 @@ pmc_dmc620_initialize_c(struct pmc_mdep *md)
 	pcd = &md->pmd_classdep[PMC_MDEP_CLASS_INDEX_DMC620_C];
 
 	pcd->pcd_caps		= PMC_CAP_SYSTEM | PMC_CAP_READ |
-	    PMC_CAP_WRITE | PMC_CAP_INVERT | PMC_CAP_QUALIFIER |
-	    PMC_CAP_INTERRUPT | PMC_CAP_DOMWIDE;
+	    PMC_CAP_WRITE | PMC_CAP_INVERT | PMC_CAP_INTERRUPT |
+	    PMC_CAP_DOMWIDE;
 	pcd->pcd_class	= PMC_CLASS_DMC620_PMU_C;
 	pcd->pcd_num	= npmc;
 	pcd->pcd_ri	= md->pmd_npmc;
