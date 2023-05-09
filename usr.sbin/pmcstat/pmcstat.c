@@ -522,7 +522,7 @@ main(int argc, char **argv)
 	CPU_COPY(&rootmask, &cpumask);
 
 	while ((option = getopt(argc, argv,
-	    "ACD:EF:G:ILM:NO:P:R:S:TUWZa:c:def:gi:k:l:m:n:o:p:qr:s:t:u:vw:z:")) != -1)
+	    "ACD:EF:G:ILM:NO:P:R:S:TUWZa:c:def:gi:k:l:m:n:o:p:qr:s:t:u:vw:z:")) != -1) {
 		switch (option) {
 		case 'A':
 			args.pa_flags |= FLAG_SKIP_TOP_FN_RES;
@@ -869,6 +869,7 @@ main(int argc, char **argv)
 			break;
 
 		}
+	}
 	if ((do_listcounters | do_descr) &&
 		pmc_pmu_enabled() == 0)
 			errx(EX_USAGE, "pmu features not supported on host or hwpmc not loaded");
