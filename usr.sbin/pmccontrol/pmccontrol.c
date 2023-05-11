@@ -85,15 +85,11 @@ static void	pmcc_init_debug(void);
 static int	pmcc_do_list_state(void);
 static int	pmcc_do_enable_disable(struct pmcc_op_list *);
 static int	pmcc_do_list_events(void);
+static void	pmcc_do_version(void);
+
+static void	usage(int);
 
 /* Globals */
-
-static char usage_message[] =
-	"Usage:\n"
-	"       " PMCC_PROGRAM_NAME " -L\n"
-	"       " PMCC_PROGRAM_NAME " -l\n"
-	"       " PMCC_PROGRAM_NAME " -s\n"
-	"       " PMCC_PROGRAM_NAME " [-e pmc | -d pmc | -c cpu] ...";
 
 #if DEBUG
 static FILE *debug_stream = NULL;
@@ -123,6 +119,19 @@ pmcc_init_debug(void)
 		debug_stream = stderr;
 }
 #endif
+
+static void
+usage(int errcode)
+{
+	fprintf(stderr,
+	    "Usage:\n"
+	    "\t" PMCC_PROGRAM_NAME " -L\n"
+	    "\t" PMCC_PROGRAM_NAME " -l\n"
+	    "\t" PMCC_PROGRAM_NAME " -s\n"
+	    "\t" PMCC_PROGRAM_NAME " -v\n"
+	    "\t" PMCC_PROGRAM_NAME " [-e pmc | -d pmc | -c cpu] ...");
+	exit(errcode);
+}
 
 static int
 pmcc_do_enable_disable(struct pmcc_op_list *op_list)
@@ -340,6 +349,17 @@ pmcc_show_statistics(void)
 	return 0;
 }
 
+static void
+pmcc_do_version(void)
+{
+	pmc_init
+
+	printf("Compiled-in version: %x\n", PMC_VERSION);
+	printf("Kernel hwpmc(4) version: ");
+
+	exit(0);
+}
+
 /*
  * Main
  */
@@ -436,6 +456,14 @@ main(int argc, char **argv)
 				break;
 			}
 			command = PMCC_SHOW_STATISTICS;
+			break;
+
+		case 'v':
+			if (command != PMCC_PRINT_USAGE) {
+				error = 1;
+				break;
+			}
+			pmcc_do_version();
 			break;
 
 		case ':':
