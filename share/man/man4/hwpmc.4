@@ -36,10 +36,24 @@
 .Nd "Hardware Performance Monitoring Counter support"
 .Sh SYNOPSIS
 .Cd "options HWPMC_HOOKS"
-.Cd "device hwpmc"
 .Pp
 Additionally, for i386 systems:
+.Bd -ragged -offset indent
 .Cd "device apic"
+.Ed
+.Pp
+To load the driver as a module at boot time, place the
+following line in
+.Xr loader.conf 5 :
+.Bd -ragged -offset indent
+hwpmc_load="YES"
+.Ed
+.Pp
+Alternatively, to compile this driver into the kernel, place the
+following line in your kernel configuration file:
+.Bd -ragged -offset indent
+.Cd "device hwpmc"
+.Ed
 .Sh DESCRIPTION
 The
 .Nm
