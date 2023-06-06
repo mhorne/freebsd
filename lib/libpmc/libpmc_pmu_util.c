@@ -651,7 +651,6 @@ pmc_pmu_pmcallocate_md(const char *event_name, struct pmc_op_pmcallocate *pm)
 	assert(idx >= 0);
 	pm->pm_ev = idx;
 	pm->pm_md.pm_md_config = ped.ped_event;
-	pm->pm_md.pm_md_flags |= PM_MD_RAW_EVENT;
 	pm->pm_class = PMC_CLASS_ARMV8;
 	pm->pm_caps |= (PMC_CAP_READ | PMC_CAP_WRITE);
 
@@ -682,5 +681,6 @@ pmc_pmu_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm)
 		return (error);
 	}
 
+	pm->pm_flags |= PMC_F_EV_PMU;
 	return (0);
 }
