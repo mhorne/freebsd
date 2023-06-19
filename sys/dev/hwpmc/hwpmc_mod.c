@@ -3309,6 +3309,9 @@ pmc_do_op_pmcallocate(struct thread *td, struct pmc_op_pmcallocate *pa)
 
 	p = td->td_proc;
 
+	PMCDBG5(PMC,ALL,1, "event=%d caps=0x%x flags=0x%x mode=%d cpu=%u",
+	    pa->pm_ev, caps, flags, mode, cpu);
+
 	/* Requested mode must exist. */
 	if ((mode != PMC_MODE_SS && mode != PMC_MODE_SC &&
 	     mode != PMC_MODE_TS && mode != PMC_MODE_TC))
@@ -3384,8 +3387,8 @@ pmc_do_op_pmcallocate(struct thread *td, struct pmc_op_pmcallocate *pa)
 	if ((pcd->pcd_caps & caps) != caps)
 		return (EOPNOTSUPP);
 
-	PMCDBG4(PMC,ALL,2, "event=%d caps=0x%x mode=%d cpu=%d", pa->pm_ev,
-	    caps, mode, cpu);
+	PMCDBG5(PMC,ALL,2, "event=%d caps=0x%x flags=0x%x mode=%d cpu=%d",
+	    pa->pm_ev, caps, flags, mode, cpu);
 
 	pmc = pmc_allocate_pmc_descriptor();
 	pmc->pm_id    = PMC_ID_MAKE_ID(cpu, pa->pm_mode, class, PMC_ID_INVALID);
