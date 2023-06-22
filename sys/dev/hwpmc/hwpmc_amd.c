@@ -378,9 +378,6 @@ amd_allocate_pmc(int cpu __unused, int ri, struct pmc *pm,
 	if (pd->pd_class != a->pm_class)
 		return (EINVAL);
 
-	if ((a->pm_flags & PMC_F_EV_PMU) == 0)
-		return (EINVAL);
-
 	caps = pm->pm_caps;
 
 	PMCDBG2(MDP, ALL, 1,"amd-allocate ri=%d caps=0x%x", ri, caps);
@@ -406,10 +403,12 @@ amd_allocate_pmc(int cpu __unused, int ri, struct pmc *pm,
 		break;
 	}
 
-	if (strlen(pmc_cpuid) != 0) {
-		pm->pm_md.pm_amd.pm_amd_evsel = a->pm_md.pm_amd.pm_amd_config;
+	if ((a->pm_flags & PMC_F_EV_PMU) != 0) {
+		/* Full configuration was provided by userspace. */
 		PMCDBG2(MDP, ALL, 2,"amd-allocate ri=%d -> config=0x%x", ri,
 		    a->pm_md.pm_amd.pm_amd_config);
+
+		pm->pm_md.pm_amd.pm_amd_evsel = a->pm_md.pm_amd.pm_amd_config;
 		return (0);
 	}
 
