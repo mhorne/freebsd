@@ -94,6 +94,9 @@ static struct amd_descr amd_pmcdesc[AMD_NPMCS] =
 	PMCDESC(AMD_PMC_EVSEL_EP_DF_3,	AMD_PMC_PERFCTR_EP_DF_3)
 };
 
+static bool has_cache_pmcs;
+static bool has_fabric_pmcs;
+
 struct amd_event_code_map {
 	enum pmc_event	pe_ev;	 /* enum value */
 	uint16_t	pe_code; /* encoded event mask */
@@ -363,6 +366,7 @@ amd_allocate_pmc(int cpu __unused, int ri, struct pmc *pm,
 	const struct pmc_descr *pd;
 	uint64_t allowed_unitmask, caps, config, unitmask;
 	enum pmc_event pe;
+	uint32_t subclass;
 	int i;
 
 	KASSERT(ri >= 0 && ri < AMD_NPMCS,
@@ -382,15 +386,25 @@ amd_allocate_pmc(int cpu __unused, int ri, struct pmc *pm,
 	PMCDBG2(MDP, ALL, 1,"amd-allocate ri=%d caps=0x%x", ri, caps);
 
 	/* Validate sub-class. */
-	if ((ri >= 0 && ri < 6) && a->pm_md.pm_amd.pm_amd_sub_class !=
-	    PMC_AMD_SUB_CLASS_CORE)
-		return (EINVAL);
-	if ((ri >= 6 && ri < 12) && a->pm_md.pm_amd.pm_amd_sub_class !=
-	    PMC_AMD_SUB_CLASS_L3_CACHE)
-		return (EINVAL);
-	if ((ri >= 12 && ri < 16) && a->pm_md.pm_amd.pm_amd_sub_class !=
-	    PMC_AMD_SUB_CLASS_DATA_FABRIC)
-		return (EINVAL);
+	subclass = a->pm_md.pm_amd.pm_amd_sub_class;
+	switch (ri) {
+	case 0 ... 5:
+		if (subclass != PMC_AMD_SUB_CLASS_CORE)
+			return (EINVAL);
+		break;
+	case 6 ... 11:
+		if (!has_cache_pmcs)
+			return (EOPNOTSUPP);
+		if (subclass != PMC_AMD_SUB_CLASS_L3_CACHE)
+			return (EINVAL);
+		break;
+	case 12 ... 15:
+		if (!has_fabric_pmcs)
+			return (EOPNOTSUPP);
+		if (subclass != PMC_AMD_SUB_CLASS_DATA_FABRIC)
+			return (EINVAL);
+		break;
+	}
 
 	if (strlen(pmc_cpuid) != 0) {
 		pm->pm_md.pm_amd.pm_amd_evsel = a->pm_md.pm_amd.pm_amd_config;
@@ -798,14 +812,6 @@ pmc_amd_initialize(void)
 	int error, i, ncpus;
 	int family, model, stepping;
 
-	/*
-	 * The presence of hardware performance counters on the AMD
-	 * Athlon, Duron or later processors, is _not_ indicated by
-	 * any of the processor feature flags set by the 'CPUID'
-	 * instruction, so we only check the 'instruction family'
-	 * field returned by CPUID for instruction family >= 6.
-	 */
-
 	family = CPUID_TO_FAMILY(cpu_id);
 	model = CPUID_TO_MODEL(cpu_id);
 	stepping = CPUID_TO_STEPPING(cpu_id);
@@ -826,6 +832,20 @@ pmc_amd_initialize(void)
 		    model);
 		return (NULL);
 	}
+
+	/* Must have core PMC support. */
+	if ((amd_feature2 & AMDID2_PCXC) == 0) {
+		printf("pmc: CPU does not support PMC features\n");
+		return (NULL);
+	}
+
+	/* Northbridge / Data fabric counters */
+	if ((amd_feature2 & AMDID2_PNXC) != 0)
+		has_fabric_pmcs = true;
+
+	/* L2 / L3 cache counters */
+	if ((amd_feature2 & AMDID2_PTSCEL2I) != 0)
+		has_cache_pmcs = true;
 
 	/*
 	 * Allocate space for pointers to PMC HW descriptors and for
