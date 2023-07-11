@@ -752,16 +752,26 @@ void vm_page_lock_assert_KBI(vm_page_t m, int a, const char *file, int line);
 	    (m), (m)->busy_lock, __FILE__, __LINE__));			\
 } while (0)
 
+/*
+ * vm_page_busied(9)
+ */
 #define	vm_page_busied(m)						\
 	(vm_page_busy_fetch(m) != VPB_UNBUSIED)
 
+/*
+ * vm_page_xbusied(9)
+ */
 #define	vm_page_xbusied(m)						\
 	((vm_page_busy_fetch(m) & VPB_SINGLE_EXCLUSIVE) != 0)
 
 #define	vm_page_busy_freed(m)						\
 	(vm_page_busy_fetch(m) == VPB_FREED)
 
-/* Note: page m's lock must not be owned by the caller. */
+/*
+ * vm_page_xunbusy(9):
+ *
+ * Note: page m's lock must not be owned by the caller.
+ */
 #define	vm_page_xunbusy(m) do {						\
 	if (!atomic_cmpset_rel_int(&(m)->busy_lock,			\
 	    VPB_CURTHREAD_EXCLUSIVE, VPB_UNBUSIED))			\
@@ -835,6 +845,8 @@ vm_page_astate_fcmpset(vm_page_t m, vm_page_astate_t *old, vm_page_astate_t new)
 }
 
 /*
+ *	vm_page_aflag_clear(9):
+ *
  *	Clear the given bits in the specified page.
  */
 static inline void
@@ -853,6 +865,8 @@ vm_page_aflag_clear(vm_page_t m, uint16_t bits)
 }
 
 /*
+ *	vm_page_aflag_set(9):
+ *
  *	Set the given bits in the specified page.
  */
 static inline void
@@ -873,7 +887,7 @@ vm_page_aflag_set(vm_page_t m, uint16_t bits)
 }
 
 /*
- *	vm_page_dirty:
+ *	vm_page_dirty(9):
  *
  *	Set all bits in the page's dirty field.
  *
@@ -895,7 +909,7 @@ vm_page_dirty(vm_page_t m)
 }
 
 /*
- *	vm_page_undirty:
+ *	vm_page_undirty(9):
  *
  *	Set page to not be dirty.  Note: does not clear pmap modify bits
  */

@@ -817,6 +817,9 @@ vm_page_startup(vm_offset_t vaddr)
 	return (vaddr);
 }
 
+/*
+ *	vm_page_reference(9)
+ */
 void
 vm_page_reference(vm_page_t m)
 {
@@ -901,7 +904,7 @@ vm_page_busy_acquire(vm_page_t m, int allocflags)
 }
 
 /*
- *	vm_page_busy_downgrade:
+ *	vm_page_busy_downgrade(9):
  *
  *	Downgrade an exclusive busy page into a single shared busy page.
  */
@@ -950,7 +953,7 @@ vm_page_busy_tryupgrade(vm_page_t m)
 }
 
 /*
- *	vm_page_sbusied:
+ *	vm_page_sbusied(9):
  *
  *	Return a positive value if the page is shared busied, 0 otherwise.
  */
@@ -964,7 +967,7 @@ vm_page_sbusied(vm_page_t m)
 }
 
 /*
- *	vm_page_sunbusy:
+ *	vm_page_sunbusy(9):
  *
  *	Shared unbusy a page.
  */
@@ -997,7 +1000,7 @@ vm_page_sunbusy(vm_page_t m)
 }
 
 /*
- *	vm_page_busy_sleep:
+ *	vm_page_busy_sleep(9):
  *
  *	Sleep if the page is busy, using the page pointer as wchan.
  *	This is used to implement the hard-path of the busying mechanism.
@@ -1103,7 +1106,7 @@ _vm_page_busy_sleep(vm_object_t obj, vm_page_t m, vm_pindex_t pindex,
 }
 
 /*
- *	vm_page_trysbusy:
+ *	vm_page_trysbusy(9):
  *
  *	Try to shared busy a page.
  *	If the operation succeeds 1 is returned otherwise 0.
@@ -1141,7 +1144,7 @@ vm_page_trysbusy(vm_page_t m)
 }
 
 /*
- *	vm_page_tryxbusy:
+ *	vm_page_tryxbusy(9):
  *
  *	Try to exclusive busy a page.
  *	If the operation succeeds 1 is returned otherwise 0.
@@ -1318,7 +1321,7 @@ vm_page_updatefake(vm_page_t m, vm_paddr_t paddr, vm_memattr_t memattr)
 }
 
 /*
- *	vm_page_free:
+ *	vm_page_free(9):
  *
  *	Free a page.
  */
@@ -1331,7 +1334,7 @@ vm_page_free(vm_page_t m)
 }
 
 /*
- *	vm_page_free_zero:
+ *	vm_page_free_zero(9):
  *
  *	Free a page to the zerod-pages queue
  */
@@ -1419,7 +1422,7 @@ vm_page_dirty_KBI(vm_page_t m)
 }
 
 /*
- *	vm_page_insert:		[ internal use only ]
+ *	vm_page_insert(9):	[ internal use only ]
  *
  *	Inserts the given mem entry into the object and object list.
  *
@@ -1582,7 +1585,7 @@ vm_page_object_remove(vm_page_t m)
 }
 
 /*
- *	vm_page_remove:
+ *	vm_page_remove(9):
  *
  *	Removes the specified page from its containing object, but does not
  *	invalidate any backing storage.  Returns true if the object's reference
@@ -1619,7 +1622,7 @@ vm_page_remove_xbusy(vm_page_t m)
 }
 
 /*
- *	vm_page_lookup:
+ *	vm_page_lookup(9):
  *
  *	Returns the page associated with the object/offset
  *	pair specified; if none is found, NULL is returned.
@@ -1827,7 +1830,7 @@ vm_page_replace(vm_page_t mnew, vm_object_t object, vm_pindex_t pindex,
 }
 
 /*
- *	vm_page_rename:
+ *	vm_page_rename(9):
  *
  *	Move the given memory entry from its
  *	current object to the specified target object/offset.
@@ -1887,7 +1890,7 @@ vm_page_rename(vm_page_t m, vm_object_t new_object, vm_pindex_t new_pindex)
 }
 
 /*
- *	vm_page_alloc:
+ *	vm_page_alloc(9):
  *
  *	Allocate and return a page that is associated with the specified
  *	object and offset pair.  By default, this page is exclusive busied.
@@ -1926,6 +1929,8 @@ vm_page_alloc_domain(vm_object_t object, vm_pindex_t pindex, int domain,
 }
 
 /*
+ * vm_page_alloc_after(9):
+ *
  * Allocate a page in the specified object with the given page index.  To
  * optimize insertion of the page into the object, the caller must also specifiy
  * the resident page in the object with largest index smaller than the given
@@ -2128,7 +2133,7 @@ found:
 }
 
 /*
- *	vm_page_alloc_contig:
+ *	vm_page_alloc_contig(9):
  *
  *	Allocate a contiguous set of physical pages of the given size "npages"
  *	from the free lists.  All of the physical pages must be at or above
@@ -2222,6 +2227,9 @@ vm_page_find_contig_domain(int domain, int req, u_long npages, vm_paddr_t low,
 	return (NULL);
 }
 
+/*
+ *	vm_page_alloc_contig_domain(9)
+ */
 vm_page_t
 vm_page_alloc_contig_domain(vm_object_t object, vm_pindex_t pindex, int domain,
     int req, u_long npages, vm_paddr_t low, vm_paddr_t high, u_long alignment,
@@ -2404,6 +2412,9 @@ found:
 	return (m);
 }
 
+/*
+ *	vm_page_alloc_freelist(9)
+ */
 vm_page_t
 vm_page_alloc_freelist(int freelist, int req)
 {
@@ -2421,6 +2432,9 @@ vm_page_alloc_freelist(int freelist, int req)
 	return (m);
 }
 
+/*
+ *	vm_page_alloc_freelist_domain(9)
+ */
 vm_page_t
 vm_page_alloc_freelist_domain(int domain, int freelist, int req)
 {
@@ -2430,6 +2444,9 @@ vm_page_alloc_freelist_domain(int domain, int freelist, int req)
 	return (_vm_page_alloc_noobj_domain(domain, freelist, req));
 }
 
+/*
+ *	vm_page_alloc_noobj(9)
+ */
 vm_page_t
 vm_page_alloc_noobj(int req)
 {
@@ -2447,12 +2464,18 @@ vm_page_alloc_noobj(int req)
 	return (m);
 }
 
+/*
+ *	vm_page_alloc_noobj_domain(9)
+ */
 vm_page_t
 vm_page_alloc_noobj_domain(int domain, int req)
 {
 	return (_vm_page_alloc_noobj_domain(domain, VM_NFREELIST, req));
 }
 
+/*
+ *	vm_page_alloc_noobj_contig(9)
+ */
 vm_page_t
 vm_page_alloc_noobj_contig(int req, u_long npages, vm_paddr_t low,
     vm_paddr_t high, u_long alignment, vm_paddr_t boundary,
@@ -2473,6 +2496,9 @@ vm_page_alloc_noobj_contig(int req, u_long npages, vm_paddr_t low,
 	return (m);
 }
 
+/*
+ *	vm_page_alloc_noobj_contig_domain(9)
+ */
 vm_page_t
 vm_page_alloc_noobj_contig_domain(int domain, int req, u_long npages,
     vm_paddr_t low, vm_paddr_t high, u_long alignment, vm_paddr_t boundary,
@@ -3955,7 +3981,7 @@ vm_page_free_prep(vm_page_t m)
 }
 
 /*
- *	vm_page_free_toq:
+ *	vm_page_free_toq(9):
  *
  *	Returns the given page to the free list, disassociating it
  *	from any VM object.
@@ -4012,6 +4038,8 @@ vm_page_free_pages_toq(struct spglist *free, bool update_wire_count)
 }
 
 /*
+ * vm_page_wire(9):
+ *
  * Mark this page as wired down.  For managed pages, this prevents reclamation
  * by the page daemon, or when the containing object, if any, is destroyed.
  */
@@ -4040,6 +4068,8 @@ vm_page_wire(vm_page_t m)
 }
 
 /*
+ * vm_page_wire_mapped(9):
+ *
  * Attempt to wire a mapped page following a pmap lookup of that page.
  * This may fail if a thread is concurrently tearing down mappings of the page.
  * The transient failure is acceptable because it translates to the
@@ -4121,6 +4151,8 @@ vm_page_unwire_managed(vm_page_t m, uint8_t nqueue, bool noreuse)
 }
 
 /*
+ * vm_page_unwire(9):
+ *
  * Release one wiring of the specified page, potentially allowing it to be
  * paged out.
  *
@@ -4146,6 +4178,8 @@ vm_page_unwire(vm_page_t m, uint8_t nqueue)
 }
 
 /*
+ * vm_page_unwire_noq(9):
+ *
  * Unwire a page without (re-)inserting it into a page queue.  It is up
  * to the caller to enqueue, requeue, or free the page as appropriate.
  * In most cases involving managed pages, vm_page_unwire() should be used
@@ -4423,7 +4457,7 @@ vm_page_try_remove_write(vm_page_t m)
 }
 
 /*
- * vm_page_advise
+ *	vm_page_advise(9):
  *
  * 	Apply the specified advice to the given page.
  */
@@ -4987,6 +5021,8 @@ vm_page_grab_pages_unlocked(vm_object_t object, vm_pindex_t pindex,
 }
 
 /*
+ * vm_page_bits(9):
+ *
  * Mapping function for valid or dirty bits in a page.
  *
  * Inputs are required to range within a page.
@@ -5326,6 +5362,9 @@ vm_page_set_validclean(vm_page_t m, int base, int size)
 		vm_page_clear_dirty_mask(m, pagebits);
 }
 
+/*
+ *	vm_page_clear_dirty(9)
+ */
 void
 vm_page_clear_dirty(vm_page_t m, int base, int size)
 {
@@ -5334,7 +5373,7 @@ vm_page_clear_dirty(vm_page_t m, int base, int size)
 }
 
 /*
- *	vm_page_set_invalid:
+ *	vm_page_set_invalid(9):
  *
  *	Invalidates DEV_BSIZE'd chunks within a page.  Both the
  *	valid and dirty bits for the effected areas are cleared.
@@ -5395,7 +5434,7 @@ vm_page_invalid(vm_page_t m)
 }
 
 /*
- * vm_page_zero_invalid()
+ *	vm_page_zero_invalid(9):
  *
  *	The kernel assumes that the invalid portions of a page contain
  *	garbage, but such pages can be mapped into memory by user code.
@@ -5438,7 +5477,7 @@ vm_page_zero_invalid(vm_page_t m, boolean_t setvalid)
 }
 
 /*
- *	vm_page_is_valid:
+ *	vm_page_is_valid(9):
  *
  *	Is (partial) page valid?  Note that the case where size == 0
  *	will return FALSE in the degenerate case where the page is
@@ -5504,6 +5543,8 @@ vm_page_ps_test(vm_page_t m, int flags, vm_page_t skip_m)
 }
 
 /*
+ * vm_page_test_dirty(9):
+ *
  * Set the page's dirty bits if the page is modified.
  */
 void
