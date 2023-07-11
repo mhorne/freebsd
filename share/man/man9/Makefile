@@ -395,6 +395,7 @@ MAN=	accept_filter.9 \
 	vm_map_submap.9 \
 	vm_map_sync.9 \
 	vm_map_wire.9 \
+	vm_page.9 \
 	vm_page_advise.9 \
 	vm_page_alloc.9 \
 	vm_page_bits.9 \
@@ -2362,6 +2363,7 @@ MLINKS+=vm_map_max.9 vm_map_min.9 \
 	vm_map_max.9 vm_map_pmap.9
 MLINKS+=vm_map_stack.9 vm_map_growstack.9
 MLINKS+=vm_map_wire.9 vm_map_unwire.9
+MLINKS+=vm_page.9 vm_page_t.9
 MLINKS+=vm_page_alloc.9 vm_page_alloc_after.9 \
 	vm_page_alloc.9 vm_page_alloc_contig.9 \
 	vm_page_alloc.9 vm_page_alloc_contig_domain.9 \
