@@ -26,7 +26,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd July 24, 2001
+.Dd July 11, 2023
 .Dt VM_PAGE_FREE 9
 .Os
 .Sh NAME
@@ -90,9 +90,7 @@ the page, and frees it.
 .Fn vm_page_try_to_free
 returns 1 if it is able to free the page; otherwise, 0 is returned.
 .Sh SEE ALSO
-.Xr vm_page_busy 9 ,
-.Xr vm_page_hold 9 ,
-.Xr vm_page_wire 9
+.Xr vm_page 9 ,
 .Sh AUTHORS
 This manual page was written by
 .An Chad David Aq Mt davidc@acns.ab.ca .

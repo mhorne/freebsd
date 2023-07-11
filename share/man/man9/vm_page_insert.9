@@ -26,7 +26,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd July 17, 2001
+.Dd July 11, 2023
 .Dt VM_PAGE_INSERT 9
 .Os
 .Sh NAME
@@ -91,6 +91,8 @@ The index of a page in a VM object is the byte index into the
 same object truncated to a page boundary.
 For example, if the page size is 4096 bytes, and the address
 in the object is 81944, the page index is 20.
+.Sh SEE ALSO
+.Xr vm_page 9
 .Sh AUTHORS
 This manual page was written by
 .An Chad David Aq Mt davidc@acns.ab.ca .
