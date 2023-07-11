@@ -52,6 +52,9 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20230803: vm_page_dontneed.9 renamed to vm_page_advise.9
+OLD_FILES+=usr/share/man/man9/vm_page_dontneed.9.gz
+
 # 20230802: Remove a copy of libdtrace.so installed to the wrong path
 OLD_FILES+=usr/lib/libdtrace.so.2
 

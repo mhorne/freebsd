@@ -395,11 +395,11 @@ MAN=	accept_filter.9 \
 	vm_map_submap.9 \
 	vm_map_sync.9 \
 	vm_map_wire.9 \
+	vm_page_advise.9 \
 	vm_page_alloc.9 \
 	vm_page_bits.9 \
 	vm_page_busy.9 \
 	vm_page_deactivate.9 \
-	vm_page_dontneed.9 \
 	vm_page_aflag.9 \
 	vm_page_free.9 \
 	vm_page_grab.9 \

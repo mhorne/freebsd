@@ -1,5 +1,9 @@
 .\"
 .\" Copyright (C) 2001 Chad David <davidc@acns.ab.ca>. All rights reserved.
+.\" Copyright (c) 2023 The FreeBSD Foundation
+.\"
+.\" Portions of this documentation were written by Mitchell Horne
+.\" <mhorne@FreeBSD.org> under sponsorship from the FreeBSD Foundation.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
@@ -26,34 +30,55 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd July 30, 2001
-.Dt VM_PAGE_DONTNEED 9
+.Dd July 11, 2023
+.Dt VM_PAGE_ADVISE 9
 .Os
 .Sh NAME
-.Nm vm_page_dontneed
-.Nd "indicate that a page is not needed anymore"
+.Nm vm_page_advise
+.Nd "apply advisory usage hint to a page"
 .Sh SYNOPSIS
 .In sys/param.h
+.In sys/mman.h
 .In vm/vm.h
 .In vm/vm_page.h
 .Ft void
-.Fn vm_page_dontneed "vm_page_t m"
+.Fn vm_page_advise "vm_page_t m" "int advice"
 .Sh DESCRIPTION
 The
-.Fn vm_page_dontneed
-function advises the VM system that the given page is no longer
-required.
+.Fn vm_page_advise
+function applies the requested advisory action to the page
+.Fa m .
+.Pp
+The values of
+.Fa advice
+are defined by the
+.Xr madvise 2
+system call.
+Values recognized by this function are:
+.Bl -tag -offset -indent -width "Dv MADV_DONTNEED"
+.It Dv MADV_DONTNEED
+Advise the VM system that the page denoted by
+.Fa m
+is no longer required.
 If the page is already in the inactive queue or in the cache queue, this
 function does nothing; otherwise the page is deactivated.
-.Pp
-Note that
-.Fn vm_page_dontneed
-does not necessarily deactivate a page, but instead implements an
-algorithm that attempts to prevent small objects from having their
-pages reused too quickly, and large objects from flushing smaller
-ones from the queues as their pages are released.
+.It Dv MADV_FREE
+Advise the VM system that the contents of page
+.Fa m
+are no longer important.
+The page is marked as clean with
+.Xr vm_page_undirty 9 .
+.It Dv MADV_WILLNEED
+Advise the VM system that
+.Fa m
+will be needed, and put it on the active page queue.
+.El
 .Sh SEE ALSO
-.Xr vm_page_deactivate 9
+.Xr madvise 2 ,
+.Xr vm_page_deactivate 9 ,
+.Xr vm_page_undirty 9
 .Sh AUTHORS
 This manual page was written by
-.An Chad David Aq Mt davidc@acns.ab.ca .
+.An Chad David Aq Mt davidc@acns.ab.ca
+and revised by
+.An Mitchell Horne Aq Mt mhorne@FreeBSD.org .
