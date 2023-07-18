@@ -343,6 +343,7 @@ MAN=	accept_filter.9 \
 	ucred.9 \
 	uidinfo.9 \
 	uio.9 \
+	uma.9 \
 	unr.9 \
 	vaccess.9 \
 	vaccess_acl_nfs4.9 \
@@ -459,8 +460,7 @@ MAN=	accept_filter.9 \
 	vrele.9 \
 	vslock.9 \
 	watchdog.9 \
-	zero_region.9 \
-	zone.9
+	zero_region.9
 
 MLINKS=	accept_filter.9 accept_filt_add.9 \
 	accept_filter.9 accept_filt_del.9 \
@@ -2268,6 +2268,33 @@ MLINKS+=uidinfo.9 uifind.9 \
 MLINKS+=uio.9 uiomove.9 \
 	uio.9 uiomove_frombuf.9 \
 	uio.9 uiomove_nofault.9
+MLINKS+=uma.9 uma_prealloc.9 \
+	uma.9 uma_reclaim.9 \
+	uma.9 uma_zalloc.9 \
+	uma.9 uma_zalloc_arg.9 \
+	uma.9 uma_zalloc_domain.9 \
+	uma.9 uma_zalloc_pcpu.9 \
+	uma.9 uma_zalloc_pcpu_arg.9 \
+	uma.9 uma_zcache_create.9 \
+	uma.9 uma_zcreate.9 \
+	uma.9 uma_zdestroy.9 \
+	uma.9 uma_zfree.9 \
+	uma.9 uma_zfree_arg.9 \
+	uma.9 uma_zfree_pcpu.9 \
+	uma.9 uma_zfree_pcpu_arg.9 \
+	uma.9 uma_zone_get_cur.9 \
+	uma.9 uma_zone_get_max.9 \
+	uma.9 uma_zone_reclaim.9 \
+	uma.9 uma_zone_reserve.9 \
+	uma.9 uma_zone_reserve_kva.9 \
+	uma.9 uma_zone_set_allocf.9 \
+	uma.9 uma_zone_set_freef.9 \
+	uma.9 uma_zone_set_max.9 \
+	uma.9 uma_zone_set_maxaction.9 \
+	uma.9 uma_zone_set_maxcache.9 \
+	uma.9 uma_zone_set_warning.9 \
+	uma.9 uma_zsecond_create.9 \
+	uma.9 zone.9
 MLINKS+=unr.9 alloc_unr.9 \
 	unr.9 alloc_unrl.9 \
 	unr.9 alloc_unr_specific.9 \
@@ -2429,33 +2456,6 @@ MLINKS+=vref.9 VREF.9 \
 MLINKS+=vrele.9 vput.9 \
 	vrele.9 vunref.9
 MLINKS+=vslock.9 vsunlock.9
-MLINKS+=zone.9 uma.9 \
-	zone.9 uma_prealloc.9 \
-	zone.9 uma_reclaim.9 \
-	zone.9 uma_zalloc.9 \
-	zone.9 uma_zalloc_arg.9 \
-	zone.9 uma_zalloc_domain.9 \
-	zone.9 uma_zalloc_pcpu.9 \
-	zone.9 uma_zalloc_pcpu_arg.9 \
-	zone.9 uma_zcache_create.9 \
-	zone.9 uma_zcreate.9 \
-	zone.9 uma_zdestroy.9 \
-	zone.9 uma_zfree.9 \
-	zone.9 uma_zfree_arg.9 \
-	zone.9 uma_zfree_pcpu.9 \
-	zone.9 uma_zfree_pcpu_arg.9 \
-	zone.9 uma_zone_get_cur.9 \
-	zone.9 uma_zone_get_max.9 \
-	zone.9 uma_zone_reclaim.9 \
-	zone.9 uma_zone_reserve.9 \
-	zone.9 uma_zone_reserve_kva.9 \
-	zone.9 uma_zone_set_allocf.9 \
-	zone.9 uma_zone_set_freef.9 \
-	zone.9 uma_zone_set_max.9 \
-	zone.9 uma_zone_set_maxaction.9 \
-	zone.9 uma_zone_set_maxcache.9 \
-	zone.9 uma_zone_set_warning.9 \
-	zone.9 uma_zsecond_create.9
 
 # This makes more sense for amd64 and i386 but
 # we decide to install all manpages in all architectures
