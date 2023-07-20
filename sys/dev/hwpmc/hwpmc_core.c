@@ -107,25 +107,21 @@ static int core_iap_wroffset;
 static u_int pmc_alloc_refs;
 static bool pmc_tsx_force_abort_set;
 
-static int
-core_pcpu_noop(struct pmc_mdep *md, int cpu)
+static void
+core_pcpu_noop(struct pmc_mdep *md __unused)
 {
-	(void) md;
-	(void) cpu;
-	return (0);
 }
 
-static int
-core_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+core_pcpu_init(struct pmc_mdep *md)
 {
 	struct pmc_cpu *pc;
 	struct core_cpu *cc;
 	struct pmc_hw *phw;
 	int core_ri, n, npmc;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[iaf,%d] insane cpu number %d", __LINE__, cpu));
-
+	cpu = PCPU_GET(cpuid);
 	PMCDBG1(MDP,INI,1,"core-init cpu=%d", cpu);
 
 	core_ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_IAP].pcd_ri;
@@ -155,24 +151,21 @@ core_pcpu_init(struct pmc_mdep *md, int cpu)
 		/* Enable Freezing PMCs on PMI. */
 		wrmsr(MSR_DEBUGCTLMSR, rdmsr(MSR_DEBUGCTLMSR) | 0x1000);
 	}
-
-	return (0);
 }
 
-static int
-core_pcpu_fini(struct pmc_mdep *md, int cpu)
+static void
+core_pcpu_fini(struct pmc_mdep *md)
 {
-	int core_ri, n, npmc;
 	struct pmc_cpu *pc;
 	struct core_cpu *cc;
+	int core_ri, n, npmc;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[core,%d] insane cpu number (%d)", __LINE__, cpu));
-
+	cpu = PCPU_GET(cpuid);
 	PMCDBG1(MDP,INI,1,"core-pcpu-fini cpu=%d", cpu);
 
 	if ((cc = core_pcpu[cpu]) == NULL)
-		return (0);
+		return;
 
 	core_pcpu[cpu] = NULL;
 
@@ -196,8 +189,6 @@ core_pcpu_fini(struct pmc_mdep *md, int cpu)
 		pc->pc_hwpmcs[n + core_ri] = NULL;
 
 	free(cc, M_PMC);
-
-	return (0);
 }
 
 /*

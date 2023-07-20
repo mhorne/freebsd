@@ -50,6 +50,18 @@ __FBSDID("$FreeBSD$");
 #define CLASS2TYPE(c)	((c) - PMC_CLASS_DMC620_PMU_CD2)
 
 /* Create wrapper for each class. */
+#define	CLASSDEP_FN1_VOID(fn, t1, a1)					\
+	static void fn(int class, t1 a1);				\
+	static void fn ## _cd2(t1 a1)					\
+	{								\
+		fn(PMC_CLASS_DMC620_PMU_CD2, a1);			\
+	}								\
+	static void fn ## _c(t1 a1)					\
+	{								\
+		fn(PMC_CLASS_DMC620_PMU_C, a1);				\
+	}								\
+	static void fn(int class, t1 a1)
+
 #define	CLASSDEP_FN2(fn, t1, a1, t2, a2)				\
 	static int fn(int class, t1 a1, t2 a2);				\
 	static int fn ## _cd2(t1 a1, t2 a2)				\
@@ -456,20 +468,19 @@ CLASSDEP_FN4(dmc620_describe, int, cpu, int, ri, struct pmc_info *, pi,
 /*
  * processor dependent initialization.
  */
-
-CLASSDEP_FN2(dmc620_pcpu_init, struct pmc_mdep *, md, int, cpu)
+CLASSDEP_FN1_VOID(dmc620_pcpu_init, struct pmc_mdep *, md)
 {
 	int first_ri, n, npmc;
 	struct pmc_hw  *phw;
 	struct pmc_cpu *pc;
 	int mdep_class;
+	u_int cpu;
 
 	mdep_class = class2mdep(class);
 	KASSERT(mdep_class != -1, ("[dmc620,%d] wrong class %d", __LINE__,
 	    class));
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[dmc620,%d] insane cpu number %d", __LINE__, cpu));
 
+	cpu = PCPU_GET(cpuid);
 	PMCDBG1(MDP, INI, 1, "dmc620-init cpu=%d", cpu);
 
 	/*
@@ -491,18 +502,14 @@ CLASSDEP_FN2(dmc620_pcpu_init, struct pmc_mdep *, md, int, cpu)
 		phw->phw_pmc = NULL;
 		pc->pc_hwpmcs[n + first_ri] = phw;
 	}
-	return (0);
 }
 
 /*
  * processor dependent cleanup prior to the KLD
  * being unloaded
  */
-
-CLASSDEP_FN2(dmc620_pcpu_fini, struct pmc_mdep *, md, int, cpu)
+CLASSDEP_FN1_VOID(dmc620_pcpu_fini, struct pmc_mdep *, md)
 {
-
-	return (0);
 }
 
 int

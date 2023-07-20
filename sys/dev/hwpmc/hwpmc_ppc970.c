@@ -299,10 +299,10 @@ ppc970_set_pmc(int cpu, int ri, int config)
 	}
 }
 
-static int
-ppc970_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+ppc970_pcpu_init(struct pmc_mdep *md)
 {
-	powerpc_pcpu_init(md, cpu);
+	powerpc_pcpu_init(md);
 
 	/* Clear the MMCRs, and set FC, to disable all PMCs. */
 	/* 970 PMC is not counted when set to 0x08 */
@@ -310,12 +310,10 @@ ppc970_pcpu_init(struct pmc_mdep *md, int cpu)
 	    SPR_MMCR0_FCECE | SPR_MMCR0_PMC1CE | SPR_MMCR0_PMCNCE |
 	    SPR_MMCR0_PMC1SEL(0x8) | SPR_MMCR0_PMC2SEL(0x8));
 	mtspr(SPR_MMCR1, 0x4218420);
-
-	return (0);
 }
 
-static int
-ppc970_pcpu_fini(struct pmc_mdep *md, int cpu)
+static void
+ppc970_pcpu_fini(struct pmc_mdep *md)
 {
 	register_t mmcr0;
 
@@ -325,7 +323,7 @@ ppc970_pcpu_fini(struct pmc_mdep *md, int cpu)
 	mmcr0 |= SPR_MMCR0_FC;
 	mtspr(SPR_MMCR0, mmcr0);
 
-	return (powerpc_pcpu_fini(md, cpu));
+	powerpc_pcpu_fini(md);
 }
 
 static void

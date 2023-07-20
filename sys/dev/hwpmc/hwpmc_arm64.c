@@ -438,8 +438,8 @@ arm64_get_config(int cpu, int ri, struct pmc **ppm)
 	return (0);
 }
 
-static int
-arm64_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+arm64_pcpu_init(struct pmc_mdep *md)
 {
 	struct arm64_cpu *pac;
 	struct pmc_hw  *phw;
@@ -447,11 +447,11 @@ arm64_pcpu_init(struct pmc_mdep *md, int cpu)
 	uint64_t pmcr;
 	int first_ri;
 	int i;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[arm64,%d] wrong cpu number %d", __LINE__, cpu));
 	PMCDBG0(MDP, INI, 1, "arm64-pcpu-init");
 
+	cpu = PCPU_GET(cpuid);
 	arm64_pcpu[cpu] = pac = malloc(sizeof(struct arm64_cpu), M_PMC,
 	    M_WAITOK | M_ZERO);
 
@@ -482,12 +482,10 @@ arm64_pcpu_init(struct pmc_mdep *md, int cpu)
 	pmcr = arm64_pmcr_read();
 	pmcr |= PMCR_E;
 	arm64_pmcr_write(pmcr);
-
-	return (0);
 }
 
-static int
-arm64_pcpu_fini(struct pmc_mdep *md, int cpu)
+static void
+arm64_pcpu_fini(struct pmc_mdep *md __unused)
 {
 	uint32_t pmcr;
 
@@ -500,8 +498,6 @@ arm64_pcpu_fini(struct pmc_mdep *md, int cpu)
 	free(arm64_pcpu[cpu]->pc_arm64pmcs, M_PMC);
 	free(arm64_pcpu[cpu], M_PMC);
 	arm64_pcpu[cpu] = NULL;
-
-	return (0);
 }
 
 struct pmc_mdep *

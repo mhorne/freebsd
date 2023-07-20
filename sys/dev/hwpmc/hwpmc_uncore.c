@@ -79,25 +79,21 @@ static int uncore_ucf_npmc;
 static int uncore_ucp_width;
 static int uncore_ucp_npmc;
 
-static int
-uncore_pcpu_noop(struct pmc_mdep *md, int cpu)
+static void
+uncore_pcpu_noop(struct pmc_mdep *md __unused)
 {
-	(void) md;
-	(void) cpu;
-	return (0);
 }
 
-static int
-uncore_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+uncore_pcpu_init(struct pmc_mdep *md)
 {
 	struct pmc_cpu *pc;
 	struct uncore_cpu *cc;
 	struct pmc_hw *phw;
 	int uncore_ri, n, npmc;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[ucf,%d] insane cpu number %d", __LINE__, cpu));
-
+	cpu = PCPU_GET(cpuid);
 	PMCDBG1(MDP,INI,1,"uncore-init cpu=%d", cpu);
 
 	uncore_ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_UCP].pcd_ri;
@@ -120,24 +116,21 @@ uncore_pcpu_init(struct pmc_mdep *md, int cpu)
 		phw->phw_pmc	  = NULL;
 		pc->pc_hwpmcs[n + uncore_ri]  = phw;
 	}
-
-	return (0);
 }
 
-static int
-uncore_pcpu_fini(struct pmc_mdep *md, int cpu)
+static void
+uncore_pcpu_fini(struct pmc_mdep *md)
 {
-	int uncore_ri, n, npmc;
 	struct pmc_cpu *pc;
 	struct uncore_cpu *cc;
+	int uncore_ri, n, npmc;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[uncore,%d] insane cpu number (%d)", __LINE__, cpu));
-
+	cpu = PCPU_GET(cpuid);
 	PMCDBG1(MDP,INI,1,"uncore-pcpu-fini cpu=%d", cpu);
 
 	if ((cc = uncore_pcpu[cpu]) == NULL)
-		return (0);
+		return;
 
 	uncore_pcpu[cpu] = NULL;
 
@@ -159,8 +152,6 @@ uncore_pcpu_fini(struct pmc_mdep *md, int cpu)
 		pc->pc_hwpmcs[n + uncore_ri] = NULL;
 
 	free(cc, M_PMC);
-
-	return (0);
 }
 
 /*

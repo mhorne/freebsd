@@ -329,12 +329,12 @@ e500_set_pmc(int cpu, int ri, int config)
 	}
 }
 
-static int
-e500_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+e500_pcpu_init(struct pmc_mdep *md)
 {
 	int i;
 
-	powerpc_pcpu_init(md, cpu);
+	powerpc_pcpu_init(md);
 
 	/* Freeze all counters. */
 	mtpmr(PMR_PMGC0, PMGC_FAC | PMGC_PMIE | PMGC_FCECE);
@@ -345,12 +345,10 @@ e500_pcpu_init(struct pmc_mdep *md, int cpu)
 
 	/* Unfreeze global register. */
 	mtpmr(PMR_PMGC0, PMGC_PMIE | PMGC_FCECE);
-
-	return (0);
 }
 
-static int
-e500_pcpu_fini(struct pmc_mdep *md, int cpu)
+static void
+e500_pcpu_fini(struct pmc_mdep *md)
 {
 	uint32_t pmgc0 = mfpmr(PMR_PMGC0);
 
@@ -358,7 +356,7 @@ e500_pcpu_fini(struct pmc_mdep *md, int cpu)
 	mtpmr(PMR_PMGC0, pmgc0);
 	mtmsr(mfmsr() & ~PSL_PMM);
 
-	return (powerpc_pcpu_fini(md, cpu));
+	powerpc_pcpu_fini(md);
 }
 
 static int

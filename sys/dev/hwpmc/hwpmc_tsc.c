@@ -163,14 +163,14 @@ tsc_get_msr(int ri __diagused, uint32_t *msr)
 	return (0);
 }
 
-static int
-tsc_pcpu_fini(struct pmc_mdep *md, int cpu)
+static void
+tsc_pcpu_fini(struct pmc_mdep *md)
 {
-	int ri;
 	struct pmc_cpu *pc;
+	int ri;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[tsc,%d] illegal cpu %d", __LINE__, cpu));
+	cpu = PCPU_GET(cpuid);
 	KASSERT(tsc_pcpu[cpu] != NULL, ("[tsc,%d] null pcpu", __LINE__));
 
 	free(tsc_pcpu[cpu], M_PMC);
@@ -180,20 +180,17 @@ tsc_pcpu_fini(struct pmc_mdep *md, int cpu)
 
 	pc = pmc_pcpu[cpu];
 	pc->pc_hwpmcs[ri] = NULL;
-
-	return (0);
 }
 
-static int
-tsc_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+tsc_pcpu_init(struct pmc_mdep *md)
 {
-	int ri;
 	struct pmc_cpu *pc;
 	struct tsc_cpu *tsc_pc;
+	int ri;
+	u_int cpu;
 
-
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[tsc,%d] illegal cpu %d", __LINE__, cpu));
+	cpu = PCPU_GET(cpuid);
 	KASSERT(tsc_pcpu, ("[tsc,%d] null pcpu", __LINE__));
 	KASSERT(tsc_pcpu[cpu] == NULL, ("[tsc,%d] non-null per-cpu",
 	    __LINE__));
@@ -215,8 +212,6 @@ tsc_pcpu_init(struct pmc_mdep *md, int cpu)
 	KASSERT(pc, ("[tsc,%d] null generic per-cpu", __LINE__));
 
 	pc->pc_hwpmcs[ri] = &tsc_pc->tc_hw;
-
-	return (0);
 }
 
 static int

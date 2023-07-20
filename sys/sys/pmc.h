@@ -1029,9 +1029,9 @@ struct pmc_classdep {
 	int (*pcd_describe)(int _cpu, int _ri, struct pmc_info *_pi,
 		struct pmc **_ppmc);
 
-	/* class-dependent initialization & finalization */
-	int (*pcd_pcpu_init)(struct pmc_mdep *_md, int _cpu);
-	int (*pcd_pcpu_fini)(struct pmc_mdep *_md, int _cpu);
+	/* class-dependent per-CPU initialization & finalization */
+	void (*pcd_pcpu_init)(struct pmc_mdep *_md);
+	void (*pcd_pcpu_fini)(struct pmc_mdep *_md);
 
 	/* machine-specific interface */
 	int (*pcd_get_msr)(int _ri, uint32_t *_msr);

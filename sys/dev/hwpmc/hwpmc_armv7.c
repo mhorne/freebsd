@@ -402,8 +402,8 @@ armv7_get_config(int cpu, int ri, struct pmc **ppm)
 	return 0;
 }
 
-static int
-armv7_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+armv7_pcpu_init(struct pmc_mdep *md)
 {
 	struct armv7_cpu *pac;
 	struct pmc_hw  *phw;
@@ -411,11 +411,11 @@ armv7_pcpu_init(struct pmc_mdep *md, int cpu)
 	uint32_t pmnc;
 	int first_ri;
 	int i;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[armv7,%d] wrong cpu number %d", __LINE__, cpu));
 	PMCDBG0(MDP, INI, 1, "armv7-pcpu-init");
 
+	cpu = PCPU_GET(cpuid);
 	armv7_pcpu[cpu] = pac = malloc(sizeof(struct armv7_cpu), M_PMC,
 	    M_WAITOK|M_ZERO);
 
@@ -441,12 +441,10 @@ armv7_pcpu_init(struct pmc_mdep *md, int cpu)
 	pmnc = cp15_pmcr_get();
 	pmnc |= ARMV7_PMNC_ENABLE;
 	cp15_pmcr_set(pmnc);
-
-	return 0;
 }
 
-static int
-armv7_pcpu_fini(struct pmc_mdep *md, int cpu)
+static void
+armv7_pcpu_fini(struct pmc_mdep *md)
 {
 	uint32_t pmnc;
 
@@ -464,8 +462,6 @@ armv7_pcpu_fini(struct pmc_mdep *md, int cpu)
 	free(armv7_pcpu[cpu]->pc_armv7pmcs, M_PMC);
 	free(armv7_pcpu[cpu], M_PMC);
 	armv7_pcpu[cpu] = NULL;
-
-	return 0;
 }
 
 struct pmc_mdep *

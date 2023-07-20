@@ -198,14 +198,15 @@ soft_get_config(int cpu, int ri, struct pmc **ppm)
 	return (0);
 }
 
-static int
-soft_pcpu_fini(struct pmc_mdep *md, int cpu)
+static void
+soft_pcpu_fini(struct pmc_mdep *md)
 {
-	int ri;
 	struct pmc_cpu *pc;
+	int ri;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[soft,%d] illegal cpu %d", __LINE__, cpu));
+	cpu = PCPU_GET(cpuid);
+
 	KASSERT(soft_pcpu[cpu] != NULL, ("[soft,%d] null pcpu", __LINE__));
 
 	free(soft_pcpu[cpu], M_PMC);
@@ -218,21 +219,19 @@ soft_pcpu_fini(struct pmc_mdep *md, int cpu)
 
 	pc = pmc_pcpu[cpu];
 	pc->pc_hwpmcs[ri] = NULL;
-
-	return (0);
 }
 
-static int
-soft_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+soft_pcpu_init(struct pmc_mdep *md)
 {
-	int first_ri, n;
 	struct pmc_cpu *pc;
 	struct soft_cpu *soft_pc;
 	struct pmc_hw *phw;
+	int first_ri, n;
+	u_int cpu;
 
+	cpu = PCPU_GET(cpuid);
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[soft,%d] illegal cpu %d", __LINE__, cpu));
 	KASSERT(soft_pcpu, ("[soft,%d] null pcpu", __LINE__));
 	KASSERT(soft_pcpu[cpu] == NULL, ("[soft,%d] non-null per-cpu",
 	    __LINE__));
@@ -252,8 +251,6 @@ soft_pcpu_init(struct pmc_mdep *md, int cpu)
 		phw->phw_pmc = NULL;
 		pc->pc_hwpmcs[n + first_ri] = phw;
 	}
-
-	return (0);
 }
 
 static int

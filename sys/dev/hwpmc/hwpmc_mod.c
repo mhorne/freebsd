@@ -5527,13 +5527,9 @@ pmc_initialize(void)
 		    M_WAITOK | M_ZERO);
 		for (n = 0; error == 0 && n < md->pmd_nclass; n++)
 			if (md->pmd_classdep[n].pcd_num > 0)
-				error = md->pmd_classdep[n].pcd_pcpu_init(md,
-				    cpu);
+				md->pmd_classdep[n].pcd_pcpu_init(md);
 	}
 	pmc_restore_cpu_binding(&pb);
-
-	if (error != 0)
-		return (error);
 
 	/* allocate space for the sample array */
 	for (cpu = 0; cpu < maxcpu; cpu++) {
@@ -5765,8 +5761,7 @@ pmc_cleanup(void)
 			pmc_select_cpu(cpu);
 			for (c = 0; c < md->pmd_nclass; c++) {
 				if (md->pmd_classdep[c].pcd_num > 0) {
-					md->pmd_classdep[c].pcd_pcpu_fini(md,
-					    cpu);
+					md->pmd_classdep[c].pcd_pcpu_fini(md);
 				}
 			}
 		}

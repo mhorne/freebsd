@@ -83,13 +83,13 @@ power8_set_pmc(int cpu, int ri, int config)
 	mtspr(SPR_MMCR2, mmcr);
 }
 
-static int
-power8_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+power8_pcpu_init(struct pmc_mdep *md)
 {
 	register_t mmcr0;
 	int i;
 
-	powerpc_pcpu_init(md, cpu);
+	powerpc_pcpu_init(md);
 
 	/* Freeze all counters before modifying PMC registers */
 	mmcr0 = mfspr(SPR_MMCR0) | SPR_MMCR0_FC;
@@ -122,10 +122,9 @@ power8_pcpu_init(struct pmc_mdep *md, int cpu)
 	mmcr0 &= ~SPR_MMCR0_FC;
 	mmcr0 |= SPR_MMCR0_PMAE;
 	mtspr(SPR_MMCR0, mmcr0);
-	return (0);
 }
 
-static int
+static void
 power8_pcpu_fini(struct pmc_mdep *md, int cpu)
 {
 	register_t mmcr0;
@@ -136,7 +135,7 @@ power8_pcpu_fini(struct pmc_mdep *md, int cpu)
 	mmcr0 |= SPR_MMCR0_FC;
 	mtspr(SPR_MMCR0, mmcr0);
 
-	return (powerpc_pcpu_fini(md, cpu));
+	powerpc_pcpu_fini(md);
 }
 
 static void

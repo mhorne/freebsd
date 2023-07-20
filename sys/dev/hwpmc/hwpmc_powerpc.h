@@ -96,8 +96,8 @@ int pmc_power8_initialize(struct pmc_mdep *pmc_mdep);
 
 int powerpc_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc);
 int powerpc_get_config(int cpu, int ri, struct pmc **ppm);
-int powerpc_pcpu_init(struct pmc_mdep *md, int cpu);
-int powerpc_pcpu_fini(struct pmc_mdep *md, int cpu);
+void powerpc_pcpu_init(struct pmc_mdep *md);
+void powerpc_pcpu_fini(struct pmc_mdep *md);
 int powerpc_allocate_pmc(int cpu, int ri, struct pmc *pm,
     const struct pmc_op_pmcallocate *a);
 int powerpc_release_pmc(int cpu, int ri, struct pmc *pmc);
