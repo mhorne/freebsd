@@ -135,17 +135,17 @@ powerpc_get_config(int cpu, int ri, struct pmc **ppm)
 	return (0);
 }
 
-int
-powerpc_pcpu_init(struct pmc_mdep *md, int cpu)
+void
+powerpc_pcpu_init(struct pmc_mdep *md)
 {
 	struct pmc_cpu *pc;
 	struct powerpc_cpu *pac;
 	struct pmc_hw  *phw;
 	int first_ri, i;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[powerpc,%d] wrong cpu number %d", __LINE__, cpu));
-	PMCDBG1(MDP,INI,1,"powerpc-init cpu=%d", cpu);
+	cpu = curcpu;
+	PMCDBG1(MDP, INI, 1, "powerpc-pcpu-init cpu=%u", cpu);
 
 	powerpc_pcpu[cpu] = pac = malloc(sizeof(struct powerpc_cpu) +
 	    ppc_max_pmcs * sizeof(struct pmc_hw), M_PMC, M_WAITOK | M_ZERO);
@@ -162,19 +162,17 @@ powerpc_pcpu_init(struct pmc_mdep *md, int cpu)
 		phw->phw_pmc = NULL;
 		pc->pc_hwpmcs[i + first_ri] = phw;
 	}
-
-	return (0);
 }
 
-int
-powerpc_pcpu_fini(struct pmc_mdep *md, int cpu)
+void
+powerpc_pcpu_fini(struct pmc_mdep *md __unused)
 {
-	PMCDBG1(MDP,INI,1,"powerpc-fini cpu=%d", cpu);
+	u_int cpu = curcpu;
+
+	PMCDBG1(MDP, INI, 1, "powerpc-pcpu-fini cpu=%u", cpu);
 
 	free(powerpc_pcpu[cpu], M_PMC);
 	powerpc_pcpu[cpu] = NULL;
-
-	return (0);
 }
 
 int

@@ -662,18 +662,17 @@ amd_get_msr(int ri, uint32_t *msr)
 /*
  * Processor-dependent initialization.
  */
-static int
-amd_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+amd_pcpu_init(struct pmc_mdep *md)
 {
 	struct amd_cpu *pac;
 	struct pmc_cpu *pc;
 	struct pmc_hw  *phw;
 	int first_ri, n;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[amd,%d] insane cpu number %d", __LINE__, cpu));
-
-	PMCDBG1(MDP, INI, 1, "amd-init cpu=%d", cpu);
+	cpu = curcpu;
+	PMCDBG1(MDP, INI, 1, "amd-pcpu-init cpu=%u", cpu);
 
 	amd_pcpu[cpu] = pac = malloc(sizeof(struct amd_cpu), M_PMC,
 	    M_WAITOK | M_ZERO);
@@ -693,30 +692,27 @@ amd_pcpu_init(struct pmc_mdep *md, int cpu)
 		phw->phw_pmc = NULL;
 		pc->pc_hwpmcs[n + first_ri] = phw;
 	}
-
-	return (0);
 }
 
 /*
  * Processor-dependent cleanup prior to the KLD being unloaded.
  */
-static int
-amd_pcpu_fini(struct pmc_mdep *md, int cpu)
+static void
+amd_pcpu_fini(struct pmc_mdep *md)
 {
 	struct amd_cpu *pac;
 	struct pmc_cpu *pc;
 	int first_ri, i;
+	u_int cpu;
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[amd,%d] insane cpu number (%d)", __LINE__, cpu));
-
-	PMCDBG1(MDP, INI, 1, "amd-cleanup cpu=%d", cpu);
+	cpu = curcpu;
+	PMCDBG1(MDP, INI, 1, "amd-pcpu-fini cpu=%u", cpu);
 
 	/*
 	 * Next, free up allocated space.
 	 */
 	if ((pac = amd_pcpu[cpu]) == NULL)
-		return (0);
+		return;
 
 	amd_pcpu[cpu] = NULL;
 
@@ -741,7 +737,6 @@ amd_pcpu_fini(struct pmc_mdep *md, int cpu)
 		pc->pc_hwpmcs[i + first_ri] = NULL;
 
 	free(pac, M_PMC);
-	return (0);
 }
 
 /*

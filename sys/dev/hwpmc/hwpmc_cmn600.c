@@ -588,20 +588,19 @@ cmn600_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc)
 /*
  * processor dependent initialization.
  */
-
-static int
-cmn600_pcpu_init(struct pmc_mdep *md, int cpu)
+static void
+cmn600_pcpu_init(struct pmc_mdep *md)
 {
-	int first_ri, n, npmc;
 	struct pmc_hw  *phw;
 	struct pmc_cpu *pc;
+	int first_ri, n, npmc;
 	int mdep_class;
+	u_int cpu;
 
+	cpu = curcpu;
 	mdep_class = PMC_MDEP_CLASS_INDEX_CMN600;
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
-	    ("[cmn600,%d] insane cpu number %d", __LINE__, cpu));
 
-	PMCDBG1(MDP, INI, 1, "cmn600-init cpu=%d", cpu);
+	PMCDBG1(MDP, INI, 1, "cmn600-pcpu-init cpu=%u", cpu);
 
 	/*
 	 * Set the content of the hardware descriptors to a known
@@ -622,19 +621,16 @@ cmn600_pcpu_init(struct pmc_mdep *md, int cpu)
 		phw->phw_pmc = NULL;
 		pc->pc_hwpmcs[n + first_ri] = phw;
 	}
-	return (0);
 }
 
 /*
  * processor dependent cleanup prior to the KLD
  * being unloaded
  */
-
-static int
-cmn600_pcpu_fini(struct pmc_mdep *md, int cpu)
+static void
+cmn600_pcpu_fini(struct pmc_mdep *md __unused)
 {
-
-	return (0);
+	PMCDBG1(MDP, INI, 1, "cmn600-pcpu-init cpu=%u", curcpu);
 }
 
 static int
