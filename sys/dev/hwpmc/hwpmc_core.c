@@ -115,7 +115,6 @@ core_pcpu_noop(struct pmc_mdep *md __unused)
 static void
 core_pcpu_init(struct pmc_mdep *md)
 {
-	struct pmc_cpu *pc;
 	struct core_cpu *cc;
 	struct pmc_hw *phw;
 	int core_ri, n, npmc;
@@ -134,17 +133,13 @@ core_pcpu_init(struct pmc_mdep *md)
 	    M_PMC, M_WAITOK | M_ZERO);
 
 	core_pcpu[cpu] = cc;
-	pc = pmc_pcpu[cpu];
-
-	KASSERT(pc != NULL && cc != NULL,
-	    ("[core,%d] NULL per-cpu structures cpu=%d", __LINE__, cpu));
 
 	for (n = 0, phw = cc->pc_corepmcs; n < npmc; n++, phw++) {
 		phw->phw_state 	  = PMC_PHW_FLAG_IS_ENABLED |
 		    PMC_PHW_CPU_TO_STATE(cpu) |
 		    PMC_PHW_INDEX_TO_STATE(n + core_ri);
 		phw->phw_pmc	  = NULL;
-		pc->pc_hwpmcs[n + core_ri]  = phw;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[n + core_ri] = phw;
 	}
 
 	if (core_version >= 2 && vm_guest == VM_GUEST_NO) {
@@ -156,7 +151,6 @@ core_pcpu_init(struct pmc_mdep *md)
 static void
 core_pcpu_fini(struct pmc_mdep *md)
 {
-	struct pmc_cpu *pc;
 	struct core_cpu *cc;
 	int core_ri, n, npmc;
 	u_int cpu;
@@ -168,11 +162,6 @@ core_pcpu_fini(struct pmc_mdep *md)
 		return;
 
 	core_pcpu[cpu] = NULL;
-
-	pc = pmc_pcpu[cpu];
-
-	KASSERT(pc != NULL, ("[core,%d] NULL per-cpu %d state", __LINE__,
-		cpu));
 
 	npmc = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_IAP].pcd_num;
 	core_ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_IAP].pcd_ri;
@@ -186,7 +175,7 @@ core_pcpu_fini(struct pmc_mdep *md)
 	}
 
 	for (n = 0; n < npmc; n++)
-		pc->pc_hwpmcs[n + core_ri] = NULL;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[n + core_ri] = NULL;
 
 	free(cc, M_PMC);
 }

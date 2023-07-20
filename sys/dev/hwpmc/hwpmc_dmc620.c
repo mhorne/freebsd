@@ -472,7 +472,6 @@ CLASSDEP_FN1_VOID(dmc620_pcpu_init, struct pmc_mdep *, md)
 {
 	int first_ri, n, npmc;
 	struct pmc_hw  *phw;
-	struct pmc_cpu *pc;
 	int mdep_class;
 	u_int cpu;
 
@@ -488,7 +487,6 @@ CLASSDEP_FN1_VOID(dmc620_pcpu_init, struct pmc_mdep *, md)
 	 * state and initialize pointers in the MI per-cpu descriptor.
 	 */
 
-	pc = pmc_pcpu[cpu];
 	first_ri = md->pmd_classdep[mdep_class].pcd_ri;
 	npmc = md->pmd_classdep[mdep_class].pcd_num;
 
@@ -500,7 +498,7 @@ CLASSDEP_FN1_VOID(dmc620_pcpu_init, struct pmc_mdep *, md)
 		if (dmc620_pmcs[class_ri2unit(class, n)].arg != NULL)
 			phw->phw_state |= PMC_PHW_FLAG_IS_ENABLED;
 		phw->phw_pmc = NULL;
-		pc->pc_hwpmcs[n + first_ri] = phw;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[n + first_ri] = phw;
 	}
 }
 
@@ -515,7 +513,6 @@ CLASSDEP_FN1_VOID(dmc620_pcpu_fini, struct pmc_mdep *, md)
 int
 dmc620_intr(struct trapframe *tf, int class, int unit, int i)
 {
-	struct pmc_cpu *pc __diagused;
 	struct pmc_hw *phw;
 	struct pmc *pm;
 	int error, cpu, ri;
@@ -525,8 +522,6 @@ dmc620_intr(struct trapframe *tf, int class, int unit, int i)
 	cpu = curcpu;
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[dmc620,%d] CPU %d out of range", __LINE__, cpu));
-	pc = pmc_pcpu[cpu];
-	KASSERT(pc != NULL, ("pc != NULL"));
 
 	phw = dmc620desc(class, cpu, ri)->pd_phw;
 	KASSERT(phw != NULL, ("phw != NULL"));

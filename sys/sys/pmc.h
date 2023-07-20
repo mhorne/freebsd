@@ -961,26 +961,21 @@ struct pmc_samplebuffer {
 	(&(psb)->ps_samples[(psb)->ps_prodidx & pmc_sample_mask])
 
 /*
- * struct pmc_cpustate
+ * struct pmc_cpu
  *
  * A CPU is modelled as a collection of HW PMCs with space for additional
  * flags.
+ * TODO: update comment.
  */
-
 struct pmc_cpu {
-	uint32_t	pc_state;	/* physical cpu number + flags */
-	struct pmc_samplebuffer *pc_sb[3]; /* space for samples */
-	struct pmc_hw	*pc_hwpmcs[];	/* 'npmc' pointers */
+	struct pmc_samplebuffer *pc_sb[PMC_NUM_SR];	/* space for samples */
+	struct pmc_hw **pc_hwpmcs;			/* array of 'npmc' pointers */
 };
 
-#define	PMC_PCPU_CPU_MASK		0x000000FF
-#define	PMC_PCPU_FLAGS_MASK		0xFFFFFF00
-#define	PMC_PCPU_FLAGS_SHIFT		8
-#define	PMC_PCPU_STATE_TO_CPU(S)	((S) & PMC_PCPU_CPU_MASK)
-#define	PMC_PCPU_STATE_TO_FLAGS(S)	(((S) & PMC_PCPU_FLAGS_MASK) >> PMC_PCPU_FLAGS_SHIFT)
-#define	PMC_PCPU_FLAGS_TO_STATE(F)	(((F) << PMC_PCPU_FLAGS_SHIFT) & PMC_PCPU_FLAGS_MASK)
-#define	PMC_PCPU_CPU_TO_STATE(C)	((C) & PMC_PCPU_CPU_MASK)
-#define	PMC_PCPU_FLAG_HTT		(PMC_PCPU_FLAGS_TO_STATE(0x1))
+/*
+ * Per-CPU state.
+ */
+DPCPU_DECLARE(struct pmc_cpu, pmc_pcpu);
 
 /*
  * struct pmc_binding
@@ -1064,13 +1059,6 @@ struct pmc_mdep  {
 	 */
 	struct pmc_classdep pmd_classdep[];
 };
-
-/*
- * Per-CPU state.  This is an array of 'mp_ncpu' pointers
- * to struct pmc_cpu descriptors.
- */
-
-extern struct pmc_cpu **pmc_pcpu;
 
 /* driver statistics */
 extern struct pmc_driverstats pmc_stats;

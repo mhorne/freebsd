@@ -201,7 +201,6 @@ soft_get_config(int cpu, int ri, struct pmc **ppm)
 static void
 soft_pcpu_fini(struct pmc_mdep *md)
 {
-	struct pmc_cpu *pc;
 	int ri;
 	u_int cpu;
 
@@ -217,14 +216,12 @@ soft_pcpu_fini(struct pmc_mdep *md)
 	KASSERT(ri >= 0 && ri < SOFT_NPMCS,
 	    ("[soft,%d] ri=%d", __LINE__, ri));
 
-	pc = pmc_pcpu[cpu];
-	pc->pc_hwpmcs[ri] = NULL;
+	DPCPU_GET(pmc_pcpu).pc_hwpmcs[ri] = NULL;
 }
 
 static void
 soft_pcpu_init(struct pmc_mdep *md)
 {
-	struct pmc_cpu *pc;
 	struct soft_cpu *soft_pc;
 	struct pmc_hw *phw;
 	int first_ri, n;
@@ -237,9 +234,6 @@ soft_pcpu_init(struct pmc_mdep *md)
 	    __LINE__));
 
 	soft_pc = malloc(sizeof(struct soft_cpu), M_PMC, M_WAITOK|M_ZERO);
-	pc = pmc_pcpu[cpu];
-
-	KASSERT(pc != NULL, ("[soft,%d] cpu %d null per-cpu", __LINE__, cpu));
 
 	soft_pcpu[cpu] = soft_pc;
 	phw = soft_pc->soft_hw;
@@ -249,7 +243,7 @@ soft_pcpu_init(struct pmc_mdep *md)
 		phw->phw_state = PMC_PHW_FLAG_IS_ENABLED |
 		    PMC_PHW_CPU_TO_STATE(cpu) | PMC_PHW_INDEX_TO_STATE(n);
 		phw->phw_pmc = NULL;
-		pc->pc_hwpmcs[n + first_ri] = phw;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[n + first_ri] = phw;
 	}
 }
 

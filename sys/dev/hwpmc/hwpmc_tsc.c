@@ -166,7 +166,6 @@ tsc_get_msr(int ri __diagused, uint32_t *msr)
 static void
 tsc_pcpu_fini(struct pmc_mdep *md)
 {
-	struct pmc_cpu *pc;
 	int ri;
 	u_int cpu;
 
@@ -178,14 +177,12 @@ tsc_pcpu_fini(struct pmc_mdep *md)
 
 	ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_TSC].pcd_ri;
 
-	pc = pmc_pcpu[cpu];
-	pc->pc_hwpmcs[ri] = NULL;
+	DPCPU_GET(pmc_pcpu).pc_hwpmcs[ri] = NULL;
 }
 
 static void
 tsc_pcpu_init(struct pmc_mdep *md)
 {
-	struct pmc_cpu *pc;
 	struct tsc_cpu *tsc_pc;
 	int ri;
 	u_int cpu;
@@ -205,13 +202,7 @@ tsc_pcpu_init(struct pmc_mdep *md)
 
 	ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_TSC].pcd_ri;
 
-	KASSERT(pmc_pcpu, ("[tsc,%d] null generic pcpu", __LINE__));
-
-	pc = pmc_pcpu[cpu];
-
-	KASSERT(pc, ("[tsc,%d] null generic per-cpu", __LINE__));
-
-	pc->pc_hwpmcs[ri] = &tsc_pc->tc_hw;
+	DPCPU_GET(pmc_pcpu).pc_hwpmcs[ri] = &tsc_pc->tc_hw;
 }
 
 static int

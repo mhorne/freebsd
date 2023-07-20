@@ -443,7 +443,6 @@ arm64_pcpu_init(struct pmc_mdep *md)
 {
 	struct arm64_cpu *pac;
 	struct pmc_hw  *phw;
-	struct pmc_cpu *pc;
 	uint64_t pmcr;
 	int first_ri;
 	int i;
@@ -457,15 +456,13 @@ arm64_pcpu_init(struct pmc_mdep *md)
 
 	pac->pc_arm64pmcs = malloc(sizeof(struct pmc_hw) * arm64_npmcs,
 	    M_PMC, M_WAITOK | M_ZERO);
-	pc = pmc_pcpu[cpu];
 	first_ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_ARMV8].pcd_ri;
-	KASSERT(pc != NULL, ("[arm64,%d] NULL per-cpu pointer", __LINE__));
 
 	for (i = 0, phw = pac->pc_arm64pmcs; i < arm64_npmcs; i++, phw++) {
 		phw->phw_state    = PMC_PHW_FLAG_IS_ENABLED |
 		    PMC_PHW_CPU_TO_STATE(cpu) | PMC_PHW_INDEX_TO_STATE(i);
 		phw->phw_pmc      = NULL;
-		pc->pc_hwpmcs[i + first_ri] = phw;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[i + first_ri] = phw;
 	}
 
 	/*

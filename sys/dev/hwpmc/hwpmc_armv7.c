@@ -407,7 +407,6 @@ armv7_pcpu_init(struct pmc_mdep *md)
 {
 	struct armv7_cpu *pac;
 	struct pmc_hw  *phw;
-	struct pmc_cpu *pc;
 	uint32_t pmnc;
 	int first_ri;
 	int i;
@@ -421,15 +420,13 @@ armv7_pcpu_init(struct pmc_mdep *md)
 
 	pac->pc_armv7pmcs = malloc(sizeof(struct pmc_hw) * armv7_npmcs,
 	    M_PMC, M_WAITOK|M_ZERO);
-	pc = pmc_pcpu[cpu];
 	first_ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_ARMV7].pcd_ri;
-	KASSERT(pc != NULL, ("[armv7,%d] NULL per-cpu pointer", __LINE__));
 
 	for (i = 0, phw = pac->pc_armv7pmcs; i < armv7_npmcs; i++, phw++) {
 		phw->phw_state    = PMC_PHW_FLAG_IS_ENABLED |
 		    PMC_PHW_CPU_TO_STATE(cpu) | PMC_PHW_INDEX_TO_STATE(i);
 		phw->phw_pmc      = NULL;
-		pc->pc_hwpmcs[i + first_ri] = phw;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[i + first_ri] = phw;
 	}
 
 	pmnc = 0xffffffff;

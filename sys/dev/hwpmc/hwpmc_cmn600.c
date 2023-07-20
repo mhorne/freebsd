@@ -595,7 +595,6 @@ static void
 cmn600_pcpu_init(struct pmc_mdep *md)
 {
 	struct pmc_hw  *phw;
-	struct pmc_cpu *pc;
 	int first_ri, n, npmc;
 	int mdep_class;
 	u_int cpu;
@@ -612,7 +611,6 @@ cmn600_pcpu_init(struct pmc_mdep *md)
 	 * state and initialize pointers in the MI per-cpu descriptor.
 	 */
 
-	pc = pmc_pcpu[cpu];
 	first_ri = md->pmd_classdep[mdep_class].pcd_ri;
 	npmc = md->pmd_classdep[mdep_class].pcd_num;
 
@@ -624,7 +622,7 @@ cmn600_pcpu_init(struct pmc_mdep *md)
 		if (cmn600_pmcs[class_ri2unit(n)].arg != NULL)
 			phw->phw_state |= PMC_PHW_FLAG_IS_ENABLED;
 		phw->phw_pmc = NULL;
-		pc->pc_hwpmcs[n + first_ri] = phw;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[n + first_ri] = phw;
 	}
 }
 
@@ -640,7 +638,6 @@ cmn600_pcpu_fini(struct pmc_mdep *md __unused)
 static int
 cmn600_pmu_intr(struct trapframe *tf, int unit, int i)
 {
-	struct pmc_cpu *pc __diagused;
 	struct pmc_hw *phw;
 	struct pmc *pm;
 	int error, cpu, ri;
@@ -649,8 +646,6 @@ cmn600_pmu_intr(struct trapframe *tf, int unit, int i)
 	cpu = curcpu;
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[cmn600,%d] CPU %d out of range", __LINE__, cpu));
-	pc = pmc_pcpu[cpu];
-	KASSERT(pc != NULL, ("pc != NULL"));
 
 	phw = cmn600desc(ri)->pd_phw;
 	KASSERT(phw != NULL, ("phw != NULL"));

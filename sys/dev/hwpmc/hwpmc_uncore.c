@@ -86,7 +86,6 @@ uncore_pcpu_noop(struct pmc_mdep *md __unused)
 static void
 uncore_pcpu_init(struct pmc_mdep *md)
 {
-	struct pmc_cpu *pc;
 	struct uncore_cpu *cc;
 	struct pmc_hw *phw;
 	int uncore_ri, n, npmc;
@@ -101,26 +100,20 @@ uncore_pcpu_init(struct pmc_mdep *md)
 
 	cc = malloc(sizeof(struct uncore_cpu) + npmc * sizeof(struct pmc_hw),
 	    M_PMC, M_WAITOK | M_ZERO);
-
 	uncore_pcpu[cpu] = cc;
-	pc = pmc_pcpu[cpu];
-
-	KASSERT(pc != NULL && cc != NULL,
-	    ("[uncore,%d] NULL per-cpu structures cpu=%d", __LINE__, cpu));
 
 	for (n = 0, phw = cc->pc_uncorepmcs; n < npmc; n++, phw++) {
 		phw->phw_state 	  = PMC_PHW_FLAG_IS_ENABLED |
 		    PMC_PHW_CPU_TO_STATE(cpu) |
 		    PMC_PHW_INDEX_TO_STATE(n + uncore_ri);
 		phw->phw_pmc	  = NULL;
-		pc->pc_hwpmcs[n + uncore_ri]  = phw;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[n + uncore_ri] = phw;
 	}
 }
 
 static void
 uncore_pcpu_fini(struct pmc_mdep *md)
 {
-	struct pmc_cpu *pc;
 	struct uncore_cpu *cc;
 	int uncore_ri, n, npmc;
 	u_int cpu;
@@ -133,11 +126,6 @@ uncore_pcpu_fini(struct pmc_mdep *md)
 
 	uncore_pcpu[cpu] = NULL;
 
-	pc = pmc_pcpu[cpu];
-
-	KASSERT(pc != NULL, ("[uncore,%d] NULL per-cpu %d state", __LINE__,
-		cpu));
-
 	npmc = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_UCP].pcd_num;
 	uncore_ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_UCP].pcd_ri;
 
@@ -148,7 +136,7 @@ uncore_pcpu_fini(struct pmc_mdep *md)
 	npmc += md->pmd_classdep[PMC_MDEP_CLASS_INDEX_UCF].pcd_num;
 
 	for (n = 0; n < npmc; n++)
-		pc->pc_hwpmcs[n + uncore_ri] = NULL;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[n + uncore_ri] = NULL;
 
 	free(cc, M_PMC);
 }
