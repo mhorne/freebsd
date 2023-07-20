@@ -94,8 +94,14 @@ enum pmc_flags {
 	PMC_FLAG_NOWAIT   = 0x04, /* do not wait for mallocs */
 };
 
-struct pmc_cpu		**pmc_pcpu;	 /* per-cpu state */
-pmc_value_t		*pmc_pcpu_saved; /* saved PMC values: CSW handling */
+/* Pointers for per-CPU state. */
+DPCPU_DEFINE(struct pmc_cpu, pmc_pcpu) = {
+	.pc_sb = {0},
+	.pc_hwpmcs = NULL,
+};
+
+/* Saved PMC values: context switch handling */
+pmc_value_t		*pmc_pcpu_saved;
 
 #define	PMC_PCPU_SAVED(C, R)	pmc_pcpu_saved[(R) + md->pmd_npmc * (C)]
 
@@ -1448,7 +1454,7 @@ pmc_process_csw_in(struct thread *td)
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[pmc,%d] weird CPU id %d", __LINE__, cpu));
 
-	pc = pmc_pcpu[cpu];
+	pc = DPCPU_PTR(pmc_pcpu);
 	for (ri = 0; ri < md->pmd_npmc; ri++) {
 		if ((pm = pp->pp_pmcs[ri].pp_pmc) == NULL)
 			continue;
@@ -1579,7 +1585,6 @@ pmc_process_csw_out(struct thread *td)
 {
 	struct pmc *pm;
 	struct pmc_classdep *pcd;
-	struct pmc_cpu *pc;
 	struct pmc_process *pp;
 	struct pmc_thread *pt = NULL;
 	struct proc *p;
@@ -1614,8 +1619,6 @@ pmc_process_csw_out(struct thread *td)
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[pmc,%d weird CPU id %d", __LINE__, cpu));
-
-	pc = pmc_pcpu[cpu];
 
 	/*
 	 * When a PMC gets unlinked from a target PMC, it will
@@ -1757,7 +1760,7 @@ pmc_process_csw_out(struct thread *td)
 	 * Perform any other architecture/cpu dependent thread
 	 * switch out functions.
 	 */
-	(void)(*md->pmd_switch_out)(pc, pp);
+	(void)(*md->pmd_switch_out)(DPCPU_PTR(pmc_pcpu), pp);
 
 	critical_exit();
 }
@@ -2726,7 +2729,7 @@ pmc_release_pmc_descriptor(struct pmc *pm)
 		if (pm->pm_state == PMC_STATE_RUNNING &&
 			pm->pm_pcpu_state[cpu].pps_stalled == 0) {
 
-			phw = pmc_pcpu[cpu]->pc_hwpmcs[ri];
+			phw = DPCPU_GET(pmc_pcpu).pc_hwpmcs[ri];
 
 			KASSERT(phw->phw_pmc == pm,
 			    ("[pmc, %d] pmc ptr ri(%d) hw(%p) pm(%p)",
@@ -3391,10 +3394,10 @@ pmc_do_op_pmcallocate(struct thread *td, struct pmc_op_pmcallocate *pa)
 	pmc_save_cpu_binding(&pb);
 
 #define	PMC_IS_SHAREABLE_PMC(cpu, n)				\
-	(pmc_pcpu[(cpu)]->pc_hwpmcs[(n)]->phw_state &		\
+	(DPCPU_GET(pmc_pcpu).pc_hwpmcs[(n)]->phw_state &	\
 	 PMC_PHW_FLAG_IS_SHAREABLE)
 #define	PMC_IS_UNALLOCATED(cpu, n)				\
-	(pmc_pcpu[(cpu)]->pc_hwpmcs[(n)]->phw_pmc == NULL)
+	(DPCPU_GET(pmc_pcpu).pc_hwpmcs[(n)]->phw_pmc == NULL)
 
 	if (PMC_IS_SYSTEM_MODE(mode)) {
 		pmc_select_cpu(cpu);
@@ -3461,7 +3464,7 @@ pmc_do_op_pmcallocate(struct thread *td, struct pmc_op_pmcallocate *pa)
 		pmc_save_cpu_binding(&pb);
 		pmc_select_cpu(cpu);
 
-		phw = pmc_pcpu[cpu]->pc_hwpmcs[n];
+		phw = DPCPU_GET(pmc_pcpu).pc_hwpmcs[n];
 		pcd = pmc_ri_to_classdep(md, n, &adjri);
 
 		if ((phw->phw_state & PMC_PHW_FLAG_IS_ENABLED) == 0 ||
@@ -4102,7 +4105,6 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 	{
 		int cpu, ri;
 		enum pmc_state request;
-		struct pmc_cpu *pc;
 		struct pmc_hw *phw;
 		struct pmc_op_pmcadmin pma;
 		struct pmc_binding pb;
@@ -4164,8 +4166,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 		pmc_save_cpu_binding(&pb);
 		pmc_select_cpu(cpu);
 
-		pc  = pmc_pcpu[cpu];
-		phw = pc->pc_hwpmcs[ri];
+		phw = DPCPU_GET(pmc_pcpu).pc_hwpmcs[ri];
 
 		/*
 		 * XXX do we need some kind of 'forced' disable?
@@ -4591,7 +4592,7 @@ pmc_add_sample(ring_type_t ring, struct pmc *pm, struct trapframe *tf)
 	 * Allocate space for a sample buffer.
 	 */
 	cpu = curcpu;
-	psb = pmc_pcpu[cpu]->pc_sb[ring];
+	psb = DPCPU_GET(pmc_pcpu).pc_sb[ring];
 	inuserspace = TRAPF_USERMODE(tf);
 	ps = PMC_PROD_SAMPLE(psb);
 	if (psb->ps_considx != psb->ps_prodidx &&
@@ -4687,6 +4688,7 @@ pmc_process_interrupt(int ring, struct pmc *pm, struct trapframe *tf)
  * Capture a user call chain. This function will be called from ast()
  * before control returns to userland and before the process gets
  * rescheduled.
+ * TODO: remove cpu arg
  */
 static void
 pmc_capture_user_callchain(int cpu, int ring, struct trapframe *tf)
@@ -4699,7 +4701,7 @@ pmc_capture_user_callchain(int cpu, int ring, struct trapframe *tf)
 	int nsamples, nrecords, pass, iter;
 	int start_ticks __diagused;
 
-	psb = pmc_pcpu[cpu]->pc_sb[ring];
+	psb = DPCPU_GET(pmc_pcpu).pc_sb[ring];
 	td = curthread;
 	nrecords = INT_MAX;
 	pass = 0;
@@ -4815,7 +4817,7 @@ pmc_process_samples(int cpu, ring_type_t ring)
 	    ("[pmc,%d] not on the correct CPU pcpu=%d cpu=%d", __LINE__,
 		PCPU_GET(cpuid), cpu));
 
-	psb = pmc_pcpu[cpu]->pc_sb[ring];
+	psb = DPCPU_GET(pmc_pcpu).pc_sb[ring];
 	delta = psb->ps_prodidx - psb->ps_considx;
 	MPASS(delta <= pmc_nsamples);
 	MPASS(psb->ps_considx <= psb->ps_prodidx);
@@ -5069,7 +5071,7 @@ pmc_process_exit(void *arg __unused, struct proc *p)
 	/*
 	 * Inform the MD layer of this pseudo "context switch out".
 	 */
-	(void)md->pmd_switch_out(pmc_pcpu[cpu], pp);
+	(void)md->pmd_switch_out(DPCPU_PTR(pmc_pcpu), pp);
 
 	critical_exit(); /* ok to be pre-empted now */
 
@@ -5390,9 +5392,10 @@ static int
 pmc_initialize(void)
 {
 	struct pmc_classdep *pcd;
+	struct pmc_cpu *pc;
 	struct pmc_sample *ps;
 	struct pmc_samplebuffer *sb;
-	int c, cpu, error, n, ri;
+	int c, error, n, ri;
 	u_int maxcpu, domain;
 
 	md = NULL;
@@ -5496,10 +5499,6 @@ pmc_initialize(void)
 
 	maxcpu = pmc_cpu_max();
 
-	/* allocate space for the per-cpu array */
-	pmc_pcpu = malloc(maxcpu * sizeof(struct pmc_cpu *), M_PMC,
-	    M_WAITOK | M_ZERO);
-
 	/* per-cpu 'saved values' for managing process-mode PMCs */
 	pmc_pcpu_saved = malloc(sizeof(pmc_value_t) * maxcpu * md->pmd_npmc,
 	    M_PMC, M_WAITOK);
@@ -5508,22 +5507,20 @@ pmc_initialize(void)
 	 * Perform CPU-dependent allocations, including: */
 	/* allocate space for the sample array */
 	/* TODO: finish comment */
-	for (cpu = 0; cpu < maxcpu; cpu++) {
+	for (int cpu = 0; cpu < maxcpu; cpu++) {
 		if (!pmc_cpu_is_active(cpu))
 			continue;
 
-		pmc_pcpu[cpu] = malloc(sizeof(struct pmc_cpu) +
+		pc = DPCPU_ID_PTR(cpu, pmc_pcpu);
+		pc->pc_hwpmcs = malloc_domainset(
 		    md->pmd_npmc * sizeof(struct pmc_hw *), M_PMC,
-		    M_WAITOK | M_ZERO);
+		    DOMAINSET_PREF(domain), M_WAITOK | M_ZERO);
 
 		domain = PCPU_GET(domain);
 		sb = malloc_domainset(sizeof(struct pmc_samplebuffer) +
 		    pmc_nsamples * sizeof(struct pmc_sample), M_PMC,
 		    DOMAINSET_PREF(domain), M_WAITOK | M_ZERO);
 
-		KASSERT(pmc_pcpu[cpu] != NULL,
-		    ("[pmc,%d] cpu=%d Null per-cpu data", __LINE__, cpu));
-
 		sb->ps_callchains = malloc_domainset(pmc_callchaindepth *
 		    pmc_nsamples * sizeof(uintptr_t), M_PMC,
 		    DOMAINSET_PREF(domain), M_WAITOK | M_ZERO);
@@ -5532,7 +5529,7 @@ pmc_initialize(void)
 			ps->ps_pc = sb->ps_callchains +
 			    (n * pmc_callchaindepth);
 
-		pmc_pcpu[cpu]->pc_sb[PMC_HR] = sb;
+		pc->pc_sb[PMC_HR] = sb;
 
 		sb = malloc_domainset(sizeof(struct pmc_samplebuffer) +
 		    pmc_nsamples * sizeof(struct pmc_sample), M_PMC,
@@ -5545,7 +5542,7 @@ pmc_initialize(void)
 			ps->ps_pc = sb->ps_callchains +
 			    (n * pmc_callchaindepth);
 
-		pmc_pcpu[cpu]->pc_sb[PMC_SR] = sb;
+		pc->pc_sb[PMC_SR] = sb;
 
 		sb = malloc_domainset(sizeof(struct pmc_samplebuffer) +
 		    pmc_nsamples * sizeof(struct pmc_sample), M_PMC,
@@ -5556,7 +5553,7 @@ pmc_initialize(void)
 		for (n = 0, ps = sb->ps_samples; n < pmc_nsamples; n++, ps++)
 			ps->ps_pc = sb->ps_callchains + n * pmc_callchaindepth;
 
-		pmc_pcpu[cpu]->pc_sb[PMC_UR] = sb;
+		pc->pc_sb[PMC_UR] = sb;
 	}
 
 	/* allocate space for the row disposition array */
@@ -5663,6 +5660,7 @@ static void
 pmc_cleanup(void)
 {
 	struct pmc_binding pb;
+	struct pmc_cpu *pc;
 	struct pmc_owner *po, *tmp;
 	struct pmc_ownerhash *ph;
 	struct pmc_processhash *prh __pmcdbg_used;
@@ -5780,30 +5778,30 @@ pmc_cleanup(void)
 		md = NULL;
 	}
 
-	/* Free per-cpu descriptors. */
+	/* Free per-CPU descriptors. */
 	for (cpu = 0; cpu < maxcpu; cpu++) {
 		if (!pmc_cpu_is_active(cpu))
 			continue;
-		KASSERT(pmc_pcpu[cpu]->pc_sb[PMC_HR] != NULL,
+
+		pc = DPCPU_ID_PTR(cpu, pmc_pcpu);
+		KASSERT(pc->pc_sb[PMC_HR] != NULL,
 		    ("[pmc,%d] Null hw cpu sample buffer cpu=%d", __LINE__,
 			cpu));
-		KASSERT(pmc_pcpu[cpu]->pc_sb[PMC_SR] != NULL,
+		KASSERT(pc->pc_sb[PMC_SR] != NULL,
 		    ("[pmc,%d] Null sw cpu sample buffer cpu=%d", __LINE__,
 			cpu));
-		KASSERT(pmc_pcpu[cpu]->pc_sb[PMC_UR] != NULL,
+		KASSERT(pc->pc_sb[PMC_UR] != NULL,
 		    ("[pmc,%d] Null userret cpu sample buffer cpu=%d", __LINE__,
 			cpu));
-		free(pmc_pcpu[cpu]->pc_sb[PMC_HR]->ps_callchains, M_PMC);
-		free(pmc_pcpu[cpu]->pc_sb[PMC_HR], M_PMC);
-		free(pmc_pcpu[cpu]->pc_sb[PMC_SR]->ps_callchains, M_PMC);
-		free(pmc_pcpu[cpu]->pc_sb[PMC_SR], M_PMC);
-		free(pmc_pcpu[cpu]->pc_sb[PMC_UR]->ps_callchains, M_PMC);
-		free(pmc_pcpu[cpu]->pc_sb[PMC_UR], M_PMC);
-		free(pmc_pcpu[cpu], M_PMC);
-	}
+		free(pc->pc_sb[PMC_HR]->ps_callchains, M_PMC);
+		free(pc->pc_sb[PMC_HR], M_PMC);
+		free(pc->pc_sb[PMC_SR]->ps_callchains, M_PMC);
+		free(pc->pc_sb[PMC_SR], M_PMC);
+		free(pc->pc_sb[PMC_UR]->ps_callchains, M_PMC);
+		free(pc->pc_sb[PMC_UR], M_PMC);
 
-	free(pmc_pcpu, M_PMC);
-	pmc_pcpu = NULL;
+		free(pc->pc_hwpmcs, M_PMC);
+	}
 
 	free(pmc_pcpu_saved, M_PMC);
 	pmc_pcpu_saved = NULL;

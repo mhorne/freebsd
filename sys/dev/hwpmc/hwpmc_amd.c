@@ -666,7 +666,6 @@ static void
 amd_pcpu_init(struct pmc_mdep *md)
 {
 	struct amd_cpu *pac;
-	struct pmc_cpu *pc;
 	struct pmc_hw  *phw;
 	int first_ri, n;
 	u_int cpu;
@@ -681,16 +680,12 @@ amd_pcpu_init(struct pmc_mdep *md)
 	 * Set the content of the hardware descriptors to a known
 	 * state and initialize pointers in the MI per-cpu descriptor.
 	 */
-	pc = pmc_pcpu[cpu];
 	first_ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_K8].pcd_ri;
-
-	KASSERT(pc != NULL, ("[amd,%d] NULL per-cpu pointer", __LINE__));
-
 	for (n = 0, phw = pac->pc_amdpmcs; n < amd_npmcs; n++, phw++) {
 		phw->phw_state = PMC_PHW_FLAG_IS_ENABLED |
 		    PMC_PHW_CPU_TO_STATE(cpu) | PMC_PHW_INDEX_TO_STATE(n);
 		phw->phw_pmc = NULL;
-		pc->pc_hwpmcs[n + first_ri] = phw;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[n + first_ri] = phw;
 	}
 }
 
@@ -701,7 +696,6 @@ static void
 amd_pcpu_fini(struct pmc_mdep *md)
 {
 	struct amd_cpu *pac;
-	struct pmc_cpu *pc;
 	int first_ri, i;
 	u_int cpu;
 
@@ -725,16 +719,13 @@ amd_pcpu_fini(struct pmc_mdep *md)
 	}
 #endif
 
-	pc = pmc_pcpu[cpu];
-	KASSERT(pc != NULL, ("[amd,%d] NULL per-cpu state", __LINE__));
-
 	first_ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_K8].pcd_ri;
 
 	/*
 	 * Reset pointers in the MI 'per-cpu' state.
 	 */
 	for (i = 0; i < amd_npmcs; i++)
-		pc->pc_hwpmcs[i + first_ri] = NULL;
+		DPCPU_GET(pmc_pcpu).pc_hwpmcs[i + first_ri] = NULL;
 
 	free(pac, M_PMC);
 }
