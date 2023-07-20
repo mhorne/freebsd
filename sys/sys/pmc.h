@@ -649,6 +649,13 @@ struct pmc_op_getdyneventinfo {
 
 #define PMC_SYSCTL_NAME_PREFIX "kern." PMC_MODULE_NAME "."
 
+typedef enum ring_type {
+	PMC_HR = 0,	/* Hardware ring buffer */
+	PMC_SR = 1,	/* Software ring buffer */
+	PMC_UR = 2,	/* userret ring buffer */
+	PMC_NUM_SR = PMC_UR + 1
+} ring_type_t;
+
 /*
  * Locking keys
  *
