@@ -237,17 +237,22 @@ static struct sysent syscallname##_sysent = {			\
 	SYS_AUE_##syscallname					\
 }
 
-#define SYSCALL_MODULE(name, offset, new_sysent, evh, arg)	\
-static struct syscall_module_data name##_syscall_mod = {	\
-	evh, arg, offset, new_sysent, { 0, NULL, AUE_NULL }	\
+#define SYSCALL_MODULE(modname, off, sysent, evh, arg)		\
+static struct syscall_module_data modname##_syscall_mod = {	\
+	.chainevh =	evh,					\
+	.chainarg =	arg,					\
+	.offset =	off,					\
+	.new_sysent =	sysent,					\
+	.old_sysent =	{ 0, NULL, AUE_NULL },			\
+	.flags =	0,					\
 };								\
 								\
-static moduledata_t name##_mod = {				\
-	#name,							\
-	syscall_module_handler,					\
-	&name##_syscall_mod					\
+static moduledata_t modname##_mod = {				\
+	.name =		#modname,				\
+	.evhand =	syscall_module_handler,			\
+	.priv =		&modname##_syscall_mod,			\
 };								\
-DECLARE_MODULE(name, name##_mod, SI_SUB_SYSCALLS, SI_ORDER_MIDDLE)
+DECLARE_MODULE(modname, modname##_mod, SI_SUB_SYSCALLS, SI_ORDER_MIDDLE)
 
 #define	SYSCALL_MODULE_HELPER(syscallname)			\
 static int syscallname##_syscall = SYS_##syscallname;		\
