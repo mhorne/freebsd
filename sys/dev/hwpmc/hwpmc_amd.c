@@ -751,22 +751,12 @@ amd_pcpu_fini(struct pmc_mdep *md, int cpu)
 {
 	struct amd_cpu *pac;
 	struct pmc_cpu *pc;
-	uint32_t evsel;
 	int first_ri, i;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[amd,%d] insane cpu number (%d)", __LINE__, cpu));
 
 	PMCDBG1(MDP, INI, 1, "amd-cleanup cpu=%d", cpu);
-
-	/*
-	 * First, turn off all PMCs on this CPU.
-	 */
-	for (i = 0; i < 4; i++) { /* XXX this loop is now not needed */
-		evsel = rdmsr(AMD_PMC_EVSEL_0 + i);
-		evsel &= ~AMD_PMC_ENABLE;
-		wrmsr(AMD_PMC_EVSEL_0 + i, evsel);
-	}
 
 	/*
 	 * Next, free up allocated space.
@@ -776,14 +766,19 @@ amd_pcpu_fini(struct pmc_mdep *md, int cpu)
 
 	amd_pcpu[cpu] = NULL;
 
-#ifdef	HWPMC_DEBUG
+	/* Verify PMC state assumptions for this CPU. */
 	for (i = 0; i < AMD_NPMCS; i++) {
 		KASSERT(pac->pc_amdpmcs[i].phw_pmc == NULL,
 		    ("[amd,%d] CPU%d/PMC%d in use", __LINE__, cpu, i));
-		KASSERT(AMD_PMC_IS_STOPPED(AMD_PMC_EVSEL_0 + i),
+
+		if (i >= 6 && i < 12 && !has_cache_pmcs)
+			continue;
+		if (i >= 12 && i < 16 && !has_fabric_pmcs)
+			continue;
+
+		KASSERT(AMD_PMC_IS_STOPPED(amd_pmcdesc[i].pm_evsel),
 		    ("[amd,%d] CPU%d/PMC%d not stopped", __LINE__, cpu, i));
 	}
-#endif
 
 	pc = pmc_pcpu[cpu];
 	KASSERT(pc != NULL, ("[amd,%d] NULL per-cpu state", __LINE__));
