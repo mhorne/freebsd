@@ -59,10 +59,10 @@
 .Fn sleepq_broadcast "const void *wchan" "int flags" "int pri" "int queue"
 .Ft void
 .Fn sleepq_free "struct sleepqueue *sq"
-.Ft struct sleepqueue *
-.Fn sleepq_lookup "const void *wchan"
 .Ft void
 .Fn sleepq_lock "const void *wchan"
+.Ft struct sleepqueue *
+.Fn sleepq_lookup "const void *wchan"
 .Ft void
 .Fn sleepq_release "const void *wchan"
 .Ft void
@@ -194,6 +194,14 @@ and
 .It Dv SLEEPQ_PAUSE
 A sleep queue used to implement
 .Xr pause 9 .
+.It Dv SLEEPQ_SX
+A sleep queue backing an
+.Xr sx 9
+lock.
+.It Dv SLEEPQ_LK
+A sleep queue backing a
+.Xr lockmgr 9
+lock.
 .El
 .Pp
 There are currently two optional flag:
@@ -201,13 +209,14 @@ There are currently two optional flag:
 .Bl -tag -width ".Dv SLEEPQ_INTERRUPTIBLE" -compact
 .It Dv SLEEPQ_INTERRUPTIBLE
 The current thread is entering an interruptible sleep.
-.El
-.Bl -tag -width ".Dv SLEEPQ_STOP_ON_BDRY" -compact
-.It Dv SLEEPQ_STOP_ON_BDRY
-When thread is entering an interruptible sleep, do not stop it upon
-arrival of stop action, like
-.Dv SIGSTOP .
-Wake it up instead.
+.It Dv SLEEPQ_UNFAIR
+The most recent thread will be woken from the sleepqueue, rather than the
+thread with the highest priority.
+Used to implement
+.Xr wakeup_any 9 .
+.It Dv SLEEPQ_DROP
+When set, threads woken from the sleepqueue will return without the thread lock
+held.
 .El
 .Pp
 A timeout on the sleep may be specified by calling
@@ -294,7 +303,7 @@ function awakens the highest priority thread sleeping on a wait channel
 awakens all of the threads sleeping on a wait channel.
 The
 .Fa wchan
-argument specifics which wait channel to awaken.
+argument specifies which wait channel to awaken.
 The
 .Fa flags
 argument must match the sleep queue type contained in the
@@ -383,6 +392,8 @@ than manipulating sleep queues directly.
 .Sh SEE ALSO
 .Xr callout 9 ,
 .Xr condvar 9 ,
+.Xr lockmgr 9 ,
 .Xr runqueue 9 ,
 .Xr scheduler 9 ,
-.Xr sleep 9
+.Xr sleep 9 ,
+.Xr sx 9
