@@ -75,12 +75,20 @@ struct thread;
 
 #ifdef _KERNEL
 
+/*
+ * The 'flags' parameter encodes the type and special flag params. Keep in sync
+ * with sleepqueue(9).
+ */
+
+/* Types */
 #define	SLEEPQ_TYPE		0x0ff		/* Mask of sleep queue types. */
 #define	SLEEPQ_SLEEP		0x00		/* Used by sleep/wakeup. */
 #define	SLEEPQ_CONDVAR		0x01		/* Used for a cv. */
 #define	SLEEPQ_PAUSE		0x02		/* Used by pause. */
 #define	SLEEPQ_SX		0x03		/* Used by an sx lock. */
 #define	SLEEPQ_LK		0x04		/* Used by a lockmgr. */
+
+/* Flags */
 #define	SLEEPQ_INTERRUPTIBLE	0x100		/* Sleep is interruptible. */
 #define	SLEEPQ_UNFAIR		0x200		/* Unfair wakeup order. */
 #define	SLEEPQ_DROP		0x400		/* Return without lock held. */
