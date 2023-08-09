@@ -35,5 +35,6 @@
  * Prototypes.
  */
 const char *_pmc_name_of_event(enum pmc_event _ev, enum pmc_cputype _cpu);
+void pmc_log(enum pmc_log_level level, const char *fmt, ...);
 
 #endif	/* LIBPMC_INTERNAL_H */

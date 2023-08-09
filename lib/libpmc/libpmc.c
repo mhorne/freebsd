@@ -294,6 +294,42 @@ static const char * pmc_state_names[] = {
 };
 
 /*
+ * Logging.
+ */
+enum pmc_log_level {
+	PMC_LOG_NONE,
+	PMC_LOG_ERRORS,	/* standard errors/warnings */
+	PMC_LOG_DEBUG,	/* debugging */
+};
+
+static enum pmc_log_level pmc_log = PMC_LOG_NONE;
+
+void
+pmc_log(enum pmc_log_level level, const char *fmt, ...)
+{
+	va_list ap;
+	int pri;
+
+	if (level > pmc_log)
+		return;
+
+	switch (level) {
+	case PMC_LOG_NONE:
+		return;
+	case PMC_LOG_ERRORS
+		pri = LOG_ERR;
+		break;
+	case PMC_LOG_DEBUG:
+		pri = LOG_DEBUG;
+		break;
+	}
+
+	va_start(ap, fmt);
+	vsyslog(pri, fmt, ap);
+	va_end(ap);
+}
+
+/*
  * Filled in by pmc_init().
  */
 static int pmc_syscall = -1;
