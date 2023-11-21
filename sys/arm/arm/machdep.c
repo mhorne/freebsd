@@ -544,7 +544,7 @@ initarm(struct arm_boot_params *abp)
 
 	/* Establish static device mappings. */
 	err_devmap = platform_devmap_init();
-	devmap_bootstrap(0, NULL);
+	devmap_bootstrap(NULL);
 	vm_max_kernel_address = platform_lastaddr();
 
 	/*

@@ -74,8 +74,7 @@ void devmap_register_table(const struct devmap_entry * _table);
  * in older code.  If the table pointer is NULL, this will use the table
  * installed previously by devmap_register_table().
  */
-void devmap_bootstrap(vm_offset_t _l1pt,
-    const struct devmap_entry *_table);
+void devmap_bootstrap(const struct devmap_entry *_table);
 
 /*
  * Translate between virtual and physical addresses within a region that is

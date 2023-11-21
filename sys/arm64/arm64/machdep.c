@@ -978,7 +978,7 @@ initarm(struct arm64_bootparams *abp)
 
 	physmem_init_kernel_globals();
 
-	devmap_bootstrap(0, NULL);
+	devmap_bootstrap(NULL);
 
 	valid = bus_probe();
 
