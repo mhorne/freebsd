@@ -174,7 +174,7 @@ devmap_register_table(const struct devmap_entry *table)
  * with a NULL pointer.
  */
 void
-devmap_bootstrap(vm_offset_t l1pt, const struct devmap_entry *table)
+devmap_bootstrap(const struct devmap_entry *table)
 {
 	const struct devmap_entry *pd;
 
