@@ -545,39 +545,121 @@ pmap_early_alloc_tables(vm_paddr_t *freemempos, int npages)
 	return (pt);
 }
 
-static void
-pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa, vm_paddr_t max_pa)
+static vm_paddr_t
+pmap_bootstrap_dmap(pd_entry_t *l1, vm_paddr_t freemempos)
 {
+	vm_paddr_t physmap[PHYS_AVAIL_ENTRIES] = {0};
 	vm_offset_t va;
-	vm_paddr_t pa;
-	pd_entry_t *l1;
-	u_int l1_slot;
-	pt_entry_t entry;
-	pn_t pn;
+	vm_paddr_t min_pa, max_pa, pa, endpa;
+	u_int l1slot, l2slot;
+	int physmap_idx;
+	pd_entry_t *l2;
 
-	pa = dmap_phys_base = min_pa & ~L1_OFFSET;
-	va = DMAP_MIN_ADDRESS;
-	l1 = (pd_entry_t *)kern_l1;
-	l1_slot = pmap_l1_index(DMAP_MIN_ADDRESS);
+	physmap_idx = physmem_avail(physmap, nitems(physmap));
+	min_pa = physmap[0];
+	max_pa = physmap[physmap_idx - 1];
 
-	printf("bootstrap dmap\n");
-	for (; va < DMAP_MAX_ADDRESS && pa < max_pa;
-	    pa += L1_SIZE, va += L1_SIZE, l1_slot++) {
-		KASSERT(l1_slot < Ln_ENTRIES, ("Invalid L1 index"));
+	printf("physmap_idx %u\n", physmap_idx);
+	printf("min_pa %lx\n", min_pa);
+	printf("max_pa %lx\n", max_pa);
 
-		/* superpages */
-		pn = (pa / PAGE_SIZE);
-		entry = PTE_KERN;
-		entry |= (pn << PTE_PPN0_S);
-		pmap_store(&l1[l1_slot], entry);
-		printf("l1[%d] = %#lx\n", l1_slot, entry);
+	/* Lower physical address aligned to 1GB. */
+	dmap_phys_base = rounddown(min_pa, L1_SIZE);
+
+	/* Walk the physmap table. */
+	l2 = NULL;
+	l1slot = 512; /* impossible for kernel map */
+	for (int idx = 0; idx < physmap_idx; idx += 2) {
+		pa = physmap[idx];
+		endpa = physmap[idx + 1];
+
+		printf("%s: physmap range %#lx-%#lx\n", __func__, pa, endpa);
+
+		if ((pa & L2_OFFSET) != 0) {
+			printf("warn: pa %#lx not 2MB-aligned!\n", pa);
+			pa = rounddown(pa, L2_SIZE);
+		}
+
+		if (endpa - pa < L2_SIZE) {
+			printf("warn: physmem region too small for DMAP! %lu\n", endpa - pa);
+			continue;
+		}
+
+		/* Virtual address for this range. */
+		va = (pa - dmap_phys_base) + DMAP_MIN_ADDRESS;
+		printf("va = %#lx\n", va);
+
+		/* Any 1GB possible for this range? */
+		if ((endpa - roundup(pa, L1_SIZE)) < L1_SIZE)
+			goto l2end;
+
+		/* Loop until the next 1GB boundary. */
+		while ((pa & L1_OFFSET) != 0) {
+			/* Need to allocate another page table? */
+			if (l2 == NULL || pmap_l1_index(va) != l1slot) {
+				/* Need to alloc another page table. */
+				l2 = pmap_early_alloc_tables(&freemempos, 1);
+
+				printf("alloc l2 table %p\n", l2);
+				/* Link it. */
+				l1slot = pmap_l1_index(va);
+				printf("&l1[%d] <-- %p\n", l1slot, l2);
+				pmap_store(&l1[l1slot],
+				    L1_PDE((vm_paddr_t)l2, PTE_V));
+			}
+
+			/* map l2 pages */
+			l2slot = pmap_l2_index(va);
+			printf("1. map pa %#lx to va %#lx (%d)\n", pa, va, l2slot);
+			pmap_store(&l2[l2slot], L2_PTE(pa, PTE_KERN));
+
+			pa += L2_SIZE;
+			va += L2_SIZE;
+		}
+
+		/* Map what we can with 1GB superpages. */
+		while (pa + L1_SIZE - 1 < endpa) {
+			/* map l1 pages */
+			printf("2. map pa %#lx to va %#lx\n", pa, va);
+			l1slot = pmap_l1_index(va);
+			printf("slot %d\n", l1slot);
+			pmap_store(&l1[l1slot], L1_PTE(pa, PTE_KERN));
+
+			pa += L1_SIZE;
+			va += L1_SIZE;
+		}
+
+l2end:
+		while (pa < endpa) {
+			/* alloc and map l2 pages */
+			if (l2 == NULL || pmap_l1_index(va) != l1slot) {
+				/* Need to alloc another page table. */
+				l2 = pmap_early_alloc_tables(&freemempos, 1);
+
+				printf("alloc l2 table %p\n", l2);
+
+				/* Link it. */
+				l1slot = pmap_l1_index(va);
+				printf("&l1[%d] <-- %p\n", l1slot, l2);
+				pmap_store(&l1[l1slot],
+				    L1_PDE((vm_paddr_t)l2, PTE_V));
+			}
+
+			/* map l2 pages */
+			l2slot = pmap_l2_index(va);
+			printf("3. map pa %#lx to va %#lx (%d)\n", pa, va, l2slot);
+			pmap_store(&l2[l2slot], L2_PTE(pa, PTE_KERN));
+
+			pa += L2_SIZE;
+			va += L2_SIZE;
+		}
 	}
 
 	/* Set the upper limit of the DMAP region */
 	dmap_phys_max = pa;
 	dmap_max_addr = va;
 
-	sfence_vma();
+	return (freemempos);
 }
 
 /*
@@ -595,15 +677,13 @@ pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa, vm_paddr_t max_pa)
  *	accessed through the direct map, however.
  */
 static vm_offset_t
-pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen,
-    vm_paddr_t min_pa, vm_paddr_t max_pa)
+pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen)
 {
 	pt_entry_t *l0, *l1, *kern_l2, *kern_l3, *devmap_l3;
-	pt_entry_t *dmap_l2;
 	pd_entry_t *devmap_l2;
 	vm_paddr_t kernend, freemempos, pa;
 	int nkernl3, ndevmapl3;
-	int nkernl2, ndmapl2;
+	int nkernl2;
 	int i, slot;
 	int mode;
 
@@ -648,14 +728,6 @@ pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen,
 	printf("number of KVA L2 page tables: %d\n", nkernl2);
 	kern_l2 = pmap_early_alloc_tables(&freemempos, nkernl2);
 	printf("kern_l2: %p, %d\n", kern_l2, nkernl2);
-
-	/*
-	 * Allocate a set of L2 page tables for the direct map.
-	 */
-	ndmapl2 = howmany((max_pa - min_pa) / Ln_ENTRIES, L2_SIZE);
-	printf("number of DMAP L2 page tables: %d\n", ndmapl2);
-	dmap_l2 = pmap_early_alloc_tables(&freemempos, ndmapl2);
-	printf("dmap_l2: %p\n", dmap_l2);
 
 	/*
 	 * Allocate L2 page tables for the static devmap, located at the end of
@@ -732,7 +804,7 @@ pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen,
 	pmap_store(&l1[slot], L1_PDE(pa, PTE_V));
 
 	/* Bootstrap the direct map. */
-	pmap_bootstrap_dmap((vm_offset_t)l1, min_pa, max_pa);
+	freemempos = pmap_bootstrap_dmap(l1, freemempos);
 
 	/* Return the next position of free memory */
 	return (freemempos);
@@ -744,13 +816,10 @@ pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen,
 void
 pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 {
-	vm_paddr_t physmap[PHYS_AVAIL_ENTRIES];
-	vm_paddr_t freemempos;
-	vm_paddr_t max_pa, min_pa, pa;
+	vm_paddr_t freemempos, pa;
 	vm_offset_t freeva;
 	vm_offset_t dpcpu, msgbufpv;
 	pt_entry_t *pte;
-	u_int physmap_idx;
 	int i;
 
 	printf("pmap_bootstrap %lx %lx\n", kernstart, kernlen);
@@ -768,30 +837,8 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 	 */
 	CPU_SET(PCPU_GET(hart), &kernel_pmap->pm_active);
 
-	/* Assume the address we were loaded to is a valid physical address. */
-	min_pa = max_pa = kernstart;
-
-	physmap_idx = physmem_avail(physmap, nitems(physmap));
-	physmap_idx /= 2;
-
-	/*
-	 * Find the minimum physical address. physmap is sorted,
-	 * but may contain empty ranges.
-	 */
-	for (i = 0; i < physmap_idx * 2; i += 2) {
-		if (physmap[i] == physmap[i + 1])
-			continue;
-		if (physmap[i] <= min_pa)
-			min_pa = physmap[i];
-		if (physmap[i + 1] > max_pa)
-			max_pa = physmap[i + 1];
-	}
-	printf("physmap_idx %u\n", physmap_idx);
-	printf("min_pa %lx\n", min_pa);
-	printf("max_pa %lx\n", max_pa);
-
 	/* Create a new set of pagetables to run the kernel in. */
-	freemempos = pmap_create_pagetables(kernstart, kernlen, min_pa, max_pa);
+	freemempos = pmap_create_pagetables(kernstart, kernlen);
 	printf("freemempos after creating pagetables: %lx\n", freemempos);
 
 	/* Switch to the newly created page tables. */
