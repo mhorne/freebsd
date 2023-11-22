@@ -189,6 +189,9 @@ regions_to_avail(vm_paddr_t *avail, uint32_t exflags, size_t maxavail,
 	const struct region *exp, *hwp;
 	uint64_t availsz;
 
+	/* Be nice to the callers and zero the entire array. */
+	bzero(avail, maxavail * sizeof(vm_paddr_t));
+
 	totalmem = 0;
 	availmem = 0;
 	availsz = 0;
