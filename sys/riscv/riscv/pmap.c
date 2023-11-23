@@ -638,18 +638,24 @@ pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen,
 	if (mode == PMAP_MODE_SV39)
 		root_pt_phys = (vm_paddr_t)l1;
 
+	printf("root_pt_phys: %#lx\n", root_pt_phys);
+
 	/*
 	 * Allocate a set of L2 page tables for KVA. Most likely, only 1 is
 	 * needed.
 	 */
 	nkernl2 = howmany(kernlen / Ln_ENTRIES, L2_SIZE);
+	printf("number of KVA L2 page tables: %d\n", nkernl2);
 	kern_l2 = pmap_early_alloc_tables(&freemempos, nkernl2);
+	printf("kern_l2: %p, %d\n", kern_l2, nkernl2);
 
 	/*
 	 * Allocate a set of L2 page tables for the direct map.
 	 */
 	ndmapl2 = howmany((max_pa - min_pa) / Ln_ENTRIES, L2_SIZE);
+	printf("number of DMAP L2 page tables: %d\n", ndmapl2);
 	dmap_l2 = pmap_early_alloc_tables(&freemempos, ndmapl2);
+	printf("dmap_l2: %p\n", dmap_l2);
 
 	/*
 	 * Allocate L2 page tables for the static devmap, located at the end of
@@ -657,10 +663,12 @@ pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen,
 	 * size, therefore we require only a single L2 table.
 	 */
 	devmap_l2 = pmap_early_alloc_tables(&freemempos, 1);
+	printf("devmap_l2: %p\n", devmap_l2);
 
 	/* Allocate L3 page tables for the devmap. */
 	ndevmapl3 = howmany(EARLY_DEVMAP_SIZE / Ln_ENTRIES, L3_SIZE);
 	devmap_l3 = pmap_early_alloc_tables(&freemempos, ndevmapl3);
+	printf("devmap_l3: %p, %d\n", devmap_l3, ndevmapl3);
 
 	/*
 	 * A somewhat arbitrary choice of 8MB. This should be more than enough
@@ -668,14 +676,17 @@ pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen,
 	 */
 	nkernl3 = 4;
 	kern_l3 = pmap_early_alloc_tables(&freemempos, nkernl3);
+	printf("kern_l3: %p, %d\n", kern_l3, nkernl3);
 
 	/* Allocations are done. */
 	if (freemempos < roundup2(kernend, L2_SIZE))
 		freemempos = roundup2(kernend, L2_SIZE);
+	printf("freemempos: %#lx\n", freemempos);
 
 	/* Map what we have so far using L2 superpages. */
 	slot = pmap_l2_index(KERNBASE);
 	for (pa = kernstart; pa < freemempos; pa += L2_SIZE, slot++) {
+		printf("kern_l2[%d] <-- %#lx\n", slot, pa);
 		pmap_store(&kern_l2[slot],
 		    L2_PTE(pa, PTE_RWX | PTE_A | PTE_D | PTE_V));
 	}
@@ -684,13 +695,17 @@ pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen,
 	slot = pmap_l2_index(freemempos - kernstart + KERNBASE);
 	for (i = 0; i < nkernl3; i++, slot++) {
 		pa = (vm_paddr_t)kern_l3 + ptoa(i);
+		printf("kern_l2[%d] <-- %#lx\n", slot, pa);
 		pmap_store(&kern_l2[slot], L2_PDE(pa, PTE_V));
 	}
 
 	/* Connect the L2 entries to the L1 table. */
+	printf("kern_l2: %#lx\n", (vm_paddr_t)kern_l2);
 	slot = pmap_l1_index(KERNBASE);
+	printf("nkernl2: %d, slot: %d\n", nkernl2, slot);
 	for (i = 0; i < nkernl2; i++, slot++) {
 		pa = (vm_paddr_t)kern_l2 + ptoa(i);
+		printf("kern_l1[%d] <-- %#lx\n", slot, pa);
 		pmap_store(&l1[slot], L1_PDE(pa, PTE_V));
 	}
 
@@ -777,12 +792,15 @@ pmap_bootstrap(vm_offset_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 
 	/* Create a new set of pagetables to run the kernel in. */
 	freemempos = pmap_create_pagetables(kernstart, kernlen, min_pa, max_pa);
+	printf("freemempos after creating pagetables: %lx\n", freemempos);
 
 	/* Switch to the newly created page tables. */
 	kernel_pmap->pm_top = (pd_entry_t *)PHYS_TO_DMAP(root_pt_phys);
 	kernel_pmap->pm_satp = atop(root_pt_phys) | pmap_satp_mode();
 	csr_write(satp, kernel_pmap->pm_satp);
 	sfence_vma();
+
+	printf("switch to new page tables done!\n");
 
 	/*
 	 * Now, we need to make a few more static reservations from KVA.
