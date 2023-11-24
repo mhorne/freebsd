@@ -113,7 +113,7 @@ vmm_fence_process_one(struct vmm_fence *fence)
 		else
 			for (va = fence->start; va < fence->start + fence->size;
 			    va += PAGE_SIZE)
-				sfence_vma_asid_page(fence->asid, va);
+				sfence_vma_page_asid(va, fence->asid);
 		break;
 	default:
 		break;

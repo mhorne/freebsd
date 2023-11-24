@@ -90,6 +90,9 @@ fence_i(void)
 	__asm __volatile("fence.i" ::: "memory");
 }
 
+/*
+ * Invalidate the entire local TLB. This includes global mappings.
+ */
 static __inline void
 sfence_vma(void)
 {
@@ -97,6 +100,10 @@ sfence_vma(void)
 	__asm __volatile("sfence.vma" ::: "memory");
 }
 
+/*
+ * Invalidate any leaf PTEs corresponding to addr, across all address spaces.
+ * This includes global mappings.
+ */
 static __inline void
 sfence_vma_page(uintptr_t addr)
 {
@@ -104,6 +111,10 @@ sfence_vma_page(uintptr_t addr)
 	__asm __volatile("sfence.vma %0" :: "r" (addr) : "memory");
 }
 
+/*
+ * Invalidate all mappings for the address space denoted by asid. An asid value
+ * of zero (not register x0) will invalidate all non-global mappings.
+ */
 static __inline void
 sfence_vma_asid(uint64_t asid)
 {
@@ -111,8 +122,12 @@ sfence_vma_asid(uint64_t asid)
 	__asm __volatile("sfence.vma x0, %0" :: "r" (asid) : "memory");
 }
 
+/*
+ * Invalidate any leaf PTEs corresponding to addr, in the address space denoted
+ * by asid. Global mappings are not affected.
+ */
 static __inline void
-sfence_vma_asid_page(uint64_t asid, uintptr_t addr)
+sfence_vma_page_asid(uint64_t addr, uintptr_t asid)
 {
 
 	__asm __volatile("sfence.vma %0, %1" :: "r" (addr), "r" (asid)

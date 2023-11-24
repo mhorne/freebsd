@@ -1070,26 +1070,82 @@ pmap_init(void)
 		pagesizes[1] = L2_SIZE;
 }
 
+static __inline void
+pmap_invalidate_all_local(pmap_t pmap)
+{
+	if (pmap == kernel_pmap)
+		sfence_vma();
+	else
+		sfence_vma_asid(0);
+}
+
+
 #ifdef SMP
 /*
  * For SMP, these functions have to use IPIs for coherence.
  *
  * In general, the calling thread uses a plain fence to order the
  * writes to the page tables before invoking an SBI callback to invoke
- * sfence_vma() on remote CPUs.
+ * sfence.vma on remote CPUs.
  */
+
 static void
-pmap_invalidate_page_sbi(pmap_t pmap, vm_offset_t va)
+pmap_invalidate_page_sbi_global(pmap_t pmap, vm_offset_t va)
 {
 	cpuset_t mask;
 
 	sched_pin();
 	mask = pmap->pm_active;
 	CPU_CLR(PCPU_GET(hart), &mask);
+
 	fence();
 	if (!CPU_EMPTY(&mask) && smp_started)
 		sbi_remote_sfence_vma(mask.__bits, va, 1);
 	sfence_vma_page(va);
+
+	sched_unpin();
+}
+
+static void
+pmap_invalidate_page_sbi(pmap_t pmap, vm_offset_t va)
+{
+	cpuset_t mask;
+
+	if (pmap == kernel_pmap) {
+		pmap_invalidate_page_sbi_global(pmap, va);
+		return;
+	}
+
+	sched_pin();
+	mask = pmap->pm_active;
+	CPU_CLR(PCPU_GET(hart), &mask);
+
+	fence();
+	if (!CPU_EMPTY(&mask) && smp_started)
+		sbi_remote_sfence_vma_asid(mask.__bits, va, 1, 0);
+	sfence_vma_page_asid(va, 0);
+
+	sched_unpin();
+}
+
+static void
+pmap_invalidate_range_sbi_global(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
+{
+	cpuset_t mask;
+
+	sched_pin();
+	mask = pmap->pm_active;
+	CPU_CLR(PCPU_GET(hart), &mask);
+
+	fence();
+	if (!CPU_EMPTY(&mask) && smp_started)
+		sbi_remote_sfence_vma(mask.__bits, sva, eva - sva + 1);
+	/*
+	 * Might consider a loop of sfence_vma_page() for a small
+	 * number of pages in the future.
+	 */
+	sfence_vma();
+
 	sched_unpin();
 }
 
@@ -1098,18 +1154,24 @@ pmap_invalidate_range_sbi(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 {
 	cpuset_t mask;
 
+	if (pmap == kernel_pmap) {
+		pmap_invalidate_range_sbi_global(pmap, sva, eva);
+		return;
+	}
+
 	sched_pin();
 	mask = pmap->pm_active;
 	CPU_CLR(PCPU_GET(hart), &mask);
+
 	fence();
 	if (!CPU_EMPTY(&mask) && smp_started)
-		sbi_remote_sfence_vma(mask.__bits, sva, eva - sva + 1);
-
+		sbi_remote_sfence_vma_asid(mask.__bits, sva, eva - sva + 1, 0);
 	/*
-	 * Might consider a loop of sfence_vma_page() for a small
+	 * Might consider a loop of sfence_vma_page_asid() for a small
 	 * number of pages in the future.
 	 */
-	sfence_vma();
+	sfence_vma_asid(0);
+
 	sched_unpin();
 }
 
@@ -1118,6 +1180,7 @@ pmap_invalidate_range_sbi(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 struct svinval_args {
 	vm_offset_t sva;
 	vm_offset_t eva;
+	bool do_global;
 };
 
 static void
@@ -1127,8 +1190,12 @@ pmap_invalidate_range_svinval_cb(void *arg)
 	vm_offset_t va;
 
 	sfence_w_inval();
-	for (va = args->sva; va < args->eva; va += PAGE_SIZE)
-		sinval_vma_page(va);
+	for (va = args->sva; va < args->eva; va += PAGE_SIZE) {
+		if (args->do_global)
+			sinval_vma_page(va);
+		else
+			sinval_vma_page_asid(va, 0);
+	}
 	sfence_inval_ir();
 }
 
@@ -1148,6 +1215,7 @@ pmap_invalidate_range_svinval(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	sched_pin();
 	args.sva = sva;
 	args.eva = eva;
+	args.do_global = pmap == kernel_pmap;
 	fence();
 	if (smp_started)
 		smp_rendezvous_cpus(pmap->pm_active, smp_no_rendezvous_barrier,
@@ -1181,7 +1249,7 @@ DEFINE_IFUNC(, void, pmap_invalidate_page,
 }
 
 static void
-pmap_invalidate_all(pmap_t pmap)
+pmap_invalidate_all_global(pmap_t pmap)
 {
 	cpuset_t mask;
 
@@ -1189,18 +1257,38 @@ pmap_invalidate_all(pmap_t pmap)
 	mask = pmap->pm_active;
 	CPU_CLR(PCPU_GET(hart), &mask);
 
-	/*
-	 * XXX: The SBI doc doesn't detail how to specify x0 as the
-	 * address to perform a global fence.  BBL currently treats
-	 * all sfence_vma requests as global however.
-	 */
 	fence();
 	if (!CPU_EMPTY(&mask) && smp_started)
 		sbi_remote_sfence_vma(mask.__bits, 0, 0);
 	sfence_vma();
+
 	sched_unpin();
 }
-#else
+
+static void
+pmap_invalidate_all(pmap_t pmap)
+{
+	cpuset_t mask;
+
+	if (pmap == kernel_pmap) {
+		pmap_invalidate_all_global(pmap);
+		return;
+	}
+
+	sched_pin();
+	mask = pmap->pm_active;
+	CPU_CLR(PCPU_GET(hart), &mask);
+
+	fence();
+	if (!CPU_EMPTY(&mask) && smp_started)
+		sbi_remote_sfence_vma_asid(mask.__bits, 0, 0, 0);
+	sfence_vma_asid(0);
+
+	sched_unpin();
+}
+
+#else /* !SMP */
+
 /*
  * Normal, non-SMP, invalidation functions.
  * We inline these within pmap.c for speed.
@@ -1209,7 +1297,10 @@ static __inline void
 pmap_invalidate_page(pmap_t pmap, vm_offset_t va)
 {
 
-	sfence_vma_page(va);
+	if (pmap == kernel_pmap)
+		sfence_vma_page(va);
+	else
+		sfence_vma_page_asid(va, 0);
 }
 
 static __inline void
@@ -1220,16 +1311,16 @@ pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	 * Might consider a loop of sfence_vma_page() for a small
 	 * number of pages in the future.
 	 */
-	sfence_vma();
+	pmap_invalidate_all_local(pmap);
 }
 
 static __inline void
 pmap_invalidate_all(pmap_t pmap)
 {
 
-	sfence_vma();
+	pmap_invalidate_all_local(pmap);
 }
-#endif
+#endif /* SMP */
 
 /*
  *	Routine:	pmap_extract
@@ -1403,7 +1494,7 @@ pmap_kremove(vm_offset_t va)
 	KASSERT(l3 != NULL, ("pmap_kremove: Invalid address"));
 
 	pmap_clear(l3);
-	sfence_vma();
+	pmap_invalidate_all_local(kernel_pmap);
 }
 
 void
@@ -3044,7 +3135,8 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	 */
 	if ((oldpte & bits) != bits)
 		pmap_store_bits(pte, bits);
-	sfence_vma();
+	pmap_invalidate_all_local(pmap);
+
 	rv = 1;
 done:
 	PMAP_UNLOCK(pmap);
@@ -5294,7 +5386,7 @@ pmap_activate_sw(struct thread *td)
 #endif
 	PCPU_SET(curpmap, pmap);
 
-	sfence_vma();
+	pmap_invalidate_all_local(pmap);
 }
 
 void
