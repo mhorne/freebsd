@@ -398,7 +398,7 @@ CTASSERT(VM_MEMATTR_WRITE_THROUGH == 4);
 #define	VM_MEMATTR_END	(VM_MEMATTR_WRITE_THROUGH + 1)
 
 bool
-pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
+pmap_is_valid_memattr(vm_memattr_t mode)
 {
 
 	return (mode >= 0 && mode < VM_MEMATTR_END);

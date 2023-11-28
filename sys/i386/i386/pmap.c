@@ -1081,7 +1081,7 @@ extern u_long pmap_pde_promotions;
  ***************************************************/
 
 static bool
-__CONCAT(PMTYPE, is_valid_memattr)(pmap_t pmap __unused, vm_memattr_t mode)
+__CONCAT(PMTYPE, is_valid_memattr)(vm_memattr_t mode)
 {
 
 	return (mode >= 0 && mode < PAT_INDEX_SIZE &&
@@ -1097,7 +1097,7 @@ __CONCAT(PMTYPE, cache_bits)(pmap_t pmap, int mode, bool is_pde)
 {
 	int cache_bits, pat_flag, pat_idx;
 
-	if (!pmap_is_valid_memattr(pmap, mode))
+	if (!pmap_is_valid_memattr(mode))
 		panic("Unknown caching mode %d\n", mode);
 
 	/* The PAT bit is different for PTE's and PDE's. */

@@ -2678,7 +2678,7 @@ pmap_swap_pat(pmap_t pmap, pt_entry_t entry)
 }
 
 bool
-pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
+pmap_is_valid_memattr(vm_memattr_t mode)
 {
 
 	return (mode >= 0 && mode < PAT_INDEX_SIZE &&
@@ -2694,7 +2694,7 @@ pmap_cache_bits(pmap_t pmap, int mode, bool is_pde)
 {
 	int cache_bits, pat_flag, pat_idx;
 
-	if (!pmap_is_valid_memattr(pmap, mode))
+	if (!pmap_is_valid_memattr(mode))
 		panic("Unknown caching mode %d\n", mode);
 
 	switch (pmap->pm_type) {

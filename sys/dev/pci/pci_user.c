@@ -865,7 +865,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	if ((pbm->pbm_flags & ~(PCIIO_BAR_MMAP_FIXED | PCIIO_BAR_MMAP_EXCL |
 	    PCIIO_BAR_MMAP_RW | PCIIO_BAR_MMAP_ACTIVATE)) != 0 ||
 	    pbm->pbm_memattr != (vm_memattr_t)pbm->pbm_memattr ||
-	    !pmap_is_valid_memattr(map->pmap, pbm->pbm_memattr))
+	    !pmap_is_valid_memattr(pbm->pbm_memattr))
 		return (EINVAL);
 
 	/* Fetch the BAR physical base and length. */

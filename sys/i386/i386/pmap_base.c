@@ -558,10 +558,10 @@ pmap_bootstrap(vm_paddr_t firstaddr)
 }
 
 bool
-pmap_is_valid_memattr(pmap_t pmap, vm_memattr_t mode)
+pmap_is_valid_memattr(vm_memattr_t mode)
 {
 
-	return (pmap_methods_ptr->pm_is_valid_memattr(pmap, mode));
+	return (pmap_methods_ptr->pm_is_valid_memattr(mode));
 }
 
 int

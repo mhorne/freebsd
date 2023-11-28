@@ -5155,7 +5155,7 @@ pmap_unmap_io_transient(vm_page_t page[], vm_offset_t vaddr[], int count,
 }
 
 bool
-pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
+pmap_is_valid_memattr(vm_memattr_t mode)
 {
 
 	return (mode >= VM_MEMATTR_DEFAULT && mode <= VM_MEMATTR_LAST);

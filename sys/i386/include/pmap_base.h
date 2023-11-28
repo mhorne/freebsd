@@ -58,7 +58,7 @@ struct pmap_methods {
 	void *(*pm_bios16_enter)(void);
 	void (*pm_bios16_leave)(void *handle);
 	void (*pm_bootstrap)(vm_paddr_t firstaddr);
-	bool (*pm_is_valid_memattr)(pmap_t, vm_memattr_t);
+	bool (*pm_is_valid_memattr)(vm_memattr_t);
 	int (*pm_cache_bits)(pmap_t, int, bool);
 	bool (*pm_ps_enabled)(pmap_t);
 	void (*pm_pinit0)(pmap_t);

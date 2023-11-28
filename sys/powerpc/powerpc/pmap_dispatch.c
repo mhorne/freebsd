@@ -237,7 +237,7 @@ pmap_mmu_name(void)
 int unmapped_buf_allowed;
 
 bool
-pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
+pmap_is_valid_memattr(vm_memattr_t mode)
 {
 
 	switch (mode) {
