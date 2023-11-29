@@ -102,6 +102,25 @@ typedef	uint64_t	pn_t;			/* page number */
 #define	PTE_MA_NC		(1ul << PTE_MA_SHIFT)
 #define	PTE_MA_IO		(2ul << PTE_MA_SHIFT)
 
+/*
+ * T-HEAD Custom Memory Attribute (MA) bits [63:59].
+ *
+ * +------+-------+----------------------------------------------------------------+
+ * | Mode | Value | Requested Memory Attributes                                    |
+ * +------+-------+----------------------------------------------------------------+
+ * | NC   | 00000 | Non-cacheable, non-bufferable, non-shareable, non-trustable,   |
+ * |      |       | weakly-ordered.                                                |
+ * | PMA  | 01110 | Non-cacheable, idempotent, weakly-ordered (RVWMO), main memory |
+ * | IO   | 10000 | Strongly-ordered, non-cacheable, non-bufferable, non-shareable |
+ * +------+-------+----------------------------------------------------------------+
+ */
+#define	PTE_THEAD_MA_SHIFT		59
+#define	PTE_THEAD_MA_MASK		(0x1ful << PTE_MA_SHIFT)
+#define	PTE_THEAD_MA_TO_MODE(pte)	((pte & PTE_MA_MASK) >> PTE_MA_SHIFT)
+#define	PTE_THEAD_MA_NC			(0x0ul << PTE_MA_SHIFT)
+#define	PTE_THEAD_MA_NONE		(0xeul << PTE_MA_SHIFT)
+#define	PTE_THEAD_MA_IO			(0x10ul << PTE_MA_SHIFT)
+
 /* Bits 63 - 54 are reserved for future use. */
 #define PTE_HI_MASK	0xFFC0000000000000ULL
 

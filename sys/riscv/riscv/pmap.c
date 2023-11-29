@@ -536,6 +536,7 @@ pmap_distribute_l1(struct pmap *pmap, vm_pindex_t l1index,
  * lacking Svpbmt extension.
  */
 static __read_frequently pt_entry_t memattr_bits[VM_MEMATTR_TOTAL];
+static __read_frequently pt_entry_t memattr_mask;
 
 static __inline pt_entry_t
 pmap_memattr_bits(vm_memattr_t mode)
@@ -862,6 +863,12 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 		memattr_bits[VM_MEMATTR_PMA] = PTE_MA_NONE;
 		memattr_bits[VM_MEMATTR_UNCACHEABLE] = PTE_MA_NC;
 		memattr_bits[VM_MEMATTR_DEVICE] = PTE_MA_IO;
+		memattr_mask = PTE_THEAD_MA_MASK;
+	} else if (has_errata_thead_pbmt) {
+		memattr_bits[VM_MEMATTR_PMA] = PTE_THEAD_MA_NONE;
+		memattr_bits[VM_MEMATTR_UNCACHEABLE] = PTE_THEAD_MA_NC;
+		memattr_bits[VM_MEMATTR_DEVICE] = PTE_THEAD_MA_IO;
+		memattr_mask = PTE_MA_MASK;
 	}
 
 	/* Create a new set of pagetables to run the kernel in. */
@@ -4766,7 +4773,7 @@ pmap_change_attr_locked(vm_offset_t va, vm_size_t size, int mode)
 		return (EINVAL);
 
 	bits = pmap_memattr_bits(mode);
-	mask = PTE_MA_MASK;
+	mask = memattr_mask;
 
 	/* First loop: perform PTE validation and demotions as necessary. */
 	for (tmpva = base; tmpva < base + size; ) {
@@ -5177,11 +5184,16 @@ sysctl_kmaps_dump(struct sbuf *sb, struct pmap_kernel_map_range *range,
     vm_offset_t eva)
 {
 	char *mode;
+	int i;
 
 	if (eva <= range->sva)
 		return;
 
-	switch (PTE_MA_TO_MODE(range->attrs)) {
+	for (i = 0; i < nitems(memattr_bits); i++)
+		if ((range->attrs & memattr_mask) == memattr_bits[i])
+			break;
+
+	switch (i) {
 	case VM_MEMATTR_PMA:
 		mode = "PMA";
 		break;
@@ -5244,16 +5256,16 @@ sysctl_kmaps_check(struct sbuf *sb, struct pmap_kernel_map_range *range,
 	attrs = l1e & PTE_G;
 	if ((l1e & PTE_RWX) != 0) {
 		attrs |= l1e & (PTE_RWX | PTE_U);
-		attrs |= l1e & PTE_MA_MASK;
+		attrs |= l1e & memattr_mask;
 	} else if (l2e != 0)
 		attrs |= l2e & PTE_G;
 
 	if ((l2e & PTE_RWX) != 0) {
 		attrs |= l2e & (PTE_RWX | PTE_U);
-		attrs |= l2e & PTE_MA_MASK;
+		attrs |= l2e & memattr_mask;
 	} else if (l3e != 0) {
 		attrs |= l3e & (PTE_RWX | PTE_U | PTE_G);
-		attrs |= l3e & PTE_MA_MASK;
+		attrs |= l3e & memattr_mask;
 	}
 
 	if (range->sva > va || !sysctl_kmaps_match(range, attrs)) {
