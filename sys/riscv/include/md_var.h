@@ -46,6 +46,9 @@ extern bool has_sstc;
 extern bool has_sscofpmf;
 extern bool has_svpbmt;
 
+/* CPU errata presence */
+extern bool has_errata_thead_pbmt;
+
 struct dumperinfo;
 struct minidumpstate;
 

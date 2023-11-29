@@ -866,6 +866,11 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 		memattr_bits[VM_MEMATTR_UNCACHEABLE] = PTE_MA_NC;
 		memattr_bits[VM_MEMATTR_DEVICE] = PTE_MA_IO;
 		memattr_mask = PTE_MA_MASK;
+	} else if (has_errata_thead_pbmt) {
+		memattr_bits[VM_MEMATTR_PMA] = PTE_THEAD_MA_NONE;
+		memattr_bits[VM_MEMATTR_UNCACHEABLE] = PTE_THEAD_MA_NC;
+		memattr_bits[VM_MEMATTR_DEVICE] = PTE_THEAD_MA_IO;
+		memattr_mask = PTE_THEAD_MA_MASK;
 	}
 
 	/* Create a new set of pagetables to run the kernel in. */

@@ -76,6 +76,9 @@ bool __read_frequently has_sstc;
 bool __read_frequently has_sscofpmf;
 bool __read_frequently has_svpbmt;
 
+/* CPU errata */
+bool has_errata_thead_pbmt;
+
 struct cpu_desc {
 	const char	*cpu_mvendor_name;
 	const char	*cpu_march_name;
@@ -459,6 +462,22 @@ identify_cpu_ids(struct cpu_desc *desc)
 	}
 }
 
+static void
+update_cpu_errata_thead(u_int cpu, struct cpu_desc *desc)
+{
+	has_errata_thead_pbmt = true;
+}
+
+static void
+update_cpu_errata(u_int cpu, struct cpu_desc *desc)
+{
+	switch (mvendorid) {
+	case MVENDORID_THEAD:
+		update_cpu_errata_thead(cpu, desc);
+		break;
+	}
+}
+
 void
 identify_cpu(u_int cpu)
 {
@@ -467,6 +486,7 @@ identify_cpu(u_int cpu)
 	identify_cpu_ids(desc);
 	identify_cpu_features(cpu, desc);
 
+	update_cpu_errata(cpu, desc);
 	update_global_capabilities(cpu, desc);
 }
 
