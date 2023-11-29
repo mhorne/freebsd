@@ -79,6 +79,9 @@ bool has_svpbmt;
 /* CPU errata */
 bool has_errata_thead_pbmt;
 
+/* CPU errata */
+bool has_errata_thead_pbmt;
+
 struct cpu_desc {
 	const char	*cpu_mvendor_name;
 	const char	*cpu_march_name;
