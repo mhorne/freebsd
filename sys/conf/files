@@ -1656,6 +1656,9 @@ dev/ena/ena_sysctl.c 		optional ena \
 	compile-with "${NORMAL_C} -I$S/contrib"
 contrib/ena-com/ena_com.c	optional ena
 contrib/ena-com/ena_eth_com.c	optional ena
+dev/eqos/if_eqos.c				optional eqos
+dev/eqos/if_eqos_if.m				optional eqos
+dev/eqos/if_eqos_fdt.c				optional eqos fdt
 dev/etherswitch/arswitch/arswitch.c		optional arswitch
 dev/etherswitch/arswitch/arswitch_reg.c		optional arswitch
 dev/etherswitch/arswitch/arswitch_phy.c		optional arswitch
