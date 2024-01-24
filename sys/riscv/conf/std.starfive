@@ -4,4 +4,7 @@
 
 device		uart_snps	# DesignWare Synopsis UART driver
 
+# Ethernet
+device		eqos		# Synopsys Designware Ethernet QoS controller
+
 files		"../starfive/files.starfive"
