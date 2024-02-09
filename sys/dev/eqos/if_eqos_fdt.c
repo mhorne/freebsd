@@ -60,7 +60,10 @@
 #include "if_eqos_if.h"
 #include "syscon_if.h"
 #include "gpio_if.h"
+
+#ifdef __arm64__
 #include "rk_otp_if.h"
+#endif
 
 #define	RK356XGMAC0	0xfe2a0000
 #define	RK356XGMAC1	0xfe010000
@@ -148,7 +151,7 @@ eqos_fdt_init(device_t dev)
 	hwreset_t eqos_reset;
 	regulator_t eqos_supply;
 	uint32_t rx_delay, tx_delay;
-	uint8_t buffer[16];
+	uint8_t buffer[16] __unused;
 	clk_t stmmaceth, mac_clk_rx, mac_clk_tx, aclk_mac, pclk_mac;
 	uint64_t freq;
 	int error;
@@ -259,6 +262,7 @@ eqos_fdt_init(device_t dev)
 	if (eqos_reset)
 		hwreset_deassert(eqos_reset);
 
+#ifdef __arm64__
 	/* set the MAC address if we have OTP data handy */
 	if (!RK_OTP_READ(dev, buffer, 0, sizeof(buffer))) {
 		uint32_t mac;
@@ -271,6 +275,7 @@ eqos_fdt_init(device_t dev)
 		WR4(sc, GMAC_MAC_ADDRESS0_HIGH,
 		    htobe16((mac & 0x0000ffff) + (device_get_unit(dev) << 8)));
 	}
+#endif
 
 	return (0);
 }
