@@ -106,6 +106,13 @@ struct plic_softc {
 
 static u_int plic_irq_cpu;
 
+static struct ofw_compat_data compat_data[] = {
+	{ "riscv,plic0",	1 },
+	{ "sifive,plic-1.0.0",	1 },
+	{ "thead,c900-plic",	1 },
+	{ NULL,			0 }
+};
+
 static int
 riscv_hartid_to_cpu(int hartid)
 {
@@ -230,8 +237,7 @@ plic_probe(device_t dev)
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
-	if (!ofw_bus_is_compatible(dev, "riscv,plic0") &&
-	    !ofw_bus_is_compatible(dev, "sifive,plic-1.0.0"))
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
 		return (ENXIO);
 
 	device_set_desc(dev, "RISC-V PLIC");
@@ -393,6 +399,9 @@ plic_attach(device_t dev)
 	pic = intr_pic_register(sc->dev, xref);
 	if (pic == NULL)
 		return (ENXIO);
+
+	/* TODO: why? */
+	OF_device_register_xref(xref, sc->dev);
 
 	return (bus_setup_intr(dev, sc->irq_res, INTR_TYPE_CLK | INTR_MPSAFE,
 	    plic_intr, NULL, sc, &sc->ih));

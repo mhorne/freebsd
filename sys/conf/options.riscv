@@ -1,3 +1,6 @@
 
 RISCV				opt_global.h	# For cpu RISCV to work
 INTRNG				opt_global.h
+
+# SoC Support
+SOC_ALLWINNER_D1		opt_soc.h

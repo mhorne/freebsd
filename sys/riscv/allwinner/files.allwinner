@@ -1,2 +1,3 @@
 
 arm/allwinner/aw_wdog.c			optional	aw_wdog
+riscv/allwinner/aw_d1_intc.c		optional	soc_allwinner_d1
