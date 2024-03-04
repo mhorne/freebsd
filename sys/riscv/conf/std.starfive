@@ -9,4 +9,8 @@ device		eqos		# Synopsys Designware Ethernet QoS controller
 device		dwc
 device		dwc_starfive
 
+# MMC/SD/SDIO Card slot support
+device		dwmmc
+device		dwmmc_starfive
+
 files		"../starfive/files.starfive"
