@@ -51,14 +51,14 @@
 
 #include "clkdev_if.h"
 
-#define PLL_OFFSET_0_			0x18
-#define PLL_OFFSET_1_			0x1c
-#define PLL_OFFSET_2_			0x20
-#define PLL_OFFSET_3_			0x24
-#define PLL_OFFSET_4_			0x28
-#define PLL_OFFSET_5_			0x2c
-#define PLL_OFFSET_6_			0x30
-#define PLL_OFFSET_7_			0x34
+#define PLL_OFFSET_0		0x18
+#define PLL_OFFSET_1		0x1c
+#define PLL_OFFSET_2		0x20
+#define PLL_OFFSET_3		0x24
+#define PLL_OFFSET_4		0x28
+#define PLL_OFFSET_5		0x2c
+#define PLL_OFFSET_6		0x30
+#define PLL_OFFSET_7		0x34
 
 #define	DEVICE_LOCK(_clk)				\
 	CLKDEV_DEVICE_LOCK(clknode_get_device(_clk))
@@ -92,12 +92,12 @@ do {								\
 
 #define PLL_OFFSET_FILL(sc, val1, val2, val3, val4, val5, val6)	\
 do {								\
-	sc->dacpd_offset = PLL_OFFSET_## val1 ##_ ;		\
-	sc->dsmpd_offset = PLL_OFFSET_## val2 ##_ ;		\
-	sc->fbdiv_offset = PLL_OFFSET_## val3 ##_ ;		\
-	sc->frac_offset = PLL_OFFSET_## val4 ##_ ;		\
-	sc->prediv_offset = PLL_OFFSET_## val5 ##_ ;		\
-	sc->postdiv1_offset = PLL_OFFSET_## val6 ##_ ;		\
+	sc->dacpd_offset = PLL_OFFSET_## val1;			\
+	sc->dsmpd_offset = PLL_OFFSET_## val2;			\
+	sc->fbdiv_offset = PLL_OFFSET_## val3;			\
+	sc->frac_offset = PLL_OFFSET_## val4;			\
+	sc->prediv_offset = PLL_OFFSET_## val5;			\
+	sc->postdiv1_offset = PLL_OFFSET_## val6;		\
 } while (0)
 
 static struct ofw_compat_data compat_data[] = {
