@@ -70,31 +70,34 @@
 #define	SYSCON_MODIFY_4(reg, cbits, sbits)		\
 	jh7110_syscon_modify_4(sc->syscon_mem_res, (reg), (cbits), (sbits))
 
-#define PLL_MASK_FILL(id) do {						\
-        sc->pll_data[id].dacpd_mask = PLL## id ##_DACPD_MASK;		\
-	sc->pll_data[id].dsmpd_mask = PLL## id ##_DSMPD_MASK;		\
-        sc->pll_data[id].fbdiv_mask = PLL## id ##_FBDIV_MASK;		\
-	sc->pll_data[id].frac_mask = PLL## id ##_FRAC_MASK;		\
-	sc->pll_data[id].prediv_mask = PLL## id ##_PREDIV_MASK;		\
-	sc->pll_data[id].postdiv1_mask = PLL## id ##_POSTDIV1_MASK;	\
+#define PLL_MASK_FILL(sc, id)					\
+do {								\
+	sc->dacpd_mask = PLL## id ##_DACPD_MASK;		\
+	sc->dsmpd_mask = PLL## id ##_DSMPD_MASK;		\
+	sc->fbdiv_mask = PLL## id ##_FBDIV_MASK;		\
+	sc->frac_mask = PLL## id ##_FRAC_MASK;			\
+	sc->prediv_mask = PLL## id ##_PREDIV_MASK;		\
+	sc->postdiv1_mask = PLL## id ##_POSTDIV1_MASK;		\
 } while (0)
 
-#define PLL_SHIFT_FILL(id) do {						\
-        sc->pll_data[id].dacpd_shift = PLL## id ##_DACPD_SHIFT;		\
-	sc->pll_data[id].dsmpd_shift = PLL## id ##_DSMPD_SHIFT;		\
-	sc->pll_data[id].fbdiv_shift = PLL## id ##_FBDIV_SHIFT;		\
-	sc->pll_data[id].frac_shift = PLL## id ##_FRAC_SHIFT;		\
-	sc->pll_data[id].prediv_shift = PLL## id ##_PREDIV_SHIFT;	\
-	sc->pll_data[id].postdiv1_shift = PLL## id ##_POSTDIV1_SHIFT;	\
+#define PLL_SHIFT_FILL(sc, id)					\
+do {								\
+	sc->dacpd_shift = PLL## id ##_DACPD_SHIFT;		\
+	sc->dsmpd_shift = PLL## id ##_DSMPD_SHIFT;		\
+	sc->fbdiv_shift = PLL## id ##_FBDIV_SHIFT;		\
+	sc->frac_shift = PLL## id ##_FRAC_SHIFT;		\
+	sc->prediv_shift = PLL## id ##_PREDIV_SHIFT;		\
+	sc->postdiv1_shift = PLL## id ##_POSTDIV1_SHIFT;	\
 } while (0)
 
-#define PLL_OFFSET_FILL(id, val1, val2, val3, val4, val5, val6) do {	\
-        sc->pll_data[id].dacpd_offset = PLL_OFFSET_## val1 ##_ ;	\
-        sc->pll_data[id].dsmpd_offset = PLL_OFFSET_## val2 ##_ ;	\
-        sc->pll_data[id].fbdiv_offset = PLL_OFFSET_## val3 ##_ ;	\
-        sc->pll_data[id].frac_offset = PLL_OFFSET_## val4 ##_ ;		\
-        sc->pll_data[id].prediv_offset = PLL_OFFSET_## val5 ##_ ;	\
-        sc->pll_data[id].postdiv1_offset = PLL_OFFSET_## val6 ##_ ;	\
+#define PLL_OFFSET_FILL(sc, val1, val2, val3, val4, val5, val6)	\
+do {								\
+	sc->dacpd_offset = PLL_OFFSET_## val1 ##_ ;		\
+	sc->dsmpd_offset = PLL_OFFSET_## val2 ##_ ;		\
+	sc->fbdiv_offset = PLL_OFFSET_## val3 ##_ ;		\
+	sc->frac_offset = PLL_OFFSET_## val4 ##_ ;		\
+	sc->prediv_offset = PLL_OFFSET_## val5 ##_ ;		\
+	sc->postdiv1_offset = PLL_OFFSET_## val6 ##_ ;		\
 } while (0)
 
 static struct ofw_compat_data compat_data[] = {
@@ -107,42 +110,36 @@ static struct resource_spec res_spec[] = {
 	RESOURCE_SPEC_END
 };
 
-struct pll_clk_data {
-	uint32_t			dacpd_offset;
-	uint32_t			dsmpd_offset;
-	uint32_t			fbdiv_offset;
-	uint32_t			frac_offset;
-	uint32_t			prediv_offset;
-	uint32_t			postdiv1_offset;
-
-	uint32_t			dacpd_mask;
-	uint32_t			dsmpd_mask;
-	uint32_t			fbdiv_mask;
-	uint32_t			frac_mask;
-	uint32_t			prediv_mask;
-	uint32_t			postdiv1_mask;
-
-	uint32_t			dacpd_shift;
-	uint32_t			dsmpd_shift;
-	uint32_t			fbdiv_shift;
-	uint32_t			frac_shift;
-	uint32_t			prediv_shift;
-	uint32_t			postdiv1_shift;
-
-	const struct
-	jh7110_pll_syscon_value		*syscon_arr;
-	int				syscon_nitems;
-};
-
 struct jh7110_clk_pll_softc {
-	struct mtx			mtx;
-  	struct clkdom			*clkdom;
-      	struct resource			*syscon_mem_res;
+	struct mtx		mtx;
+	struct clkdom		*clkdom;
+	struct resource		*syscon_mem_res;
 };
 
-struct jh7110_clk_pll_sc {
-	int				id;
-  	struct pll_clk_data		pll_data[JH7110_PLLCLK_END];
+struct jh7110_pll_clknode_softc {
+	uint32_t	dacpd_offset;
+	uint32_t	dsmpd_offset;
+	uint32_t	fbdiv_offset;
+	uint32_t	frac_offset;
+	uint32_t	prediv_offset;
+	uint32_t	postdiv1_offset;
+
+	uint32_t	dacpd_mask;
+	uint32_t	dsmpd_mask;
+	uint32_t	fbdiv_mask;
+	uint32_t	frac_mask;
+	uint32_t	prediv_mask;
+	uint32_t	postdiv1_mask;
+
+	uint32_t	dacpd_shift;
+	uint32_t	dsmpd_shift;
+	uint32_t	fbdiv_shift;
+	uint32_t	frac_shift;
+	uint32_t	prediv_shift;
+	uint32_t	postdiv1_shift;
+
+	const struct jh7110_pll_syscon_value *syscon_arr;
+	int		syscon_nitems;
 };
 
 static const char *pll_parents[] = { "osc" };
@@ -195,35 +192,27 @@ static int
 jh7110_clk_pll_recalc_freq(struct clknode *clk, uint64_t *freq)
 {
 	struct jh7110_clk_pll_softc *sc;
-	struct jh7110_clk_pll_sc *clk_sc;
-	struct pll_clk_data *data;
+	struct jh7110_pll_clknode_softc *clk_sc;
 	uint32_t dacpd, dsmpd, fbdiv, prediv, postdiv1;
 	uint64_t frac, fcal = 0;
 
 	sc = device_get_softc(clknode_get_device(clk));
 	clk_sc = clknode_get_softc(clk);
 
-	if (clk_sc->id == JH7110_PLLCLK_PLL0_OUT)
-		data = &clk_sc->pll_data[0];
-	else if (clk_sc->id == JH7110_PLLCLK_PLL1_OUT)
-		data = &clk_sc->pll_data[1];
-	else
-		data = &clk_sc->pll_data[2];
-
 	DEVICE_LOCK(clk);
 
-	dacpd = (SYSCON_READ_4(data->dacpd_offset) & data->dacpd_mask) >>
-		data->dacpd_shift;
-	dsmpd = (SYSCON_READ_4(data->dsmpd_offset) & data->dsmpd_mask) >>
-		data->dsmpd_shift;
-	fbdiv = (SYSCON_READ_4(data->fbdiv_offset) & data->fbdiv_mask) >>
-		data->fbdiv_shift;
-	prediv = (SYSCON_READ_4(data->prediv_offset) & data->prediv_mask) >>
-		data->prediv_shift;
-	postdiv1 = (SYSCON_READ_4(data->postdiv1_offset) &
-		    data->postdiv1_mask) >> data->postdiv1_shift;
-	frac = (SYSCON_READ_4(data->frac_offset) & data->frac_mask) >>
-		data->frac_shift;
+	dacpd = (SYSCON_READ_4(clk_sc->dacpd_offset) & clk_sc->dacpd_mask) >>
+		clk_sc->dacpd_shift;
+	dsmpd = (SYSCON_READ_4(clk_sc->dsmpd_offset) & clk_sc->dsmpd_mask) >>
+		clk_sc->dsmpd_shift;
+	fbdiv = (SYSCON_READ_4(clk_sc->fbdiv_offset) & clk_sc->fbdiv_mask) >>
+		clk_sc->fbdiv_shift;
+	prediv = (SYSCON_READ_4(clk_sc->prediv_offset) & clk_sc->prediv_mask) >>
+		clk_sc->prediv_shift;
+	postdiv1 = (SYSCON_READ_4(clk_sc->postdiv1_offset) &
+		    clk_sc->postdiv1_mask) >> clk_sc->postdiv1_shift;
+	frac = (SYSCON_READ_4(clk_sc->frac_offset) & clk_sc->frac_mask) >>
+		clk_sc->frac_shift;
 
 	DEVICE_UNLOCK(clk);
 
@@ -242,23 +231,15 @@ jh7110_clk_pll_set_freq(struct clknode *clk, uint64_t fin, uint64_t *fout,
     int flags, int *done)
 {
 	struct jh7110_clk_pll_softc *sc;
-	struct jh7110_clk_pll_sc *clk_sc;
-	struct pll_clk_data *data;
+	struct jh7110_pll_clknode_softc *clk_sc;
 	const struct jh7110_pll_syscon_value *syscon_val = NULL;
 
 	sc = device_get_softc(clknode_get_device(clk));
 	clk_sc = clknode_get_softc(clk);
 
-	if (clk_sc->id == JH7110_PLLCLK_PLL0_OUT)
-		data = &clk_sc->pll_data[0];
-	else if (clk_sc->id == JH7110_PLLCLK_PLL1_OUT)
-		data = &clk_sc->pll_data[1];
-	else
-		data = &clk_sc->pll_data[2];
-
-	for (int i = 0; i != data->syscon_nitems; i++) {
-		if (*fout == data->syscon_arr[i].freq) {
-			syscon_val = &data->syscon_arr[i];
+	for (int i = 0; i != clk_sc->syscon_nitems; i++) {
+		if (*fout == clk_sc->syscon_arr[i].freq) {
+			syscon_val = &clk_sc->syscon_arr[i];
 		}
 	}
 
@@ -275,21 +256,21 @@ jh7110_clk_pll_set_freq(struct clknode *clk, uint64_t fin, uint64_t *fout,
 
 	DEVICE_LOCK(clk);
 
-	SYSCON_MODIFY_4(data->dacpd_offset, data->dacpd_mask,
-		syscon_val->dacpd << data->dacpd_shift & data->dacpd_mask);
-	SYSCON_MODIFY_4(data->dsmpd_offset, data->dsmpd_mask,
-		syscon_val->dsmpd << data->dsmpd_shift & data->dsmpd_mask);
-	SYSCON_MODIFY_4(data->prediv_offset, data->prediv_mask,
-		syscon_val->prediv << data->prediv_shift & data->prediv_mask);
-	SYSCON_MODIFY_4(data->fbdiv_offset, data->fbdiv_mask,
-		syscon_val->fbdiv << data->fbdiv_shift & data->fbdiv_mask);
-	SYSCON_MODIFY_4(data->postdiv1_offset,
-			data->postdiv1_mask, (syscon_val->postdiv1 >> 1)
-			<< data->postdiv1_shift & data->postdiv1_mask);
+	SYSCON_MODIFY_4(clk_sc->dacpd_offset, clk_sc->dacpd_mask,
+		syscon_val->dacpd << clk_sc->dacpd_shift & clk_sc->dacpd_mask);
+	SYSCON_MODIFY_4(clk_sc->dsmpd_offset, clk_sc->dsmpd_mask,
+		syscon_val->dsmpd << clk_sc->dsmpd_shift & clk_sc->dsmpd_mask);
+	SYSCON_MODIFY_4(clk_sc->prediv_offset, clk_sc->prediv_mask,
+		syscon_val->prediv << clk_sc->prediv_shift & clk_sc->prediv_mask);
+	SYSCON_MODIFY_4(clk_sc->fbdiv_offset, clk_sc->fbdiv_mask,
+		syscon_val->fbdiv << clk_sc->fbdiv_shift & clk_sc->fbdiv_mask);
+	SYSCON_MODIFY_4(clk_sc->postdiv1_offset,
+			clk_sc->postdiv1_mask, (syscon_val->postdiv1 >> 1)
+			<< clk_sc->postdiv1_shift & clk_sc->postdiv1_mask);
 
 	if (!syscon_val->dacpd && !syscon_val->dsmpd) {
-		SYSCON_MODIFY_4(data->frac_offset, data->frac_mask,
-			syscon_val->frac << data->frac_shift & data->frac_mask);
+		SYSCON_MODIFY_4(clk_sc->frac_offset, clk_sc->frac_mask,
+			syscon_val->frac << clk_sc->frac_shift & clk_sc->frac_mask);
 	}
 
 	DEVICE_UNLOCK(clk);
@@ -401,7 +382,7 @@ static device_method_t jh7110_clk_pll_methods[] = {
 };
 
 DEFINE_CLASS_1(jh7110_pllnode, jh7110_pllnode_class, jh7110_pllnode_methods,
-    sizeof(struct jh7110_clk_pll_sc), clknode_class);
+    sizeof(struct jh7110_pll_clknode_softc), clknode_class);
 DEFINE_CLASS_0(jh7110_clk_pll, jh7110_clk_pll_driver, jh7110_clk_pll_methods,
     sizeof(struct jh7110_clk_pll_softc));
 EARLY_DRIVER_MODULE(jh7110_clk_pll, simplebus, jh7110_clk_pll_driver, 0, 0,
@@ -412,42 +393,35 @@ int
 jh7110_clk_pll_register(struct clkdom *clkdom, struct jh7110_clk_def *clkdef)
 {
 	struct clknode *clk = NULL;
-	struct jh7110_clk_pll_sc *sc;
+	struct jh7110_pll_clknode_softc *sc;
 
 	clk = clknode_create(clkdom, &jh7110_pllnode_class, &clkdef->clkdef);
 	if (clk == NULL)
 		return (1);
 
 	sc = clknode_get_softc(clk);
-	sc->id = clkdef->clkdef.id;
 
-	switch (sc->id)	{
+	switch (clkdef->clkdef.id) {
 	case JH7110_PLLCLK_PLL0_OUT:
-		sc->pll_data[sc->id].syscon_arr =
-			jh7110_pll0_syscon_freq;
-		sc->pll_data[sc->id].syscon_nitems =
-			nitems(jh7110_pll0_syscon_freq);
-		PLL_MASK_FILL(0);
-		PLL_SHIFT_FILL(0);
-		PLL_OFFSET_FILL(sc->id, 0, 0, 1, 2, 3, 2);
+		sc->syscon_arr = jh7110_pll0_syscon_freq;
+		sc->syscon_nitems = nitems(jh7110_pll0_syscon_freq);
+		PLL_MASK_FILL(sc, 0);
+		PLL_SHIFT_FILL(sc, 0);
+		PLL_OFFSET_FILL(sc, 0, 0, 1, 2, 3, 2);
 		break;
 	case JH7110_PLLCLK_PLL1_OUT:
-		sc->pll_data[sc->id].syscon_arr =
-			jh7110_pll1_syscon_freq;
-		sc->pll_data[sc->id].syscon_nitems =
-			nitems(jh7110_pll1_syscon_freq);
-		PLL_MASK_FILL(1);
-		PLL_SHIFT_FILL(1);
-		PLL_OFFSET_FILL(sc->id, 3, 3, 3, 4, 5, 4);
+		sc->syscon_arr = jh7110_pll1_syscon_freq;
+		sc->syscon_nitems = nitems(jh7110_pll1_syscon_freq);
+		PLL_MASK_FILL(sc, 1);
+		PLL_SHIFT_FILL(sc, 1);
+		PLL_OFFSET_FILL(sc, 3, 3, 3, 4, 5, 4);
 		break;
 	case JH7110_PLLCLK_PLL2_OUT:
-		sc->pll_data[sc->id].syscon_arr =
-			jh7110_pll2_syscon_freq;
-		sc->pll_data[sc->id].syscon_nitems =
-			nitems(jh7110_pll2_syscon_freq);
-		PLL_MASK_FILL(2);
-		PLL_SHIFT_FILL(2);
-		PLL_OFFSET_FILL(sc->id, 5, 5, 5, 6, 7, 6);
+		sc->syscon_arr = jh7110_pll2_syscon_freq;
+		sc->syscon_nitems = nitems(jh7110_pll2_syscon_freq);
+		PLL_MASK_FILL(sc, 2);
+		PLL_SHIFT_FILL(sc, 2);
+		PLL_OFFSET_FILL(sc, 5, 5, 5, 6, 7, 6);
 		break;
 	default:
 		return (EINVAL);
