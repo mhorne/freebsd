@@ -27,8 +27,6 @@
 
 #include "opt_mmccam.h"
 
-#define SDCARD_FREQ 49500000
-
 enum dwmmc_type {
 	DWMMC_GENERIC = 1,
 	DWMMC_JH7110
@@ -43,18 +41,16 @@ static struct ofw_compat_data compat_data[] = {
 static int dwmmc_starfive_update_ios(struct dwmmc_softc *sc,
     struct mmc_ios *ios)
 {
-	u_int hz;
 	int err;
 
-	hz = ios->clock != 0 ? ios->clock : SDCARD_FREQ;
-	if (hz != sc->bus_hz) {
-		sc->bus_hz = hz;
-		err = clk_set_freq(sc->ciu, hz, CLK_SET_ROUND_DOWN);
+	if (ios->clock != 0 && ios->clock != sc->bus_hz) {
+		err = clk_set_freq(sc->ciu, ios->clock, CLK_SET_ROUND_DOWN);
 		if (err != 0) {
 			printf("%s, Failed to set freq for ciu clock\n",
 			    __func__);
 			return (err);
 		}
+		sc->bus_hz = ios->clock;
 	}
 
 	return (0);

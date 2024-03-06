@@ -1,39 +1,19 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2024 Jari Sihvola <jsihv@gmx.com>
+ * Copyright (c) 2024 The FreeBSD Foundation
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * Portions of this software were developed by Mitchell Horne
+ * <mhorne@FreeBSD.org> under sponsorship from the FreeBSD Foundation.
  */
-
-#include <sys/cdefs.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
-#include <sys/fbio.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
+#include <sys/mutex.h>
 
 #include <machine/bus.h>
 
@@ -95,11 +75,6 @@ do {								\
 	sc->postdiv1_offset = PLL_OFFSET_## val6;		\
 } while (0)
 
-static struct ofw_compat_data compat_data[] = {
-	{ "starfive,jh7110-pll",	1 },
-	{ NULL,				0 }
-};
-
 struct jh7110_clk_pll_softc {
 	struct mtx		mtx;
 	struct clkdom		*clkdom;
@@ -159,7 +134,7 @@ static struct jh7110_clk_def pll_out_clks[] = {
 };
 
 static int jh7110_clk_pll_register(struct clkdom *clkdom,
-				   struct jh7110_clk_def *clkdef);
+    struct jh7110_clk_def *clkdef);
 
 static int
 jh7110_clk_pll_recalc_freq(struct clknode *clk, uint64_t *freq)
@@ -175,17 +150,17 @@ jh7110_clk_pll_recalc_freq(struct clknode *clk, uint64_t *freq)
 	DEVICE_LOCK(clk);
 
 	dacpd = (SYSCON_READ_4(sc->syscon, clk_sc->dacpd_offset) & clk_sc->dacpd_mask) >>
-		clk_sc->dacpd_shift;
+	    clk_sc->dacpd_shift;
 	dsmpd = (SYSCON_READ_4(sc->syscon, clk_sc->dsmpd_offset) & clk_sc->dsmpd_mask) >>
-		clk_sc->dsmpd_shift;
+	    clk_sc->dsmpd_shift;
 	fbdiv = (SYSCON_READ_4(sc->syscon, clk_sc->fbdiv_offset) & clk_sc->fbdiv_mask) >>
-		clk_sc->fbdiv_shift;
+	    clk_sc->fbdiv_shift;
 	prediv = (SYSCON_READ_4(sc->syscon, clk_sc->prediv_offset) & clk_sc->prediv_mask) >>
-		clk_sc->prediv_shift;
+	    clk_sc->prediv_shift;
 	postdiv1 = (SYSCON_READ_4(sc->syscon, clk_sc->postdiv1_offset) &
-		    clk_sc->postdiv1_mask) >> clk_sc->postdiv1_shift;
+	    clk_sc->postdiv1_mask) >> clk_sc->postdiv1_shift;
 	frac = (SYSCON_READ_4(sc->syscon, clk_sc->frac_offset) & clk_sc->frac_mask) >>
-		clk_sc->frac_shift;
+	    clk_sc->frac_shift;
 
 	DEVICE_UNLOCK(clk);
 
@@ -193,8 +168,8 @@ jh7110_clk_pll_recalc_freq(struct clknode *clk, uint64_t *freq)
 	if (dacpd == 0 && dsmpd == 0)
 		fcal = frac * FRAC_PATR_SIZE / (1 << 24);
 
-	*freq = *freq / FRAC_PATR_SIZE * (fbdiv * FRAC_PATR_SIZE +
-					  fcal) / prediv / (1 << postdiv1);
+	*freq = *freq / FRAC_PATR_SIZE * (fbdiv * FRAC_PATR_SIZE + fcal) /
+	    prediv / (1 << postdiv1);
 
 	return (0);
 }
@@ -222,7 +197,7 @@ jh7110_clk_pll_set_freq(struct clknode *clk, uint64_t fin, uint64_t *fout,
 		return (EINVAL);
 	}
 
-	if (flags & CLK_SET_DRYRUN) {
+	if ((flags & CLK_SET_DRYRUN) != 0) {
 		*done = 1;
 		return (0);
 	}
@@ -230,26 +205,25 @@ jh7110_clk_pll_set_freq(struct clknode *clk, uint64_t fin, uint64_t *fout,
 	DEVICE_LOCK(clk);
 
 	SYSCON_MODIFY_4(sc->syscon, clk_sc->dacpd_offset, clk_sc->dacpd_mask,
-		syscon_val->dacpd << clk_sc->dacpd_shift & clk_sc->dacpd_mask);
+	    syscon_val->dacpd << clk_sc->dacpd_shift & clk_sc->dacpd_mask);
 	SYSCON_MODIFY_4(sc->syscon, clk_sc->dsmpd_offset, clk_sc->dsmpd_mask,
-		syscon_val->dsmpd << clk_sc->dsmpd_shift & clk_sc->dsmpd_mask);
+	    syscon_val->dsmpd << clk_sc->dsmpd_shift & clk_sc->dsmpd_mask);
 	SYSCON_MODIFY_4(sc->syscon, clk_sc->prediv_offset, clk_sc->prediv_mask,
-		syscon_val->prediv << clk_sc->prediv_shift & clk_sc->prediv_mask);
+	    syscon_val->prediv << clk_sc->prediv_shift & clk_sc->prediv_mask);
 	SYSCON_MODIFY_4(sc->syscon, clk_sc->fbdiv_offset, clk_sc->fbdiv_mask,
-		syscon_val->fbdiv << clk_sc->fbdiv_shift & clk_sc->fbdiv_mask);
+	    syscon_val->fbdiv << clk_sc->fbdiv_shift & clk_sc->fbdiv_mask);
 	SYSCON_MODIFY_4(sc->syscon, clk_sc->postdiv1_offset,
-			clk_sc->postdiv1_mask, (syscon_val->postdiv1 >> 1)
-			<< clk_sc->postdiv1_shift & clk_sc->postdiv1_mask);
+	    clk_sc->postdiv1_mask, (syscon_val->postdiv1 >> 1) <<
+	    clk_sc->postdiv1_shift & clk_sc->postdiv1_mask);
 
 	if (!syscon_val->dacpd && !syscon_val->dsmpd) {
 		SYSCON_MODIFY_4(sc->syscon, clk_sc->frac_offset, clk_sc->frac_mask,
-			syscon_val->frac << clk_sc->frac_shift & clk_sc->frac_mask);
+		    syscon_val->frac << clk_sc->frac_shift & clk_sc->frac_mask);
 	}
 
 	DEVICE_UNLOCK(clk);
 
 	*done = 1;
-
 	return (0);
 }
 
@@ -267,10 +241,10 @@ jh7110_clk_pll_probe(device_t dev)
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
-	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
+	if (!ofw_bus_is_compatible(dev, "starfive,jh7110-pll"))
 		return (ENXIO);
 
-	device_set_desc(dev, "StarFive JH7110 pll clock generator");
+	device_set_desc(dev, "StarFive JH7110 PLL clock generator");
 
 	return (BUS_PROBE_DEFAULT);
 }
@@ -279,7 +253,7 @@ static int
 jh7110_clk_pll_attach(device_t dev)
 {
 	struct jh7110_clk_pll_softc *sc;
-	int i, error;
+	int error;
 
 	sc = device_get_softc(dev);
 
@@ -298,7 +272,7 @@ jh7110_clk_pll_attach(device_t dev)
 		return (error);
 	}
 
-	for (i = 0; i < nitems(pll_out_clks); i++) {
+	for (int i = 0; i < nitems(pll_out_clks); i++) {
 		error = jh7110_clk_pll_register(sc->clkdom, &pll_out_clks[i]);
 		if (error != 0)
 			device_printf(dev, "Couldn't register clock %s: %d\n",
@@ -306,8 +280,8 @@ jh7110_clk_pll_attach(device_t dev)
 	}
 
 	error = clkdom_finit(sc->clkdom);
-	if (error) {
-		device_printf(dev, "Clkdom_finit() returns error %d\n", error);
+	if (error != 0) {
+		device_printf(dev, "clkdom_finit() returned %d\n", error);
 	}
 
 	if (bootverbose)
