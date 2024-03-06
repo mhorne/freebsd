@@ -34,14 +34,13 @@
 #include <sys/fbio.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
-#include <sys/resource.h>
-#include <sys/rman.h>
 
 #include <machine/bus.h>
 
 #include <dev/fdt/simplebus.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/syscon/syscon.h>
 
 #include <dt-bindings/clock/starfive,jh7110-crg.h>
 
@@ -50,6 +49,7 @@
 #include <dev/clk/clk.h>
 
 #include "clkdev_if.h"
+#include "syscon_if.h"
 
 #define PLL_OFFSET_0		0x18
 #define PLL_OFFSET_1		0x1c
@@ -64,11 +64,6 @@
 	CLKDEV_DEVICE_LOCK(clknode_get_device(_clk))
 #define	DEVICE_UNLOCK(_clk)				\
 	CLKDEV_DEVICE_UNLOCK(clknode_get_device(_clk))
-
-#define	SYSCON_READ_4(reg)                              \
-	bus_read_4(sc->syscon_mem_res, (reg))
-#define	SYSCON_MODIFY_4(reg, cbits, sbits)		\
-	jh7110_syscon_modify_4(sc->syscon_mem_res, (reg), (cbits), (sbits))
 
 #define PLL_MASK_FILL(sc, id)					\
 do {								\
@@ -101,19 +96,14 @@ do {								\
 } while (0)
 
 static struct ofw_compat_data compat_data[] = {
-	{ "starfive,jh7110-sys-syscon", 1 },
+	{ "starfive,jh7110-pll",	1 },
 	{ NULL,				0 }
-};
-
-static struct resource_spec res_spec[] = {
-	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_SHAREABLE },
-	RESOURCE_SPEC_END
 };
 
 struct jh7110_clk_pll_softc {
 	struct mtx		mtx;
 	struct clkdom		*clkdom;
-	struct resource		*syscon_mem_res;
+	struct syscon		*syscon;
 };
 
 struct jh7110_pll_clknode_softc {
@@ -172,23 +162,6 @@ static int jh7110_clk_pll_register(struct clkdom *clkdom,
 				   struct jh7110_clk_def *clkdef);
 
 static int
-jh7110_syscon_modify_4(struct resource *res, bus_size_t offset,
-		       uint32_t clear_bits, uint32_t set_bits)
-{
-	uint32_t val;
-	uint32_t new_val;
-
-	val = bus_read_4(res, offset);
-
-	new_val = (val & ~clear_bits) | set_bits;
-
-	if (new_val != val)
-		bus_write_4(res, offset, new_val);
-
-	return (0);
-}
-
-static int
 jh7110_clk_pll_recalc_freq(struct clknode *clk, uint64_t *freq)
 {
 	struct jh7110_clk_pll_softc *sc;
@@ -201,17 +174,17 @@ jh7110_clk_pll_recalc_freq(struct clknode *clk, uint64_t *freq)
 
 	DEVICE_LOCK(clk);
 
-	dacpd = (SYSCON_READ_4(clk_sc->dacpd_offset) & clk_sc->dacpd_mask) >>
+	dacpd = (SYSCON_READ_4(sc->syscon, clk_sc->dacpd_offset) & clk_sc->dacpd_mask) >>
 		clk_sc->dacpd_shift;
-	dsmpd = (SYSCON_READ_4(clk_sc->dsmpd_offset) & clk_sc->dsmpd_mask) >>
+	dsmpd = (SYSCON_READ_4(sc->syscon, clk_sc->dsmpd_offset) & clk_sc->dsmpd_mask) >>
 		clk_sc->dsmpd_shift;
-	fbdiv = (SYSCON_READ_4(clk_sc->fbdiv_offset) & clk_sc->fbdiv_mask) >>
+	fbdiv = (SYSCON_READ_4(sc->syscon, clk_sc->fbdiv_offset) & clk_sc->fbdiv_mask) >>
 		clk_sc->fbdiv_shift;
-	prediv = (SYSCON_READ_4(clk_sc->prediv_offset) & clk_sc->prediv_mask) >>
+	prediv = (SYSCON_READ_4(sc->syscon, clk_sc->prediv_offset) & clk_sc->prediv_mask) >>
 		clk_sc->prediv_shift;
-	postdiv1 = (SYSCON_READ_4(clk_sc->postdiv1_offset) &
+	postdiv1 = (SYSCON_READ_4(sc->syscon, clk_sc->postdiv1_offset) &
 		    clk_sc->postdiv1_mask) >> clk_sc->postdiv1_shift;
-	frac = (SYSCON_READ_4(clk_sc->frac_offset) & clk_sc->frac_mask) >>
+	frac = (SYSCON_READ_4(sc->syscon, clk_sc->frac_offset) & clk_sc->frac_mask) >>
 		clk_sc->frac_shift;
 
 	DEVICE_UNLOCK(clk);
@@ -256,20 +229,20 @@ jh7110_clk_pll_set_freq(struct clknode *clk, uint64_t fin, uint64_t *fout,
 
 	DEVICE_LOCK(clk);
 
-	SYSCON_MODIFY_4(clk_sc->dacpd_offset, clk_sc->dacpd_mask,
+	SYSCON_MODIFY_4(sc->syscon, clk_sc->dacpd_offset, clk_sc->dacpd_mask,
 		syscon_val->dacpd << clk_sc->dacpd_shift & clk_sc->dacpd_mask);
-	SYSCON_MODIFY_4(clk_sc->dsmpd_offset, clk_sc->dsmpd_mask,
+	SYSCON_MODIFY_4(sc->syscon, clk_sc->dsmpd_offset, clk_sc->dsmpd_mask,
 		syscon_val->dsmpd << clk_sc->dsmpd_shift & clk_sc->dsmpd_mask);
-	SYSCON_MODIFY_4(clk_sc->prediv_offset, clk_sc->prediv_mask,
+	SYSCON_MODIFY_4(sc->syscon, clk_sc->prediv_offset, clk_sc->prediv_mask,
 		syscon_val->prediv << clk_sc->prediv_shift & clk_sc->prediv_mask);
-	SYSCON_MODIFY_4(clk_sc->fbdiv_offset, clk_sc->fbdiv_mask,
+	SYSCON_MODIFY_4(sc->syscon, clk_sc->fbdiv_offset, clk_sc->fbdiv_mask,
 		syscon_val->fbdiv << clk_sc->fbdiv_shift & clk_sc->fbdiv_mask);
-	SYSCON_MODIFY_4(clk_sc->postdiv1_offset,
+	SYSCON_MODIFY_4(sc->syscon, clk_sc->postdiv1_offset,
 			clk_sc->postdiv1_mask, (syscon_val->postdiv1 >> 1)
 			<< clk_sc->postdiv1_shift & clk_sc->postdiv1_mask);
 
 	if (!syscon_val->dacpd && !syscon_val->dsmpd) {
-		SYSCON_MODIFY_4(clk_sc->frac_offset, clk_sc->frac_mask,
+		SYSCON_MODIFY_4(sc->syscon, clk_sc->frac_offset, clk_sc->frac_mask,
 			syscon_val->frac << clk_sc->frac_shift & clk_sc->frac_mask);
 	}
 
@@ -312,16 +285,17 @@ jh7110_clk_pll_attach(device_t dev)
 
 	mtx_init(&sc->mtx, device_get_nameunit(dev), NULL, MTX_DEF);
 
-	error = bus_alloc_resources(dev, res_spec, &sc->syscon_mem_res);
-	if (error) {
-		device_printf(dev, "Couldn't allocate resources\n");
-		return (ENXIO);
-	}
-
 	sc->clkdom = clkdom_create(dev);
 	if (sc->clkdom == NULL) {
 		device_printf(dev, "Couldn't create clkdom\n");
 		return (ENXIO);
+	}
+
+	error = syscon_get_by_ofw_node(dev, OF_parent(ofw_bus_get_node(dev)),
+	    &sc->syscon);
+	if (error != 0) {
+		device_printf(dev, "Couldn't get syscon handle of parent\n");
+		return (error);
 	}
 
 	for (i = 0; i < nitems(pll_out_clks); i++) {
