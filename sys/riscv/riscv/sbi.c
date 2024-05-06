@@ -267,6 +267,15 @@ sbi_hsm_hart_status(u_long hart)
 }
 
 void
+sbi_early_init(void)
+{
+	sbi_console_putchar('h');
+	sbi_console_putchar('i');
+	sbi_console_putchar('!');
+	sbi_console_putchar('\n');
+}
+
+void
 sbi_init(void)
 {
 	struct sbi_ret sret;

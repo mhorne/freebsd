@@ -235,5 +235,6 @@ sbi_console_getchar(void)
 
 void sbi_print_version(void);
 void sbi_init(void);
+void sbi_early_init(void);
 
 #endif /* !_MACHINE_SBI_H_ */

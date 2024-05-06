@@ -487,6 +487,13 @@ initriscv(struct riscv_bootparams *rvbp)
 #endif
 	char *env;
 
+	printf("initriscv() entry\n");
+	printf("rvbp {\n"
+	       "    kern_phys=%lx\n"
+	       "    kern_stack=%lx\n"
+	       "    dtbp_phys=%lx\n"
+	       "    modulep=%lx\n"
+	       "}\n", rvbp->kern_phys, rvbp->kern_stack, rvbp->dtbp_phys, rvbp->modulep);
 	TSRAW(&thread0, TS_ENTER, __func__, NULL);
 
 	/* Set the pcpu data, this is needed by pmap_bootstrap */

@@ -740,6 +740,7 @@ pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen)
 	/*
 	 * Allocate an L1 page table.
 	 */
+	printf("...\n");
 	l1 = pmap_early_alloc_tables(&freemempos, 1);
 	printf("alloc l1: %p\n", l1);
 	if (pmap_mode == PMAP_MODE_SV39)
@@ -898,6 +899,7 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 		memattr_mask = PTE_MA_MASK;
 	}
 
+	printf("pmap_create_pagetables entry\n");
 	/* Create a new set of pagetables to run the kernel in. */
 	freemempos = pmap_create_pagetables(kernstart, kernlen);
 	printf("freemempos after creating pagetables: %lx\n", freemempos);

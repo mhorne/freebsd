@@ -43,5 +43,6 @@ struct riscv_bootparams {
 };
 
 void initriscv(struct riscv_bootparams *);
+void thead_cpu_flush(void);
 
 #endif /* _MACHINE_MACHDEP_H_ */
