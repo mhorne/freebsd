@@ -1,6 +1,7 @@
 LOADER_NET_SUPPORT?=	yes
 LOADER_MSDOS_SUPPORT?=	yes
 LOADER_UFS_SUPPORT?=	yes
+LOADER_USBDBC_SUPPORT?=	yes
 LOADER_CD9660_SUPPORT?=	no
 LOADER_EXT2FS_SUPPORT?=	no
 
@@ -28,7 +29,12 @@ SRCS=	autoload.c \
 	self_reloc.c \
 	vers.c \
 	gfx_fb.c \
-	8x16.c
+	8x16.c 
+
+.if ${LOADER_USBDBC_SUPPORT} != "no"
+CFLAGS+=        -I${SYSDIR}/dev/usb/controller
+SRCS+=		usb_dbc.c
+.endif
 
 CFLAGS+=	-I${.CURDIR}/../loader
 .if ${MK_LOADER_ZFS} != "no"

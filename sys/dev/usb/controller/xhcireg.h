@@ -205,6 +205,65 @@
 #define	XHCI_ID_VIRTUALIZATION	0x0004
 #define	XHCI_ID_MSG_IRQ		0x0005
 #define	XHCI_ID_USB_LOCAL_MEM	0x0006
+#define	XHCI_ID_USB_DEBUG	0x000a
+
+/* XHCI Debug Capability */
+#define	XHCI_DCID		0x0001
+#define	XHCI_DCDB		0x0004
+#define	XHCI_DCERSTSZ		0x0008
+#define	XHCI_DCERSTBA		0x0010
+#define	XHCI_DCERDP		0x0018
+#define	XHCI_DCCTRL		0x0020
+#define	XHCI_DCCTRL_DCR		0x00000001
+#define	XHCI_DCCTRL_DCR_GET(x)	(((x)      ) & 0x01)
+#define	XHCI_DCCTRL_LSE		0x00000002
+#define	XHCI_DCCTRL_LSE_GET(x)	(((x) >>  1) & 0x01)
+#define	XHCI_DCCTRL_HOT		0x00000004
+#define	XHCI_DCCTRL_HOT_GET(x)	(((x) >>  2) & 0x01)
+#define	XHCI_DCCTRL_HIT		0x00000008
+#define	XHCI_DCCTRL_HIT_GET(x)	(((x) >>  3) & 0x01)
+#define	XHCI_DCCTRL_DRC		0x00000010
+#define	XHCI_DCCTRL_DRC_GET(x)	(((x) >>  4) & 0x01)
+#define	XHCI_DCCTRL_MBS_GET(x)	(((x) >> 16) & 0xFF)
+#define	XHCI_DCCTRL_ADDR_GET(x)	(((x) >> 24) & 0x07)
+#define	XHCI_DCCTRL_DCE		0x80000000
+#define	XHCI_DCCTRL_DCE_GET(x)	(((x) >> 31) & 0x01)
+#define	XHCI_DCST		0x0024
+#define	XHCI_DCST_ER		0x00000000
+#define	XHCI_DCST_ER_GET(x)	(((x)      ) & 0x01)
+#define	XHCI_DCST_SBR		0x00000004
+#define	XHCI_DCST_SBR_GET(x)	(((x) >>  2) & 0x01)
+#define	XHCI_DCST_PORT_GET(x)	(((x) >> 24) & 0xFF)
+#define	XHCI_DCPORTSC		0x0028
+#define	XHCI_DCPORTSC_CCS	0x00000001
+#define	XHCI_DCPORTSC_CCS_GET(x)	(((x)      ) & 0x01)
+#define	XHCI_DCPORTSC_PED	0x00000004
+#define	XHCI_DCPORTSC_PED_GET(x)	(((x) >>  2) & 0x01)
+#define	XHCI_DCPORTSC_PR	0x00000010
+#define	XHCI_DCPORTSC_PR_GET(x)	(((x) >>  4) & 0x01)
+#define	XHCI_DCPORTSC_PLS_GET(x)	(((x) >>  5) & 0x0F)
+#define	XHCI_DCPORTSC_PLS_U0	0x00
+#define	XHCI_DCPORTSC_PLS_U1	0x01
+#define	XHCI_DCPORTSC_PLS_U2	0x02
+#define	XHCI_DCPORTSC_PLS_U3	0x03
+#define	XHCI_DCPORTSC_PLS_DISABLED	0x04
+#define	XHCI_DCPORTSC_PLS_RXDETECTED	0x05
+#define	XHCI_DCPORTSC_PLS_INACTIVE	0x06
+#define	XHCI_DCPORTSC_PLS_POLLING	0x07
+#define	XHCI_DCPORTSC_PLS_RECOVERY	0x08
+#define	XHCI_DCPORTSC_PLS_HOTRESET	0x09
+#define	XHCI_DCPORTSC_SPEED_GET(x)	(((x) >> 10) & 0x0F)
+#define	XHCI_DCPORTSC_CSC	0x00020000
+#define	XHCI_DCPORTSC_CSC_GET(x)	(((x) >> 17) & 0x01)
+#define	XHCI_DCPORTSC_PRC	0x00200000
+#define	XHCI_DCPORTSC_PRC_GET(x)	(((x) >> 21) & 0x01)
+#define	XHCI_DCPORTSC_PLC	0x00400000
+#define	XHCI_DCPORTSC_PLC_GET(x)	(((x) >> 22) & 0x01)
+#define	XHCI_DCPORTSC_CEC	0x00800000
+#define	XHCI_DCPORTSC_CEC_GET(x)	(((x) >> 23) & 0x01)
+#define	XHCI_DCCP		0x0030
+#define	XHCI_DCDDI1		0x0038
+#define	XHCI_DCDDI2		0x003C
 
 /* XHCI register R/W wrappers */
 #define	XREAD1(sc, what, a) \
