@@ -63,6 +63,8 @@
 #include "efizfs.h"
 #include "framebuffer.h"
 
+#include "usb_dbc.h"
+
 #include "platform/acfreebsd.h"
 #include "acconfig.h"
 #define ACPI_SYSTEM_XFACE
@@ -1994,3 +1996,66 @@ command_netserver(int argc, char *argv[])
 COMMAND_SET(netserver, "netserver", "change or display netserver URI",
     command_netserver);
 #endif
+
+static int
+command_udb_info(int argc, char *argv[])
+{
+
+	udb_info();
+
+	return (CMD_OK);
+}
+COMMAND_SET(udb_info, "udb_info", "USB DbC configuration info",
+    command_udb_info);
+
+static int
+command_udb_send(int argc, char *argv[])
+{
+	size_t len;
+	size_t i;
+
+	if (argc != 2) {
+		printf("argument required\n");
+		return (CMD_ERROR);
+	}
+	printf("Sending '%s\\r\\n'...\n", argv[1]);
+	len = strlen(argv[1]);
+	for (i = 0; i < len; i++) {
+		udb_console.c_out((u_int)argv[1][i]); 
+	}
+	udb_console.c_out('\r'); 
+	udb_console.c_out('\n'); 
+	return (CMD_OK);
+}
+COMMAND_SET(udb_send, "udb_send", "USB DbC send string test",
+    command_udb_send);
+
+static int
+command_udb_probe(int argc, char *argv[])
+{
+	udb_console.c_probe(&udb_console);
+
+	return (CMD_OK);
+}
+COMMAND_SET(udb_probe, "udb_probe", "USB DbC probe",
+    command_udb_probe);
+
+static int
+command_udb_recon(int argc, char *argv[])
+{
+	udb_console.c_init(1);
+
+	return (CMD_OK);
+}
+COMMAND_SET(udb_recon, "udb_recon", "USB DbC reconnect",
+    command_udb_recon);
+
+static int
+command_udb_init(int argc, char *argv[])
+{
+
+	udb_console.c_init(0);
+	return (CMD_OK);
+}
+COMMAND_SET(udb_init, "udb_init", "USB DbC init",
+    command_udb_init);

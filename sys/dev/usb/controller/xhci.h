@@ -455,10 +455,12 @@ struct xhci_hw_softc {
 	struct usb_page_cache	root_pc;
 	struct usb_page_cache	ctx_pc;
 	struct usb_page_cache	scratch_pc[XHCI_MAX_SCRATCHPADS];
+	struct usb_page_cache	dbc_pc;
 
 	struct usb_page		root_pg;
 	struct usb_page		ctx_pg;
 	struct usb_page		scratch_pg[XHCI_MAX_SCRATCHPADS];
+	struct usb_page		dbc_pg;
 
 	struct xhci_hw_dev	devs[XHCI_MAX_DEVICES + 1];
 };
@@ -489,6 +491,65 @@ typedef int (xhci_port_route_t)(device_t, uint32_t, uint32_t);
 enum xhci_quirks {
 	XHCI_QUIRK_DISABLE_PORT_PED			= 0x00000001,
 	XHCI_QUIRK_DMA_32B				= 0x00000002,
+};
+
+struct xhci_debug_reg {
+	uint32_t id;
+	uint32_t doorbell;
+	uint32_t erstsz;
+	uint32_t rsvdz;
+	uint64_t erstba;
+	uint64_t erdp;
+	uint32_t ctrl;
+	uint32_t st;
+	uint32_t portsc;
+	uint32_t rsvdp;
+	uint64_t cp;
+	uint32_t ddi1;
+	uint32_t ddi2;
+};
+
+struct xhci_debug_ring {
+	struct xhci_trb *trb;	/* Array of TRBs */
+	uint32_t enq;		/* The offset of the enqueue ptr */
+	uint32_t deq;		/* The offset of the dequeue ptr */
+	uint8_t cyc;		/* Cycle state toggled on each wrap-around */
+#define	XHCI_DB_OUT	0x0
+#define	XHCI_DB_IN	0x1
+#define	XHCI_DB_INVAL	0xFF
+	uint8_t doorbell;	/* Doorbell target */
+};
+
+/* XXX */
+struct xhci_debug_work_ring {
+	uint8_t *buf;
+	uint32_t enq;
+	uint32_t deq;
+	uint64_t paddr;
+};
+
+struct xhci_debug_ctx {
+	uint32_t info[16];
+	uint32_t ep_out[16];
+	uint32_t ep_in[16];
+};
+
+struct xhci_debug_softc {
+	struct xhci_debug_ctx	ctx;
+	struct xhci_debug_reg	reg;
+	struct xhci_event_ring_seg *udb_erst;
+	struct xhci_debug_ring	udb_ering;
+	struct xhci_debug_ring	udb_oring;
+	struct xhci_debug_ring	udb_iring;
+	struct xhci_debug_work_ring	udb_owork;
+	char		udb_str[256];
+	int		open;
+	int		init;
+	struct {
+		volatile uint64_t dummy;
+	} __aligned(64) padding;
+	uint64_t	xhci_xecp_offset;
+	uint64_t	base;
 };
 
 struct xhci_softc {
@@ -570,6 +631,9 @@ struct xhci_softc {
 
 	/* XHCI quirks. */
 	uint32_t		sc_quirks;
+
+	/* XHCI DbC */
+	struct xhci_debug_softc	sc_udbc;
 };
 
 #define	XHCI_CMD_LOCK(sc)	sx_xlock(&(sc)->sc_cmd_sx)
