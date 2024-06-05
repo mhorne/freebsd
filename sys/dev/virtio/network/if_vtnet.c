@@ -47,6 +47,11 @@
 #include <sys/smp.h>
 #include <machine/smp.h>
 
+#include <vm/vm.h>
+#include <vm/vm_param.h>
+#include <vm/vm_page.h>
+#include <vm/vm_extern.h>
+#include <vm/pmap.h>
 #include <vm/uma.h>
 
 #include <net/debugnet.h>
@@ -892,15 +897,35 @@ static int
 vtnet_alloc_rxtx_queues(struct vtnet_softc *sc)
 {
 	int i, npairs, error;
+	vm_page_t mrxq, mtxq;
 
 	npairs = sc->vtnet_max_vq_pairs;
 
+	sc->vtnet_rxqs = (void *)kva_alloc(PAGE_SIZE);
+	mrxq = vm_page_alloc_noobj_contig(
+	    VM_ALLOC_ZERO | VM_ALLOC_WAITOK | VM_ALLOC_WIRED,
+	    /* npages */ 1, 0x100000000, BUS_SPACE_MAXADDR, PAGE_SIZE, 0,
+	    VM_MEMATTR_UNCACHEABLE);
+	pmap_qenter((vm_offset_t)sc->vtnet_rxqs, &mrxq, 1);
+	printf("%s: rxqs=%p, phys=%#lx\n", __func__, sc->vtnet_rxqs, VM_PAGE_TO_PHYS(mrxq));
+
+	sc->vtnet_txqs = (void *)kva_alloc(PAGE_SIZE);
+	mtxq = vm_page_alloc_noobj_contig(
+	    VM_ALLOC_ZERO | VM_ALLOC_WAITOK | VM_ALLOC_WIRED,
+	    /* npages */ 1, 0x100000000, BUS_SPACE_MAXADDR, PAGE_SIZE, 0,
+	    VM_MEMATTR_UNCACHEABLE);
+	pmap_qenter((vm_offset_t)sc->vtnet_txqs, &mtxq, 1);
+	printf("%s: rxqs=%p, phys=%#lx\n", __func__, sc->vtnet_txqs, VM_PAGE_TO_PHYS(mtxq));
+	pmap_page_set_memattr(mtxq, VM_MEMATTR_UNCACHEABLE);
+
+#if 0
 	sc->vtnet_rxqs = malloc(sizeof(struct vtnet_rxq) * npairs, M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	sc->vtnet_txqs = malloc(sizeof(struct vtnet_txq) * npairs, M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (sc->vtnet_rxqs == NULL || sc->vtnet_txqs == NULL)
 		return (ENOMEM);
+#endif
 
 	for (i = 0; i < npairs; i++) {
 		error = vtnet_init_rxq(sc, i);
