@@ -259,24 +259,24 @@ SYSCTL_INT(_vm_pmap, OID_AUTO, superpages_enabled,
 static SYSCTL_NODE(_vm_pmap, OID_AUTO, l2, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "2MB page mapping counters");
 
-static u_long pmap_l2_demotions;
-SYSCTL_ULONG(_vm_pmap_l2, OID_AUTO, demotions, CTLFLAG_RD,
-    &pmap_l2_demotions, 0,
+static COUNTER_U64_DEFINE_EARLY(pmap_l2_demotions);
+SYSCTL_COUNTER_U64(_vm_pmap_l2, OID_AUTO, demotions, CTLFLAG_RD,
+    &pmap_l2_demotions,
     "2MB page demotions");
 
-static u_long pmap_l2_mappings;
-SYSCTL_ULONG(_vm_pmap_l2, OID_AUTO, mappings, CTLFLAG_RD,
-    &pmap_l2_mappings, 0,
+static COUNTER_U64_DEFINE_EARLY(pmap_l2_mappings);
+SYSCTL_COUNTER_U64(_vm_pmap_l2, OID_AUTO, mappings, CTLFLAG_RD,
+    &pmap_l2_mappings,
     "2MB page mappings");
 
-static u_long pmap_l2_p_failures;
-SYSCTL_ULONG(_vm_pmap_l2, OID_AUTO, p_failures, CTLFLAG_RD,
-    &pmap_l2_p_failures, 0,
+static COUNTER_U64_DEFINE_EARLY(pmap_l2_p_failures);
+SYSCTL_COUNTER_U64(_vm_pmap_l2, OID_AUTO, p_failures, CTLFLAG_RD,
+    &pmap_l2_p_failures,
     "2MB page promotion failures");
 
-static u_long pmap_l2_promotions;
-SYSCTL_ULONG(_vm_pmap_l2, OID_AUTO, promotions, CTLFLAG_RD,
-    &pmap_l2_promotions, 0,
+static COUNTER_U64_DEFINE_EARLY(pmap_l2_promotions);
+SYSCTL_COUNTER_U64(_vm_pmap_l2, OID_AUTO, promotions, CTLFLAG_RD,
+    &pmap_l2_promotions,
     "2MB page promotions");
 
 static SYSCTL_NODE(_vm_pmap, OID_AUTO, l1, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
@@ -3025,7 +3025,7 @@ pmap_demote_l2_locked(pmap_t pmap, pd_entry_t *l2, vm_offset_t va,
 	if ((oldl2 & PTE_SW_MANAGED) != 0)
 		pmap_pv_demote_l2(pmap, va, PTE_TO_PHYS(oldl2), lockp);
 
-	atomic_add_long(&pmap_l2_demotions, 1);
+	counter_u64_add(pmap_l2_demotions, 1);
 	CTR2(KTR_PMAP, "pmap_demote_l2_locked: success for va %#lx in pmap %p",
 	    va, pmap);
 	return (true);
@@ -3057,7 +3057,7 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 	if ((pa & L2_OFFSET) != 0) {
 		CTR2(KTR_PMAP, "pmap_promote_l2: failure for va %#lx pmap %p",
 		    va, pmap);
-		atomic_add_long(&pmap_l2_p_failures, 1);
+		counter_u64_add(pmap_l2_p_failures, 1);
 		return (false);
 	}
 
@@ -3091,7 +3091,7 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 			CTR2(KTR_PMAP,
 			    "pmap_promote_l2: failure for va %#lx pmap %p",
 			    va, pmap);
-			atomic_add_long(&pmap_l2_p_failures, 1);
+			counter_u64_add(pmap_l2_p_failures, 1);
 			return (false);
 		}
 		while ((l3e & (PTE_W | PTE_D)) == PTE_W) {
@@ -3104,7 +3104,7 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 			CTR2(KTR_PMAP,
 			    "pmap_promote_l2: failure for va %#lx pmap %p",
 			    va, pmap);
-			atomic_add_long(&pmap_l2_p_failures, 1);
+			counter_u64_add(pmap_l2_p_failures, 1);
 			return (false);
 		}
 		all_l3e_PTE_A &= l3e;
@@ -3131,7 +3131,7 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 	if (pmap_insert_pt_page(pmap, ml3, true, all_l3e_PTE_A != 0)) {
 		CTR2(KTR_PMAP, "pmap_promote_l2: failure for va %#lx pmap %p",
 		    va, pmap);
-		atomic_add_long(&pmap_l2_p_failures, 1);
+		counter_u64_add(pmap_l2_p_failures, 1);
 		return (false);
 	}
 
@@ -3140,7 +3140,7 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 
 	pmap_store(l2, firstl3e);
 
-	atomic_add_long(&pmap_l2_promotions, 1);
+	counter_u64_add(pmap_l2_promotions, 1);
 	CTR2(KTR_PMAP, "pmap_promote_l2: success for va %#lx in pmap %p", va,
 	    pmap);
 	return (true);
@@ -3597,7 +3597,7 @@ pmap_enter_l2(pmap_t pmap, vm_offset_t va, pd_entry_t new_l2, u_int flags,
 	 */
 	pmap_store(l2, new_l2);
 
-	atomic_add_long(&pmap_l2_mappings, 1);
+	counter_u64_add(pmap_l2_mappings, 1);
 	CTR2(KTR_PMAP, "pmap_enter_l2: success for va %#lx in pmap %p",
 	    va, pmap);
 
