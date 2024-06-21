@@ -2037,7 +2037,7 @@ pmap_growkernel_nopanic(vm_offset_t addr)
 	vm_paddr_t paddr;
 	vm_page_t nkpg;
 	pd_entry_t *l1, *l2;
-	pt_entry_t entry;
+	pt_entry_t entry, l2e;
 	pn_t pn;
 
 	mtx_assert(&kernel_map->system_mtx, MA_OWNED);
@@ -2066,8 +2066,8 @@ pmap_growkernel_nopanic(vm_offset_t addr)
 			continue; /* try again */
 		}
 		l2 = pmap_l1_to_l2(l1, kernel_vm_end);
-		if ((pmap_load(l2) & PTE_V) != 0 &&
-		    (pmap_load(l2) & PTE_RWX) == 0) {
+		l2e = pmap_load(l2);
+		if ((l2e & PTE_V) != 0 && (l2e & PTE_RWX) == 0) {
 			kernel_vm_end = (kernel_vm_end + L2_SIZE) & ~L2_OFFSET;
 			if (kernel_vm_end - 1 >= vm_map_max(kernel_map)) {
 				kernel_vm_end = vm_map_max(kernel_map);
