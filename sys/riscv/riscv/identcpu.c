@@ -191,8 +191,17 @@ parse_ext_x(struct cpu_desc *desc __unused, char *isa, int idx, int len)
 }
 
 static __inline int
-parse_ext_z(struct cpu_desc *desc __unused, char *isa, int idx, int len)
+parse_ext_z(struct cpu_desc *desc, char *isa, int idx, int len)
 {
+	if (strncmp(&isa[idx], "zba", 3) == 0) {
+		desc->isa_extensions |= HWCAP_ISA_ZBA;
+		return (idx + 3);
+	}
+	if (strncmp(&isa[idx], "zbb", 3) == 0) {
+		desc->isa_extensions |= HWCAP_ISA_ZBB;
+		return (idx + 3);
+	}
+
 	/*
 	 * Proceed to the next multi-letter extension or the end of the
 	 * string.
@@ -225,6 +234,11 @@ parse_ext_version(char *isa, int idx, u_int *majorp __unused,
 
 	return (idx);
 }
+
+static char isa[1024];
+
+SYSCTL_STRING(_hw, HW_MACHINE, isa, CTLFLAG_RD | CTLFLAG_CAPRD, isa, 0,
+    "RISC-V ISA string");
 
 /*
  * Parse the ISA string, building up the set of HWCAP bits as they are found.
@@ -319,7 +333,6 @@ parse_mmu_fdt(struct cpu_desc *desc, phandle_t node)
 static void
 identify_cpu_features_fdt(u_int cpu, struct cpu_desc *desc)
 {
-	char isa[1024];
 	phandle_t node;
 	ssize_t len;
 	pcell_t reg;

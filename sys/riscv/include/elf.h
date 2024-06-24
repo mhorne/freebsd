@@ -83,4 +83,7 @@ __ElfType(Auxinfo);
 #define	HWCAP_ISA_G		\
     (HWCAP_ISA_I | HWCAP_ISA_M | HWCAP_ISA_A | HWCAP_ISA_F | HWCAP_ISA_D)
 
+#define	HWCAP_ISA_ZBA		(1ul << 30)
+#define	HWCAP_ISA_ZBB		(1ul << 31)
+
 #endif /* !_MACHINE_ELF_H_ */
