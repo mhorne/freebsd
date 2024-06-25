@@ -134,6 +134,7 @@ static struct ofw_compat_data compat_data[] = {
 	{ "allwinner,sun7i-a20-rtc", (uintptr_t) &a20_conf },
 	{ "allwinner,sun6i-a31-rtc", (uintptr_t) &a31_conf },
 	{ "allwinner,sun8i-h3-rtc", (uintptr_t) &h3_conf },
+	{ "allwinner,sun20i-d1-rtc", (uintptr_t) &h3_conf },
 	{ "allwinner,sun50i-h5-rtc", (uintptr_t) &h3_conf },
 	{ "allwinner,sun50i-h6-rtc", (uintptr_t) &h3_conf },
 	{ NULL, 0 }
@@ -242,23 +243,30 @@ aw_rtc_detach(device_t dev)
 	return (EBUSY);
 }
 
+static const char *clknames[] = { "osc32k", "osc32k-out", "iosc" };
+
 static void
 aw_rtc_install_clocks(struct aw_rtc_softc *sc, device_t dev) {
 	struct clkdom *clkdom;
-	const char **clknames;
-	phandle_t node;
-	int nclocks;
+	//const char **clknames;
+	phandle_t node __unused;
+	int nclocks __unused;
 
 	node = ofw_bus_get_node(dev);
+#if 0
 	nclocks = ofw_bus_string_list_to_array(node, "clock-output-names", &clknames);
 	/* No clocks to export */
-	if (nclocks <= 0)
+	if (nclocks <= 0) {
+		if (bootverbose)
+			device_printf(dev, "No clocks to export\n");
 		return;
+	}
 
 	if (nclocks != 3) {
 		device_printf(dev, "Having only %d clocks instead of 3, aborting\n", nclocks);
 		return;
 	}
+#endif
 
 	clkdom = clkdom_create(dev);
 
