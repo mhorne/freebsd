@@ -31,7 +31,7 @@ S=	${SRCTOP}/sys
 KMOD=	xhci
 SRCS=	bus_if.h device_if.h usb_if.h \
 	opt_bus.h opt_usb.h \
-	xhci_pci.c xhci.c \
+	xhci_pci.c xhci.c xhci_dbc.c \
 	pci_if.h
 
 .include <bsd.kmod.mk>
