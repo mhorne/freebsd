@@ -865,6 +865,16 @@ getmemsize(u_int64_t first)
 	u_long physmem_start, physmem_tunable, memtest;
 	pt_entry_t *pte;
 	quad_t dcons_addr, dcons_size;
+	quad_t xhci_dbc_ering_addr, xhci_dbc_ering_len;
+	quad_t xhci_dbc_iring_addr, xhci_dbc_iring_len;
+	quad_t xhci_dbc_oring_addr, xhci_dbc_oring_len;
+	quad_t xhci_dbc_ering_work_addr, xhci_dbc_ering_work_len;
+	quad_t xhci_dbc_iring_work_addr, xhci_dbc_iring_work_len;
+	quad_t xhci_dbc_oring_work_addr, xhci_dbc_oring_work_len;
+	quad_t xhci_dbc_ctx_addr, xhci_dbc_ctx_len;
+	quad_t xhci_dbc_softc_addr, xhci_dbc_softc_len;
+	quad_t xhci_dbc_erst_addr, xhci_dbc_erst_len;
+	quad_t xhci_dbc_str_addr, xhci_dbc_str_len;
 	int page_counter;
 
 	TSENTER();
@@ -970,6 +980,35 @@ getmemsize(u_int64_t first)
 		dcons_addr = 0;
 
 	/*
+	 * Get XHCI DbC TRB ring addresses
+	 */
+	getenv_quad("hw.usb.xhci.dbc.ering.paddr", &xhci_dbc_ering_addr);
+	getenv_quad("hw.usb.xhci.dbc.ering.len", &xhci_dbc_ering_len);
+	getenv_quad("hw.usb.xhci.dbc.ering.work.paddr", &xhci_dbc_ering_work_addr);
+	getenv_quad("hw.usb.xhci.dbc.ering.work.len", &xhci_dbc_ering_work_len);
+
+	getenv_quad("hw.usb.xhci.dbc.iring.paddr", &xhci_dbc_iring_addr);
+	getenv_quad("hw.usb.xhci.dbc.iring.len", &xhci_dbc_iring_len);
+	getenv_quad("hw.usb.xhci.dbc.iring.work.paddr", &xhci_dbc_iring_work_addr);
+	getenv_quad("hw.usb.xhci.dbc.iring.work.len", &xhci_dbc_iring_work_len);
+
+	getenv_quad("hw.usb.xhci.dbc.oring.paddr", &xhci_dbc_oring_addr);
+	getenv_quad("hw.usb.xhci.dbc.oring.len", &xhci_dbc_oring_len);
+
+	getenv_quad("hw.usb.xhci.dbc.oring.work.paddr", &xhci_dbc_oring_work_addr);
+	getenv_quad("hw.usb.xhci.dbc.oring.work.len", &xhci_dbc_oring_work_len);
+
+
+	getenv_quad("hw.usb.xhci.dbc.softc.paddr", &xhci_dbc_softc_addr);
+	getenv_quad("hw.usb.xhci.dbc.softc.len", &xhci_dbc_softc_len);
+	getenv_quad("hw.usb.xhci.dbc.ctx.paddr", &xhci_dbc_ctx_addr);
+	getenv_quad("hw.usb.xhci.dbc.ctx.len", &xhci_dbc_ctx_len);
+	getenv_quad("hw.usb.xhci.dbc.erst.paddr", &xhci_dbc_erst_addr);
+	getenv_quad("hw.usb.xhci.dbc.erst.len", &xhci_dbc_erst_len);
+	getenv_quad("hw.usb.xhci.dbc.str.paddr", &xhci_dbc_str_addr);
+	getenv_quad("hw.usb.xhci.dbc.str.len", &xhci_dbc_str_len);
+
+	/*
 	 * physmap is in bytes, so when converting to page boundaries,
 	 * round up the start address and round down the end address.
 	 */
@@ -1001,6 +1040,20 @@ getmemsize(u_int64_t first)
 			    && pa >= trunc_page(dcons_addr)
 			    && pa < dcons_addr + dcons_size)
 				goto do_dump_avail;
+#define	BLOCKOUT(addr, len) do { \
+	if (addr > 0 && pa >= trunc_page(addr) && pa < addr + len) \
+		goto do_dump_avail; \
+	} while (0)
+			BLOCKOUT(xhci_dbc_ering_addr, xhci_dbc_ering_len);
+			BLOCKOUT(xhci_dbc_ering_work_addr, xhci_dbc_ering_work_len);
+			BLOCKOUT(xhci_dbc_iring_addr, xhci_dbc_iring_len);
+			BLOCKOUT(xhci_dbc_iring_work_addr, xhci_dbc_iring_work_len);
+			BLOCKOUT(xhci_dbc_oring_addr, xhci_dbc_oring_len);
+			BLOCKOUT(xhci_dbc_oring_work_addr, xhci_dbc_oring_work_len);
+			BLOCKOUT(xhci_dbc_softc_addr, xhci_dbc_softc_len);
+			BLOCKOUT(xhci_dbc_ctx_addr, xhci_dbc_ctx_len);
+			BLOCKOUT(xhci_dbc_erst_addr, xhci_dbc_erst_len);
+			BLOCKOUT(xhci_dbc_str_addr, xhci_dbc_str_len);
 
 			page_bad = false;
 			if (memtest == 0)

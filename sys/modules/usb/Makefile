@@ -55,6 +55,7 @@ SUBDIR += u3g \
 	  uchcom \
 	  ucom \
 	  ucycom \
+	  udbc \
 	  ufoma \
 	  uftdi \
 	  ugensa \

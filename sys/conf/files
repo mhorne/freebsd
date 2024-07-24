@@ -3243,6 +3243,7 @@ dev/usb/controller/uhci.c		optional uhci
 dev/usb/controller/uhci_pci.c		optional uhci pci
 dev/usb/controller/xhci.c		optional xhci
 dev/usb/controller/xhci_pci.c		optional xhci pci
+dev/usb/controller/xhci_dbc.c		optional xhci pci
 dev/usb/controller/uss820dci.c		optional uss820dci
 dev/usb/controller/usb_controller.c	optional usb
 #
@@ -3351,6 +3352,7 @@ dev/usb/serial/ubsa.c		optional ubsa
 dev/usb/serial/ubser.c		optional ubser
 dev/usb/serial/uchcom.c		optional uchcom
 dev/usb/serial/ucycom.c		optional ucycom
+dev/usb/serial/udbc.c		optional udbc
 dev/usb/serial/ufoma.c		optional ufoma
 dev/usb/serial/uftdi.c		optional uftdi
 dev/usb/serial/ugensa.c		optional ugensa
@@ -3365,10 +3367,10 @@ dev/usb/serial/uslcom.c		optional uslcom
 dev/usb/serial/uvisor.c		optional uvisor
 dev/usb/serial/uvscom.c		optional uvscom
 dev/usb/serial/usb_serial.c 	optional ucom | u3g | uark | ubsa | ubser | \
-					 uchcom | ucycom | ufoma | uftdi | \
-					 ugensa | uipaq | umcs | umct | \
-					 umodem | umoscom | uplcom | usie | \
-					 uslcom | uvisor | uvscom
+					 uchcom | ucycom | udbc | ufoma | \
+					 uftdi | ugensa | uipaq | umcs | \
+					 umct | umodem | umoscom | uplcom | \
+					 usie | uslcom | uvisor | uvscom
 #
 # USB misc drivers
 #

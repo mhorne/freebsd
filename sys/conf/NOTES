@@ -2503,6 +2503,8 @@ device		u3g
 device		uark
 # USB support for Belkin F5U103 and compatible serial adapters
 device		ubsa
+# USB support for XHCI USB DbC.GP serial device
+device		udbc
 # USB support for serial adapters based on the FT8U100AX and FT8U232AM
 device		uftdi
 # USB support for some Windows CE based serial communication.

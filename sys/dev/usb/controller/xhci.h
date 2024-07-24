@@ -1,4 +1,3 @@
-
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
@@ -491,6 +490,8 @@ enum xhci_quirks {
 	XHCI_QUIRK_DMA_32B				= 0x00000002,
 };
 
+struct xhci_debug_softc;
+
 struct xhci_softc {
 	struct xhci_hw_softc	sc_hw;
 	/* base device */
@@ -533,6 +534,8 @@ struct xhci_softc {
 	uint32_t		sc_runt_off;
 	/* offset to doorbell registers */
 	uint32_t		sc_door_off;
+	/* offset to DbC registers */
+	uint32_t		sc_dbc_off;
 
 	/* chip specific */
 	uint16_t		sc_erst_max;
@@ -570,6 +573,9 @@ struct xhci_softc {
 
 	/* XHCI quirks. */
 	uint32_t		sc_quirks;
+
+	/* XHCI DbC */
+	struct xhci_debug_softc	*sc_udbc;
 };
 
 #define	XHCI_CMD_LOCK(sc)	sx_xlock(&(sc)->sc_cmd_sx)
@@ -586,6 +592,9 @@ usb_error_t xhci_start_controller(struct xhci_softc *);
 void	xhci_interrupt(struct xhci_softc *);
 void	xhci_uninit(struct xhci_softc *);
 int	xhci_pci_attach(device_t);
+
+SYSCTL_DECL(_hw_usb_xhci);
+extern int dbc_enable;
 
 DECLARE_CLASS(xhci_pci_driver);
 
