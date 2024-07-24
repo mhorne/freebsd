@@ -63,6 +63,12 @@
 #include "efizfs.h"
 #include "framebuffer.h"
 
+#include "xhci_dbc_cons.h"
+#include <dev/usb/controller/xhci_private.h>
+#include <dev/usb/controller/xhci_dbc.h>
+#include "xhci_dbc_dma.h"
+#include "xhci_dbc_command.h"
+
 #include "platform/acfreebsd.h"
 #include "acconfig.h"
 #define ACPI_SYSTEM_XFACE
@@ -2015,3 +2021,92 @@ command_netserver(int argc, char *argv[])
 COMMAND_SET(netserver, "netserver", "change or display netserver URI",
     command_netserver);
 #endif
+
+static int
+command_udb_info(int argc, char *argv[])
+{
+
+	udb_info();
+
+	return (CMD_OK);
+}
+COMMAND_SET(udb_info, "udb_info", "USB DbC configuration info",
+    command_udb_info);
+
+static int
+command_udb_debug(int argc, char *argv[])
+{
+	if (argc == 1)
+		dbc_debug++;
+	else
+		dbc_debug--;
+
+	if (dbc_debug < 0)
+		dbc_debug = 0;
+
+	printf("dbc_debug = %u\n", dbc_debug);
+
+	return (CMD_OK);
+}
+COMMAND_SET(udb_debug, "udb_debug", "USB DbC increase debug level",
+    command_udb_debug);
+
+static int
+command_udb_send(int argc, char *argv[])
+{
+	size_t len;
+	size_t i;
+
+	if (argc != 2) {
+		printf("argument required\n");
+		return (CMD_ERROR);
+	}
+	printf("Sending '%s\\r\\n'...\n", argv[1]);
+	len = strlen(argv[1]);
+	for (i = 0; i < len; i++)
+		udb_console.c_out((u_int)argv[1][i]);
+	udb_console.c_out('\r');
+	udb_console.c_out('\n');
+	return (CMD_OK);
+}
+COMMAND_SET(udb_send, "udb_send", "USB DbC send string test",
+    command_udb_send);
+
+static int
+command_udb_recv(int argc, char *argv[])
+{
+	int buf[1024];
+	int i, j;
+	int c;
+
+	printf("Receiving...\n");
+	i = 0;
+	while (udb_console.c_ready() && i < sizeof(buf)) {
+		c = udb_console.c_in();
+		if (c != -1)
+			buf[i++] = c;
+	}
+	if (i != 0) {
+		printf("[");
+		for (j = 0; j < i; j++)
+			printf("%c(%02x) ", (char)buf[j], (char)buf[j]);
+		printf("]\n");
+	}
+
+	return (CMD_OK);
+}
+COMMAND_SET(udb_recv, "udb_recv", "USB DbC recv test",
+    command_udb_recv);
+
+static int
+command_udb_probe(int argc, char *argv[])
+{
+	udb_console.c_probe(&udb_console);
+	if ((udb_console.c_flags & (C_PRESENTIN | C_PRESENTOUT)) !=
+	    (C_PRESENTIN | C_PRESENTOUT))
+		return (CMD_ERROR);
+
+	return (udb_console.c_init(0));
+}
+COMMAND_SET(udb_probe, "udb_probe", "USB DbC probe",
+    command_udb_probe);
