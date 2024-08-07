@@ -64,6 +64,7 @@
 #include "framebuffer.h"
 
 #include "xhci_dbc_cons.h"
+#include "xhci_dbc_pci.h"	/* device_t */
 #include <dev/usb/controller/xhci_private.h>
 #include <dev/usb/controller/xhci_dbc.h>
 #include "xhci_dbc_dma.h"

@@ -31,7 +31,7 @@ extern int dbc_debug;
 	if ((level) <= dbc_debug) printf(__VA_ARGS__);	\
 	} while (0)
 
-#ifdef _KERNEL
+#if _KERNEL
 
 /* PCI register access via bus_dma in kernel */
 #define	_XREAD4(sc, what, a)		XREAD4((sc)->sc_xhci, what, a)

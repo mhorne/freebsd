@@ -35,12 +35,11 @@
 #include <bootstrap.h>
 #include <efi.h>
 #include <efilib.h>
-
 #include <dev/usb/controller/xhci_private.h>
+#include "xhci_dbc_pci.h"
 #include <dev/usb/controller/xhci_dbc.h>
 #include <dev/usb/controller/xhci_dbc_private.h>
 #include "xhci_dbc_cons.h"
-#include "xhci_dbc_pci.h"
 #include "xhci_dbc_dma.h"
 
 EFI_GUID pciio_guid = EFI_PCI_IO_PROTOCOL_GUID;
@@ -115,7 +114,7 @@ found:
 }
 
 struct xhci_debug_softc *
-udb_sc_malloc(size_t len, EFI_HANDLE *h, EFI_PCI_IO_PROTOCOL *pciio)
+udb_alloc_softc(size_t len, EFI_HANDLE *h, EFI_PCI_IO_PROTOCOL *pciio)
 {
 	struct xhci_debug_softc *sc;
 	EFI_STATUS status;
@@ -194,13 +193,13 @@ xhci_debug_init_dma(struct xhci_debug_softc *sc)
 
 	ALLOC_DMA(sc->udb_ctx, struct xhci_debug_ctx *, 0);
 	ALLOC_DMA(sc->udb_erst, struct xhci_event_ring_seg *, 0);
+	ALLOC_DMA(sc->udb_str, char *, 0);
 	ALLOC_DMA(sc->udb_ering.trb, struct xhci_trb *, DC_TRB_RING_ORDER);
 	ALLOC_DMA(sc->udb_iring.trb, struct xhci_trb *, DC_TRB_RING_ORDER);
 	ALLOC_DMA(sc->udb_oring.trb, struct xhci_trb *, DC_TRB_RING_ORDER);
 	ALLOC_DMA(sc->udb_ering.work.buf, uint8_t *, DC_WORK_RING_ORDER);
 	ALLOC_DMA(sc->udb_iring.work.buf, uint8_t *, DC_WORK_RING_ORDER);
 	ALLOC_DMA(sc->udb_oring.work.buf, uint8_t *, DC_WORK_RING_ORDER);
-	ALLOC_DMA(sc->udb_str, char *, 0);
 
 	/* Export CTX, ERST, and STR */
 #define	SETADDR(n, len) do { \

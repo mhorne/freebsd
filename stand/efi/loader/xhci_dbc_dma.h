@@ -29,5 +29,5 @@ void xhci_debug_export_softc(struct xhci_debug_softc *);
 int xhci_debug_init_dma(struct xhci_debug_softc *);
 void xhci_debug_uninit_dma(struct xhci_debug_softc *);
 
-struct xhci_debug_softc *udb_sc_malloc(size_t, EFI_HANDLE *,
+struct xhci_debug_softc *udb_alloc_softc(size_t, EFI_HANDLE *,
     EFI_PCI_IO_PROTOCOL *);

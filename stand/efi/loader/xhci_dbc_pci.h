@@ -28,7 +28,10 @@
 
 extern EFI_GUID pciio_guid;
 
-/* Dummy functions to use xhci_pci_match() */
+/*
+ * Dummy functions to use xhci_pci_match().  Note that device_t is defined
+ * as PCI Type 00 header.
+ */
 typedef struct {  
 	UINT16	VendorId;
 	UINT16	DeviceId;
