@@ -154,7 +154,8 @@ struct dma {
  * This softc is used in kernel and loader.
  */
 struct xhci_softc;
-#define	XHCI_DC_COOKIE	0x4d79b718
+struct udbcons_priv;
+#define	XHCI_DC_COOKIE		0x4d79b718
 struct xhci_debug_softc {
 	struct xhci_debug_softc	*sc_next;
 	bool			sc_next_fixup;
@@ -181,6 +182,9 @@ struct xhci_debug_softc {
 	uint32_t		sc_flags;
 #define	XHCI_DEBUG_FLAGS_GDB	0x0001
 	uint64_t		sc_polling_count;
+#define	XHCI_DC_POLLING_TIME	50
+	uint32_t		sc_polling_time;
+	uint64_t		sc_dequeue_count;
 	bool			sc_init;
 	bool			sc_init_dma;
 	bool			sc_fixup_done;
@@ -192,18 +196,26 @@ struct xhci_debug_softc {
 	uint32_t		sc_dbc_off;
 	uint32_t		sc_capa_off;	/* zero */
 	uint32_t		sc_pci_rid;
+
+	struct xhci_softc	*sc_xhci;	/* used in _X{READ,WRITE} */
+	device_t		sc_dev;		/* used in kernel only */
 #ifdef _KERNEL
-	struct xhci_softc	*sc_xhci;	/* in kernel only */
+	struct udbcons_priv	*sc_cons;	/* used in kernel only */
+	char			dummy[256];	/* XXX */
 #else
-	struct console		*sc_cons;	/* in loader only */
+	struct console		*sc_cons;	/* used in loader only */
 	EFI_PCI_IO_PROTOCOL	*sc_efi_pciio;
 	EFI_HANDLE		sc_efi_hand;
 	struct dma		dma_desc[DMA_DESC_CAP];
+	char			dummy[256];	/* XXX */
 #endif
 };
 
-uint32_t xhci_debug_probe(struct xhci_debug_softc *);
-struct xhci_debug_softc *xhci_debug_alloc_softc(struct xhci_softc *);
+
+void xhci_debug_reg_read(struct xhci_debug_softc *);
+void xhci_debug_reg_restore(struct xhci_debug_softc *);
+
+uint32_t xhci_debug_get_xecp(struct xhci_debug_softc *);
 bool xhci_debug_enable(struct xhci_debug_softc *);
 void xhci_debug_disable(struct xhci_debug_softc *);
 
@@ -217,7 +229,3 @@ int work_dequeue(struct xhci_debug_ring *);
 int64_t work_enqueue(struct xhci_debug_ring *, const char *, int64_t);
 
 void udb_dump_info(struct xhci_debug_softc *);
-
-#ifdef _KERNEL
-int udbcons_init(struct xhci_softc *, device_t);
-#endif

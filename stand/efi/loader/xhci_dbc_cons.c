@@ -75,7 +75,7 @@ udbc_probe(struct console *cons)
 	device_t dev;
 
 	h0 = h = NULL;
-	if (udb_sc != NULL)
+	if (udb_sc0 != NULL)
 		return;
 
 	/* Get PCI I/O handle. */
@@ -99,9 +99,9 @@ udbc_probe(struct console *cons)
 			continue;
 		status = pciio->Pci.Read(
 		    pciio,
-		    EfiPciIoWidthUint8,
+		    EfiPciIoWidthUint32,
 		    0,
-		    sizeof(dev),
+		    sizeof(dev) >> 2,	/* 32-bit access */
 		    &dev);
 		if (EFI_ERROR(status))
 			continue;
@@ -142,14 +142,14 @@ udbc_alloc(struct console *cons, EFI_PCI_IO_PROTOCOL *pciio, EFI_HANDLE *h)
 	    &FunctionNumber);
 	if (EFI_ERROR(status))
 		return (false);
-	sc = udb_sc_malloc(sizeof(*sc), h, pciio);
+	sc = udb_alloc_softc(sizeof(*sc), h, pciio);
 	if (sc == NULL)
 		return (false);
 	sc->sc_pci_rid = PCI_RID(BusNumber, DeviceNumber, FunctionNumber);
 	sc->sc_efi_pciio = pciio;
 	sc->sc_efi_hand = h;
 
-	sc->sc_dbc_off = xhci_debug_probe(sc);
+	sc->sc_dbc_off = xhci_debug_get_xecp(sc);
 	if (sc->sc_dbc_off == 0)
 		goto error;
 
@@ -178,6 +178,8 @@ udbc_alloc(struct console *cons, EFI_PCI_IO_PROTOCOL *pciio, EFI_HANDLE *h)
 		sc->sc_next = udb_sc0;
 	udb_sc0 = sc;
 
+	(void) udbc_init(1);
+
 	return (true);
 error:
 	/* XXX: free softc */
@@ -191,6 +193,18 @@ udbc_init(int arg)
 	uint32_t rid;
 	char *p, *endp;
 	int error;
+	bool gdb;
+
+	if (udb_sc != NULL)	/* already initialized */
+		return (CMD_OK);
+
+	/* Initialize all instances */
+	for (sc = udb_sc0; sc != NULL; sc = sc->sc_next)
+		xhci_debug_enable(sc);
+
+	/* If called in c_probe, udb_sc will not be initialized. */
+	if (arg == 1)
+		return (CMD_OK);
 
 	p = getenv("hw.usb.xhci.dbc.enable");
 	if (p != NULL && p[0] == '0')
@@ -214,23 +228,26 @@ udbc_init(int arg)
 	/* XXX: too late */
 	udb_hostname = getenv("hw.usb.xhci.dbc.hostname");
 	udb_serial = getenv("hw.usb.xhci.dbc.serial");
+	p = getenv("hw.usb.xhci.dbc.gdb");
+	gdb = (p != NULL && p[0] != '0');
 
-	for (sc = udb_sc0; sc != NULL; sc->sc_next) {
+	/* Initialize flags */
+	for (sc = udb_sc0; sc != NULL; sc = sc->sc_next)
+		if (gdb)
+			sc->sc_flags |= XHCI_DEBUG_FLAGS_GDB;
+
+	for (sc = udb_sc0; sc != NULL; sc = sc->sc_next) {
 		/* If RID is not specified, use the first one. */
 		if ((rid == 0 || rid == sc->sc_pci_rid) &&
 		    sc->sc_dbc_off != 0)
 			break;
 	}
-	if (sc == NULL) {		/* allocated in c_probe */
+	if (sc == NULL) {
 		DEBUG_PRINTF(1, "USB DbC not found\n");
 		return (CMD_ERROR);
 	}
 
-	p = getenv("hw.usb.xhci.dbc.gdb");
-	if (p != NULL && p[0] != '0')
-		sc->sc_flags |= XHCI_DEBUG_FLAGS_GDB;
-
-	xhci_debug_enable(sc);
+	/* Define the console */
 	udb_sc = sc;
 	xhci_debug_event_dequeue(sc);
 

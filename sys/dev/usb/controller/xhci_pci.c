@@ -249,6 +249,13 @@ xhci_pci_attach(device_t self)
 	}
 	device_set_ivars(sc->sc_bus.bdev, &sc->sc_bus);
 
+	sc->sc_udbc_dev = device_add_child(self, "udbcons", -1);
+	if (sc->sc_udbc_dev == NULL) {
+		device_printf(self, "Could not add USB DbC device\n");
+		goto error;
+	}
+	device_set_ivars(sc->sc_udbc_dev, sc);
+
 	switch (pci_get_vendor(self)) {
 	case PCI_XHCI_VENDORID_AMD:
 		strlcpy(sc->sc_vendor, "AMD", sizeof(sc->sc_vendor));
@@ -296,6 +303,11 @@ xhci_pci_attach(device_t self)
 	xhci_pci_take_controller(self);
 
 	err = xhci_halt_controller(sc);
+
+	if (err == 0) {
+		/* Ignore DbC attachment failure. */
+		(void) device_probe_and_attach(sc->sc_udbc_dev);
+	}
 
 	if (err == 0)
 		err = xhci_start_controller(sc);

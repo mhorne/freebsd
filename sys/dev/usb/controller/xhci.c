@@ -323,9 +323,6 @@ xhci_start_controller(struct xhci_softc *sc)
 	if (err)
 		return (err);
 
-	if (dbc_enable && sc->sc_udbc != NULL)
-		xhci_debug_enable(sc->sc_udbc);
-
 	/* set up number of device slots */
 	DPRINTF("CONFIG=0x%08x -> 0x%08x\n",
 	    XREAD4(sc, oper, XHCI_CONFIG), sc->sc_noslot);
@@ -466,6 +463,9 @@ xhci_halt_controller(struct xhci_softc *sc)
 	sc->sc_oper_off = XREAD1(sc, capa, XHCI_CAPLENGTH);
 	sc->sc_runt_off = XREAD4(sc, capa, XHCI_RTSOFF) & ~0xF;
 	sc->sc_door_off = XREAD4(sc, capa, XHCI_DBOFF) & ~0x3;
+	sc->sc_dbc_off = xhci_debug_get_xecp(&(struct xhci_debug_softc){
+	    .sc_xhci = sc
+	});
 
 	/* Halt controller */
 	XWRITE4(sc, oper, XHCI_USBCMD, 0);
@@ -492,6 +492,9 @@ xhci_reset_controller(struct xhci_softc *sc)
 
 	DPRINTF("\n");
 
+	/* DbC registers must be saved before resetting */
+	xhci_debug_reg_read(sc->sc_udbc);
+
 	/* Reset controller */
 	XWRITE4(sc, oper, XHCI_USBCMD, XHCI_CMD_HCRST);
 
@@ -508,6 +511,11 @@ xhci_reset_controller(struct xhci_softc *sc)
 		    "reset timeout.\n");
 		return (USB_ERR_IOERROR);
 	}
+
+	/* Re-enable DbC if any */
+	xhci_debug_reg_restore(sc->sc_udbc);
+	xhci_debug_enable(sc->sc_udbc);
+
 	return (0);
 }
 
@@ -573,27 +581,6 @@ xhci_init(struct xhci_softc *sc, device_t self, uint8_t dma32)
 
 	/* enable 64Kbyte control endpoint quirk */
 	sc->sc_bus.control_ep_quirk = (xhcictlquirk ? 1 : 0);
-
-	/* Check if DbC is available. */
-	if (dbc_enable &&
-	    (sc->sc_udbc = xhci_debug_alloc_softc(sc)) != NULL) {
-
-		sc->sc_dbc_off = xhci_debug_probe(sc->sc_udbc);
-		if (sc->sc_dbc_off != sc->sc_udbc->sc_dbc_off)
-			device_printf(self,
-			    "DbC offset mismatch: %u, %u\n",
-			    sc->sc_dbc_off,
-			    sc->sc_udbc->sc_dbc_off);
-	}
-	/* Initialize udbcons.  The first instance will be used. */
-	if (sc->sc_dbc_off != 0) {
-		device_printf(self, "DbC is available and %s\n",
-		    (XREAD4(sc, dbc, XHCI_DCCTRL) & XHCI_DCCTRL_DCE)
-			? "running"
-			: "not running");
-		udbcons_init(sc, self);
-	} else
-		device_printf(self, "DbC not available\n");
 
 	temp = XREAD4(sc, capa, XHCI_HCSPARAMS1);
 

@@ -29,9 +29,10 @@
 #include <machine/atomic.h>
 
 #include <efi.h>
-#include <efilib.h>	/* printf */
+#include <efilib.h>		/* printf */
 #include <dev/usb/controller/xhci_private.h>
 #include <dev/usb/controller/xhcireg.h>
+#include "xhci_dbc_pci.h"	/* device_t */
 #include <dev/usb/controller/xhci_dbc.h>
 #include <dev/usb/controller/xhci_dbc_private.h>
 
