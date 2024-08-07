@@ -576,6 +576,7 @@ struct xhci_softc {
 
 	/* XHCI DbC */
 	struct xhci_debug_softc	*sc_udbc;
+	device_t		sc_udbc_dev;
 };
 
 #define	XHCI_CMD_LOCK(sc)	sx_xlock(&(sc)->sc_cmd_sx)
