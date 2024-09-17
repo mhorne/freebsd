@@ -148,6 +148,7 @@ enum awg_type {
 static struct ofw_compat_data compat_data[] = {
 	{ "allwinner,sun8i-a83t-emac",		EMAC_A83T },
 	{ "allwinner,sun8i-h3-emac",		EMAC_H3 },
+	{ "allwinner,sun20i-d1-emac",		EMAC_A64 },
 	{ "allwinner,sun50i-a64-emac",		EMAC_A64 },
 	{ NULL,					0 }
 };
