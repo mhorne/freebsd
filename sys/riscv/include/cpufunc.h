@@ -110,17 +110,17 @@ sfence_vma_page(uintptr_t addr)
 extern int64_t dcache_line_size;
 extern int64_t icache_line_size;
 
-#define	cpu_dcache_wbinv_range(a, s)
-#define	cpu_dcache_inv_range(a, s)
-#define	cpu_dcache_wb_range(a, s)
-
-#define	cpu_idcache_wbinv_range(a, s)
-#define	cpu_icache_sync_range(a, s)
-#define	cpu_icache_sync_range_checked(a, s)
+#define	cpu_dcache_wbinv_range(a, s) thead_cpu_dcache_wbinv_range(a, s)
+#define	cpu_dcache_inv_range(a, s) thead_cpu_dcache_inv_range(a, s)
+#define	cpu_dcache_wb_range(a, s) thead_cpu_dcache_wb_range(a, s)
 
 #define	cpufunc_nullop()		riscv_nullop()
 
 void riscv_nullop(void);
+
+void thead_cpu_dcache_wbinv_range(vm_offset_t, vm_size_t);
+void thead_cpu_dcache_inv_range(vm_offset_t, vm_size_t);
+void thead_cpu_dcache_wb_range(vm_offset_t, vm_size_t);
 
 #endif	/* _KERNEL */
 #endif	/* _MACHINE_CPUFUNC_H_ */

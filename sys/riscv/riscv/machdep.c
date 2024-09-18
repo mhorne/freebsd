@@ -335,8 +335,8 @@ cache_setup(void)
 
 	/* TODO */
 
-	dcache_line_size = 0;
-	icache_line_size = 0;
+	dcache_line_size = 64;
+	icache_line_size = 128;
 	idcache_line_size = 0;
 }
 
