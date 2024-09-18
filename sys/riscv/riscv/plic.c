@@ -49,6 +49,8 @@
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include <dt-bindings/interrupt-controller/irq.h>
+
 #include "pic_if.h"
 
 #define	PLIC_MAX_IRQS		1024
@@ -82,6 +84,7 @@ static pic_bind_intr_t		plic_bind_intr;
 struct plic_irqsrc {
 	struct intr_irqsrc	isrc;
 	u_int			irq;
+	u_int			trig;
 };
 
 struct plic_context {
@@ -215,6 +218,7 @@ plic_map_intr(device_t dev, struct intr_map_data *data,
 {
 	struct intr_map_data_fdt *daf;
 	struct plic_softc *sc;
+	u_int irq, type;
 
 	sc = device_get_softc(dev);
 
@@ -222,10 +226,26 @@ plic_map_intr(device_t dev, struct intr_map_data *data,
 		return (ENOTSUP);
 
 	daf = (struct intr_map_data_fdt *)data;
-	if (daf->ncells != 1 || daf->cells[0] > sc->ndev)
+	if (daf->ncells != 1 && daf->ncells != 2) {
+		device_printf(dev, "invalid ncells value: %u\n", daf->ncells);
 		return (EINVAL);
+	}
 
-	*isrcp = &sc->isrcs[daf->cells[0]].isrc;
+	irq = daf->cells[0];
+	type = daf->ncells == 2 ? daf->cells[1] : IRQ_TYPE_LEVEL_HIGH;
+
+	if (irq > sc->ndev) {
+		device_printf(dev, "cells[0] (%u) > sc->ndev (%u)", daf->cells[0], sc->ndev);
+		return (EINVAL);
+	}
+
+	/* TODO: handling of edge-triggered interrupts */
+	if (type != IRQ_TYPE_LEVEL_HIGH) {
+		device_printf(dev, "edge-triggered interrupts not supported\n");
+	}
+
+	sc->isrcs[irq].trig = type;
+	*isrcp = &sc->isrcs[irq].isrc;
 
 	return (0);
 }
