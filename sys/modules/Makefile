@@ -670,6 +670,7 @@ _irdma=		irdma
 	${MACHINE_CPUARCH} == "riscv"
 .if !empty(OPT_FDT)
 _if_cgem=	if_cgem
+_allwinner=	allwinner
 .endif
 .endif
 
