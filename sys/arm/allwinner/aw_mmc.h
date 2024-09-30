@@ -221,6 +221,6 @@ struct aw_mmc_dma_desc {
 	uint32_t next;
 };
 
-#define	AW_MMC_DMA_ALIGN	4
+#define	AW_MMC_DMA_ALIGN	64
 
 #endif /* _AW_MMC_H_ */
