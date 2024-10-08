@@ -5,6 +5,7 @@
 # SoC support
 options 	SOC_ALLWINNER_D1
 
+device		a10_timer	# Allwinner Timer
 device		aw_ccu		# Allwinner clock controller
 device		aw_gpio		# Allwinner GPIO controller
 device		aw_mmc		# Allwinner SD/MMC controller

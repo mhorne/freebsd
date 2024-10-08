@@ -44,7 +44,7 @@
 
 #include <dev/clk/clk.h>
 
-#if defined(__aarch64__)
+#if defined(__aarch64__) || defined(__riscv)
 #include "opt_soc.h"
 #else
 #include <arm/allwinner/aw_machdep.h>
@@ -87,6 +87,7 @@
 enum a10_timer_type {
 	A10_TIMER = 1,
 	A23_TIMER,
+	D1_TIMER,
 };
 
 struct a10_timer_softc {
@@ -105,20 +106,25 @@ struct a10_timer_softc {
 	bus_write_4(sc->res[A10_TIMER_MEMRES], reg, val)
 
 static u_int	a10_timer_get_timecount(struct timecounter *);
-#if defined(__arm__)
+#if defined(__arm__) || defined(__riscv)
 static int	a10_timer_timer_start(struct eventtimer *,
     sbintime_t first, sbintime_t period);
 static int	a10_timer_timer_stop(struct eventtimer *);
 #endif
 
 static uint64_t timer_read_counter64(struct a10_timer_softc *sc);
-#if defined(__arm__)
+#if defined(__arm__) || defined(__riscv)
 static void a10_timer_eventtimer_setup(struct a10_timer_softc *sc);
 #endif
 
 #if defined(__aarch64__)
 static void a23_timer_timecounter_setup(struct a10_timer_softc *sc);
 static u_int a23_timer_get_timecount(struct timecounter *tc);
+#endif
+
+#if defined(__riscv)
+static void d1_timer_timecounter_setup(struct a10_timer_softc *sc);
+static u_int d1_timer_get_timecount(struct timecounter *tc);
 #endif
 
 static int a10_timer_irq(void *);
@@ -148,6 +154,17 @@ static struct timecounter a23_timer_timecounter = {
 };
 #endif
 
+#if defined(__riscv)
+static struct timecounter d1_timer_timecounter = {
+	.tc_name           = "a10_timer timer1",
+	.tc_get_timecount  = d1_timer_get_timecount,
+	.tc_counter_mask   = ~0u,
+	.tc_frequency      = 0,
+	/* We want it to be selected over the generic RISC-V timecounter */
+	.tc_quality        = 2000,
+};
+
+#endif
 #define	A10_TIMER_MEMRES		0
 #define	A10_TIMER_IRQRES		1
 
@@ -161,6 +178,8 @@ static struct ofw_compat_data compat_data[] = {
 	{"allwinner,sun4i-a10-timer", A10_TIMER},
 #if defined(__aarch64__)
 	{"allwinner,sun8i-a23-timer", A23_TIMER},
+#elif defined(__riscv)
+	{"allwinner,sun20i-d1-timer", D1_TIMER},
 #endif
 	{NULL, 0},
 };
@@ -231,6 +250,9 @@ a10_timer_attach(device_t dev)
 	tc_init(&a10_timer_timecounter);
 #elif defined(__aarch64__)
 	a23_timer_timecounter_setup(sc);
+#elif defined(__riscv)
+	a10_timer_eventtimer_setup(sc);
+	d1_timer_timecounter_setup(sc);
 #endif
 
 	if (bootverbose) {
@@ -283,7 +305,7 @@ a10_timer_irq(void *arg)
  * Event timer function for A10 and A13
  */
 
-#if defined(__arm__)
+#if defined(__arm__) || defined(__riscv)
 static void
 a10_timer_eventtimer_setup(struct a10_timer_softc *sc)
 {
@@ -304,7 +326,7 @@ a10_timer_eventtimer_setup(struct a10_timer_softc *sc)
 	sc->et.et_frequency = sc->timer0_freq;
 	sc->et.et_name = "a10_timer Eventtimer";
 	sc->et.et_flags = ET_FLAGS_ONESHOT | ET_FLAGS_PERIODIC;
-	sc->et.et_quality = 1000;
+	sc->et.et_quality = 2000;
 	sc->et.et_min_period = (0x00000005LLU << 32) / sc->et.et_frequency;
 	sc->et.et_max_period = (0xfffffffeLLU << 32) / sc->et.et_frequency;
 	sc->et.et_start = a10_timer_timer_start;
@@ -413,6 +435,55 @@ a23_timer_get_timecount(struct timecounter *tc)
 		return (0);
 
 	val = timer_read_4(sc, TIMER_CURV_REG(0));
+	/* Counter count backwards */
+	return (~0u - val);
+}
+#endif
+
+/*
+ * Timecounter functions for D1. timer1 is used, enabling both eventtimer and
+ * timecounter interface.
+ */
+#if defined(__riscv)
+static void
+d1_timer_timecounter_setup(struct a10_timer_softc *sc)
+{
+	uint32_t val;
+
+	/* Set clock source to OSC24M, 1 pre-division, continuous mode */
+	val = timer_read_4(sc, TIMER_CTRL_REG(1));
+	val &= ~TIMER_CTRL_PRESCALAR_MASK | ~TIMER_CTRL_MODE_MASK |
+	    ~TIMER_CTRL_CLKSRC_MASK;
+	val |= TIMER_CTRL_PRESCALAR(1) | TIMER_CTRL_OSC24M;
+	timer_write_4(sc, TIMER_CTRL_REG(1), val);
+
+	/* Set reload value */
+	timer_write_4(sc, TIMER_INTV_REG(1), ~0);
+	val = timer_read_4(sc, TIMER_INTV_REG(1));
+
+	/* Enable timer0 */
+	val = timer_read_4(sc, TIMER_CTRL_REG(1));
+	val |= TIMER_CTRL_AUTORELOAD | TIMER_CTRL_START;
+	timer_write_4(sc, TIMER_CTRL_REG(1), val);
+
+	val = timer_read_4(sc, TIMER_CURV_REG(1));
+
+	d1_timer_timecounter.tc_priv = sc;
+	d1_timer_timecounter.tc_frequency = sc->timer0_freq; /* same freq */
+	tc_init(&d1_timer_timecounter);
+}
+
+static u_int
+d1_timer_get_timecount(struct timecounter *tc)
+{
+	struct a10_timer_softc *sc;
+	uint32_t val;
+
+	sc = (struct a10_timer_softc *)tc->tc_priv;
+	if (sc == NULL)
+		return (0);
+
+	val = timer_read_4(sc, TIMER_CURV_REG(1));
 	/* Counter count backwards */
 	return (~0u - val);
 }
