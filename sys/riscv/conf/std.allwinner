@@ -14,4 +14,7 @@ device		aw_sid		# Allwinner Secure ID EFUSE
 device		aw_wdog		# Allwinner Watchdog
 device		awg		# Allwinner EMAC Gigabit Ethernet
 
+# DTBs
+makeoptions	MODULES_EXTRA+="dtb/allwinner"
+
 files		"../allwinner/files.allwinner"
