@@ -180,7 +180,9 @@ ohci_controller_init(ohci_softc_t *sc, int do_suspend)
 	uint32_t desca;
 
 	/* Determine in what context we are running. */
+	DPRINTF("OREAD4.\n");
 	ctl = OREAD4(sc, OHCI_CONTROL);
+	DPRINTF("OREAD4 complete.\n");
 	if (ctl & OHCI_IR) {
 		/* SMM active, request change */
 		DPRINTF("SMM active, request owner change\n");

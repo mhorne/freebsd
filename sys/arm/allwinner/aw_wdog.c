@@ -297,4 +297,5 @@ static driver_t aw_wdog_driver = {
 	sizeof(struct aw_wdog_softc),
 };
 
-DRIVER_MODULE(aw_wdog, simplebus, aw_wdog_driver, 0, 0);
+EARLY_DRIVER_MODULE(aw_wdog, simplebus, aw_wdog_driver, 0, 0,
+    BUS_PASS_TIMER + BUS_PASS_ORDER_MIDDLE);

@@ -40,6 +40,8 @@
 #include <vm/pmap.h>
 
 #include <machine/bus.h>
+#include <machine/atomic.h>
+#include <machine/cpufunc.h>
 
 uint8_t  generic_bs_r_1(void *, bus_space_handle_t, bus_size_t);
 uint16_t generic_bs_r_2(void *, bus_space_handle_t, bus_size_t);
@@ -111,6 +113,7 @@ static void
 generic_bs_barrier(void *t, bus_space_handle_t bsh, bus_size_t offset,
     bus_size_t size, int flags)
 {
+	mb();
 }
 
 static int

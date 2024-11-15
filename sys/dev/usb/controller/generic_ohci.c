@@ -111,6 +111,7 @@ generic_ohci_attach(device_t dev)
 	phy_t phy;
 	hwreset_t rst;
 
+	printf("%s: entry\n", __func__);
 	sc->ohci_sc.sc_bus.parent = dev;
 	sc->ohci_sc.sc_bus.devices = sc->ohci_sc.sc_devices;
 	sc->ohci_sc.sc_bus.devices_max = OHCI_MAX_DEVICES;
@@ -159,9 +160,11 @@ generic_ohci_attach(device_t dev)
 		goto error;
 	}
 
+	printf("%s: enable clocks\n", __func__);
 	TAILQ_INIT(&sc->clk_list);
 	/* Enable clock */
 	for (off = 0; clk_get_by_ofw_index(dev, 0, off, &clk) == 0; off++) {
+		printf("enabling clock %s\n", clk_get_name(clk));
 		err = clk_enable(clk);
 		if (err != 0) {
 			device_printf(dev, "Could not enable clock %s\n",
@@ -173,9 +176,11 @@ generic_ohci_attach(device_t dev)
 		TAILQ_INSERT_TAIL(&sc->clk_list, clkp, next);
 	}
 
+	printf("%s: deassert resets\n", __func__);
 	/* De-assert reset */
 	TAILQ_INIT(&sc->rst_list);
 	for (off = 0; hwreset_get_by_ofw_idx(dev, 0, off, &rst) == 0; off++) {
+		printf("deasserting reset %d\n", off);
 		err = hwreset_deassert(rst);
 		if (err != 0) {
 			device_printf(dev, "Could not de-assert reset\n");
@@ -186,6 +191,7 @@ generic_ohci_attach(device_t dev)
 		TAILQ_INSERT_TAIL(&sc->rst_list, rstp, next);
 	}
 
+	printf("%s: enable phy\n", __func__);
 	/* Enable phy */
 	TAILQ_INIT(&sc->phy_list);
 	for (off = 0; phy_get_by_ofw_idx(dev, 0, off, &phy) == 0; off++) {
@@ -204,12 +210,15 @@ generic_ohci_attach(device_t dev)
 		TAILQ_INSERT_TAIL(&sc->phy_list, phyp, next);
 	}
 
+	printf("%s: GENERIC_USB_INIT()\n", __func__);
 	if (GENERIC_USB_INIT(dev) != 0) {
 		err = ENXIO;
 		goto error;
 	}
 
+	printf("%s: ohci_init()\n", __func__);
 	err = ohci_init(&sc->ohci_sc);
+	printf("%s: add children \n", __func__);
 	if (err == 0)
 		err = device_probe_and_attach(sc->ohci_sc.sc_bus.bdev);
 	if (err)
