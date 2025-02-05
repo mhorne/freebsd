@@ -63,7 +63,11 @@
 #include "efizfs.h"
 #include "framebuffer.h"
 
-#include "usb_dbc.h"
+#include "xhci_dbc_cons.h"
+#include <dev/usb/controller/xhci_private.h>
+#include <dev/usb/controller/xhci_dbc.h>
+#include "xhci_dbc_dma.h"
+#include "xhci_dbc_command.h"
 
 #include "platform/acfreebsd.h"
 #include "acconfig.h"
@@ -2020,9 +2024,8 @@ command_udb_send(int argc, char *argv[])
 	}
 	printf("Sending '%s\\r\\n'...\n", argv[1]);
 	len = strlen(argv[1]);
-	for (i = 0; i < len; i++) {
-		udb_console.c_out((u_int)argv[1][i]); 
-	}
+	for (i = 0; i < len; i++)
+		udb_console.c_out((u_int)argv[1][i]);
 	udb_console.c_out('\r'); 
 	udb_console.c_out('\n'); 
 	return (CMD_OK);
@@ -2031,31 +2034,40 @@ COMMAND_SET(udb_send, "udb_send", "USB DbC send string test",
     command_udb_send);
 
 static int
+command_udb_recv(int argc, char *argv[])
+{
+	int buf[1024];
+	int i, j;
+	int c;
+
+	printf("Receiving...\n");
+	i = 0;
+	while (udb_console.c_ready() && i < sizeof(buf)) {
+		c = udb_console.c_in();
+		if (c != -1)
+			buf[i++] = c;
+	}
+	if (i != 0) {
+		printf("[");
+		for (j = 0; j < i; j++)
+			printf("%c(%02x) ", (char)buf[j], (char)buf[j]);
+		printf("]\n");
+	}
+
+	return (CMD_OK);
+}
+COMMAND_SET(udb_recv, "udb_recv", "USB DbC recv test",
+    command_udb_recv);
+
+static int
 command_udb_probe(int argc, char *argv[])
 {
 	udb_console.c_probe(&udb_console);
+	if ((udb_console.c_flags & (C_PRESENTIN | C_PRESENTOUT)) !=
+	    (C_PRESENTIN | C_PRESENTOUT))
+		return (CMD_ERROR);
 
-	return (CMD_OK);
+	return (udb_console.c_init(0));
 }
 COMMAND_SET(udb_probe, "udb_probe", "USB DbC probe",
     command_udb_probe);
-
-static int
-command_udb_recon(int argc, char *argv[])
-{
-	udb_console.c_init(1);
-
-	return (CMD_OK);
-}
-COMMAND_SET(udb_recon, "udb_recon", "USB DbC reconnect",
-    command_udb_recon);
-
-static int
-command_udb_init(int argc, char *argv[])
-{
-
-	udb_console.c_init(0);
-	return (CMD_OK);
-}
-COMMAND_SET(udb_init, "udb_init", "USB DbC init",
-    command_udb_init);

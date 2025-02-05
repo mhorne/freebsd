@@ -208,11 +208,18 @@
 #define	XHCI_ID_USB_DEBUG	0x000a
 
 /* XHCI Debug Capability */
-#define	XHCI_DCID		0x0001
+#define	XHCI_DCID		0x0000
 #define	XHCI_DCDB		0x0004
+#define	XHCI_DCDB_GET(x)	(((x) >> 8) & 0xFF)
+#define	XHCI_DCDB_MASK		0x0000FF00	/* the other bits are RsvdP */
+#define	XHCI_DCDB_OUT		0x0000
+#define	XHCI_DCDB_IN		0x0100
+#define	XHCI_DCDB_INVAL		0xFF00
 #define	XHCI_DCERSTSZ		0x0008
-#define	XHCI_DCERSTBA		0x0010
-#define	XHCI_DCERDP		0x0018
+#define	XHCI_DCERSTBA_LO	0x0010
+#define	XHCI_DCERSTBA_HI	0x0014
+#define	XHCI_DCERDP_LO		0x0018
+#define	XHCI_DCERDP_HI		0x001C
 #define	XHCI_DCCTRL		0x0020
 #define	XHCI_DCCTRL_DCR		0x00000001
 #define	XHCI_DCCTRL_DCR_GET(x)	(((x)      ) & 0x01)
@@ -229,7 +236,7 @@
 #define	XHCI_DCCTRL_DCE		0x80000000
 #define	XHCI_DCCTRL_DCE_GET(x)	(((x) >> 31) & 0x01)
 #define	XHCI_DCST		0x0024
-#define	XHCI_DCST_ER		0x00000000
+#define	XHCI_DCST_ER		0x00000001
 #define	XHCI_DCST_ER_GET(x)	(((x)      ) & 0x01)
 #define	XHCI_DCST_SBR		0x00000004
 #define	XHCI_DCST_SBR_GET(x)	(((x) >>  2) & 0x01)
@@ -237,8 +244,8 @@
 #define	XHCI_DCPORTSC		0x0028
 #define	XHCI_DCPORTSC_CCS	0x00000001
 #define	XHCI_DCPORTSC_CCS_GET(x)	(((x)      ) & 0x01)
-#define	XHCI_DCPORTSC_PED	0x00000004
-#define	XHCI_DCPORTSC_PED_GET(x)	(((x) >>  2) & 0x01)
+#define	XHCI_DCPORTSC_PED	0x00000002
+#define	XHCI_DCPORTSC_PED_GET(x)	(((x) >>  1) & 0x01)
 #define	XHCI_DCPORTSC_PR	0x00000010
 #define	XHCI_DCPORTSC_PR_GET(x)	(((x) >>  4) & 0x01)
 #define	XHCI_DCPORTSC_PLS_GET(x)	(((x) >>  5) & 0x0F)
@@ -261,9 +268,35 @@
 #define	XHCI_DCPORTSC_PLC_GET(x)	(((x) >> 22) & 0x01)
 #define	XHCI_DCPORTSC_CEC	0x00800000
 #define	XHCI_DCPORTSC_CEC_GET(x)	(((x) >> 23) & 0x01)
-#define	XHCI_DCCP		0x0030
+#define	XHCI_DCCP_LO		0x0030
+#define	XHCI_DCCP_HI		0x0034
 #define	XHCI_DCDDI1		0x0038
 #define	XHCI_DCDDI2		0x003C
+
+#define	XHCI_DCSTATUS(ctrl, portsc) \
+	(XHCI_DCCTRL_DCE_GET(ctrl) << 4 | \
+	XHCI_DCPORTSC_CCS_GET(portsc) << 3 | \
+	XHCI_DCPORTSC_PED_GET(portsc) << 2 | \
+	XHCI_DCPORTSC_PR_GET(portsc)  << 1 | \
+	XHCI_DCCTRL_DCR_GET(ctrl))
+#define	XHCI_DCPORT_ST_OFF		0x00
+#define	XHCI_DCPORT_ST_DISCONNECTED	0x10	/* DCE only */
+#define	XHCI_DCPORT_ST_DISCONNECTED_RUNNING	0x11	/* XXX: DCE + DCR */
+#define	XHCI_DCPORT_ST_DISABLED		0x18	/* DCE + CCS */
+#define	XHCI_DCPORT_ST_RESETTING	0x1a	/* DCE + CCS + PR */
+#define	XHCI_DCPORT_ST_ENABLED		0x1c	/* DCE + CCS + PED */
+#define	XHCI_DCPORT_ST_CONFIGURED	0x1d	/* DCE + CCS + PED + DCR */
+
+#define	XHCI_DC_MAXPACKETLEN	1024
+/*
+ * While Sec 7.6.3.2 describes Endpoint IDs should be 0 or 1,
+ * Intel chips use Device Context Index (Sec 4.5.1) instead.
+ */
+#define	XHCI_DC_EPID_OUT	0
+#define	XHCI_DC_EPID_IN		1
+#define	XHCI_DC_EPID_OUT_INTEL	2
+#define	XHCI_DC_EPID_IN_INTEL	3
+#define	XHCI_DC_SLOT		1
 
 /* XHCI register R/W wrappers */
 #define	XREAD1(sc, what, a) \
@@ -275,6 +308,9 @@
 #define	XREAD4(sc, what, a) \
 	bus_space_read_4((sc)->sc_io_tag, (sc)->sc_io_hdl, \
 		(a) + (sc)->sc_##what##_off)
+#define	XREAD44LH(sc, what, a) \
+	((uint64_t)XREAD4((sc), what, a##_LO) | \
+	    ((uint64_t)XREAD4((sc), what, a##_HI) << 32))
 #define	XWRITE1(sc, what, a, x) \
 	bus_space_write_1((sc)->sc_io_tag, (sc)->sc_io_hdl, \
 		(a) + (sc)->sc_##what##_off, (x))
@@ -284,5 +320,10 @@
 #define	XWRITE4(sc, what, a, x) \
 	bus_space_write_4((sc)->sc_io_tag, (sc)->sc_io_hdl, \
 		(a) + (sc)->sc_##what##_off, (x))
+#define	XWRITE44LH(sc, what, a, x) \
+	do { \
+		XWRITE4((sc), what, a##_LO, (uint32_t)((x) & 0xffffffff)); \
+		XWRITE4((sc), what, a##_HI, (uint32_t)((x) >> 32)); \
+	} while (0)
 
 #endif	/* _XHCIREG_H_ */

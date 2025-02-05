@@ -100,9 +100,6 @@ xhci_pci_match(device_t self)
 		return ("AMD Starship USB 3.0 controller");
 	case 0x149c1022:
 		return ("AMD Matisse USB 3.0 controller");
-	case 0x15e01022:
-	case 0x15e11022:
-		return ("AMD Raven USB 3.1 controller");
 	case 0x43ba1022:
 		return ("AMD X399 USB 3.0 controller");
 	case 0x43b91022: /* X370 */
@@ -389,7 +386,7 @@ xhci_pci_attach(device_t self)
 		device_printf(self, "Could not allocate IRQ\n");
 		/* goto error; FALLTHROUGH - use polling */
 	}
-	sc->sc_bus.bdev = device_add_child(self, "usbus", DEVICE_UNIT_ANY);
+	sc->sc_bus.bdev = device_add_child(self, "usbus", -1);
 	if (sc->sc_bus.bdev == NULL) {
 		device_printf(self, "Could not add USB device\n");
 		goto error;
@@ -465,12 +462,9 @@ static int
 xhci_pci_detach(device_t self)
 {
 	struct xhci_softc *sc = device_get_softc(self);
-	int error;
 
 	/* during module unload there are lots of children leftover */
-	error = bus_generic_detach(self);
-	if (error != 0)
-		return (error);
+	device_delete_children(self);
 
 	usb_callout_drain(&sc->sc_callout);
 	xhci_halt_controller(sc);

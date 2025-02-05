@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010-2022 Hans Petter Selasky
+ * Copyright (c) 2020-2024 Hiroki Sato <hrs@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -63,11 +64,6 @@
 #include <sys/malloc.h>
 #include <sys/priv.h>
 
-#include <sys/cons.h>
-#include <sys/kdb.h>
-#include <sys/tty.h>
-#include <sys/reboot.h>
-
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
 
@@ -88,6 +84,7 @@
 
 #include <dev/usb/controller/xhci.h>
 #include <dev/usb/controller/xhcireg.h>
+#include <dev/usb/controller/xhci_dbc.h>
 
 #define	XHCI_BUS2SC(bus) \
 	__containerof(bus, struct xhci_softc, sc_bus)
@@ -97,7 +94,7 @@
 	    &((struct which##64 *)(ptr))->field.ctx : \
 	    &((struct which *)(ptr))->field)
 
-static SYSCTL_NODE(_hw_usb, OID_AUTO, xhci, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+SYSCTL_NODE(_hw_usb, OID_AUTO, xhci, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "USB XHCI");
 
 static int xhcistreams;
@@ -159,50 +156,8 @@ struct xhci_std_temp {
 	uint8_t			do_isoc_sync;
 };
 
-/* for USB DbC */
-#define	UDBCONS_NAME	"udbcons"
-
-#define	UDB_TRB_MAX_TRANSFER (USB_PAGE_SIZE << 4)
-#define	UDB_TRB_PER_PAGE (USB_PAGE_SIZE / sizeof(struct xhci_trb))
-#define	UDB_TRB_RING_ORDER 4
-#define	UDB_TRB_RING_CAP (UDB_TRB_PER_PAGE * (1ULL << UDB_TRB_RING_ORDER))
-#define	UDB_TRB_RING_BYTES (UDB_TRB_RING_CAP * sizeof(struct xhci_trb))
-#define	UDB_TRB_RING_MASK (UDB_TRB_RING_BYTES - 1U)
-#define	UDB_WORK_RING_ORDER 3
-#define	UDB_WORK_RING_CAP (USB_PAGE_SIZE * (1ULL << UDB_WORK_RING_ORDER))
-#define	UDB_WORK_RING_BYTES UDB_WORK_RING_CAP
-
-#if UDB_WORK_RING_CAP > UDB_TRB_MAX_TRANSFER
-#error	"UDB_WORK_RING_ORDER must be at most 4"
-#endif
-
-static int xhci_debug_init(struct xhci_softc *);
-
-/* DbC console ops */
-
-static int udbcons_init(struct xhci_softc *, device_t);
-
-struct udbcons_priv;
-typedef void udbcons_putc_t(struct udbcons_priv *, int);
-typedef int udbcons_getc_t(struct udbcons_priv *);
-struct udbcons_ops {
-	udbcons_putc_t	*putc;
-	udbcons_getc_t	*getc;
-};
-struct udbcons_priv {
-	device_t			dev;	/* XHCI */
-	struct xhci_softc		*xhci;
-	const struct udbcons_ops	*ops;
-	struct callout			callout;
-	struct tty			*tp;
-	bool				opened;
-	int				polltime;
-	int				alt_break_state;
-};
-static struct udbcons_priv udbcons0;
 static void xhci_debug_reg_read(struct xhci_softc *);
 static void xhci_debug_reg_restore(struct xhci_softc *);
-static void xhci_debug_enable(struct xhci_softc *);
 
 static void	xhci_do_poll(struct usb_bus *);
 static void	xhci_device_done(struct usb_xfer *, usb_error_t);
@@ -279,9 +234,6 @@ xhci_iterate_hw_softc(struct usb_bus *bus, usb_bus_mem_sub_cb_t *cb)
 
 	cb(bus, &sc->sc_hw.ctx_pc, &sc->sc_hw.ctx_pg,
 	   sizeof(struct xhci_dev_ctx_addr), XHCI_PAGE_SIZE);
-
-	cb(bus, &sc->sc_hw.dbc_pc, &sc->sc_hw.dbc_pg,
-	   sizeof(struct xhci_debug_softc), XHCI_PAGE_SIZE);
 
 	for (i = 0; i != sc->sc_noscratch; i++) {
 		cb(bus, &sc->sc_hw.scratch_pc[i], &sc->sc_hw.scratch_pg[i],
@@ -364,7 +316,6 @@ xhci_start_controller(struct xhci_softc *sc)
 	uint16_t i;
 
 	DPRINTF("\n");
-	printf("%s called\n", __func__);
 
 	sc->sc_event_ccs = 1;
 	sc->sc_event_idx = 0;
@@ -375,9 +326,10 @@ xhci_start_controller(struct xhci_softc *sc)
 	if (err)
 		return (err);
 
-	xhci_debug_reg_restore(sc);
-	xhci_debug_enable(sc);
-
+	if (udb_enable && sc->sc_udbc != NULL) {
+		xhci_debug_reg_restore(sc);
+		xhci_debug_enable(sc->sc_udbc);
+	}
 	/* set up number of device slots */
 	DPRINTF("CONFIG=0x%08x -> 0x%08x\n",
 	    XREAD4(sc, oper, XHCI_CONFIG), sc->sc_noslot);
@@ -626,66 +578,29 @@ xhci_init(struct xhci_softc *sc, device_t self, uint8_t dma32)
 	/* enable 64Kbyte control endpoint quirk */
 	sc->sc_bus.control_ep_quirk = (xhcictlquirk ? 1 : 0);
 
-#if 0
-	if (sc->sc_udbc == NULL) {
-		struct usb_page_search buf_res;
- 
-		usbd_get_page(&sc->sc_hw.dbc_pc, 0, &buf_res);
-		sc->sc_udbc = (struct xhci_debug_softc *)buf_res.buffer;
-		memset(sc->sc_udbc, 0, sizeof(*sc->sc_udbc));
-		sc->sc_udbc->base = buf_res.physaddr;
-	}
-#endif
 	/* Check if DbC is available. */
-	{
-		uint32_t eec = -1;	/* XXX */
-		uint32_t eecp;
+	if (udb_enable) {
+		sc->sc_udbc = malloc(sizeof(*sc->sc_udbc), M_DEVBUF, 
+		    M_WAITOK | M_ZERO);
+		sc->sc_udbc->sc_xhci = sc;
 
-		for (eecp = XHCI_HCS0_XECP(temp) << 2;
-		     eecp != 0 && XHCI_XECP_NEXT(eec);
-		     eecp += XHCI_XECP_NEXT(eec) << 2) {
-			eec = XREAD4(sc, capa, eecp);
-
-			if (XHCI_XECP_ID(eec) != XHCI_ID_USB_DEBUG) {
-				device_printf(self,
-				    "looking for DBC(0x0a): %02x\n",
-				    XHCI_XECP_ID(eec));
-				continue;
-			}
-		}
-		if (XHCI_XECP_ID(eec) == XHCI_ID_USB_DEBUG) {
-			struct xhci_debug_reg *r;
+		if (xhci_debug_probe(sc->sc_udbc)) {
+			/* Initialization */
+			sc->sc_dbc_off = sc->sc_udbc->sc_dbc_off;
 
 			udbcons_init(sc, self);
-#if 1
-			sc->sc_udbc.xhci_xecp_offset = eecp;
-#endif
 			xhci_debug_reg_read(sc);
 
-			r = &sc->sc_udbc.reg;
-
-			device_printf(self, "DbC found at 0x%04x:\n"
-			    "  ERSTSZ=%04x\n"
-			    "  ERSTBA=0x%08llx\n"
-			    "  ERDP=0x%08llx\n"
-			    "  CP=0x%08llx\n"
-			    "  DDI1=0x%04x\n"
-			    "  DDI2=0x%04x\n",
-				eecp,
-				r->erstsz,
-				(unsigned long long)le64toh(r->erstba),
-				(unsigned long long)le64toh(r->erdp),
-				(unsigned long long)le64toh(r->cp),
-				r->ddi1,
-				r->ddi2);
-
-			eec = XREAD4(sc, capa, eecp + XHCI_DCCTRL);
-			device_printf(self, "DbC is %s\n",
-			    (eec & XHCI_DCCTRL_DCE)
+			device_printf(self, "DbC is available and %s\n",
+			    (XREAD4(sc, dbc, XHCI_DCCTRL) & XHCI_DCCTRL_DCE)
 				? "running"
 				: "not running");
-		} else
+		} else {
 			device_printf(self, "DbC not available\n");
+			free(sc->sc_udbc, M_DEVBUF);
+			sc->sc_dbc_off = 0;
+			sc->sc_udbc = NULL;
+		}
 	}
 
 	temp = XREAD4(sc, capa, XHCI_HCSPARAMS1);
@@ -4526,763 +4441,38 @@ static const struct usb_bus_methods xhci_bus_methods = {
 	.set_endpoint_mode = xhci_set_endpoint_mode,
 };
 
-MODULE_VERSION(xhci, 1);
-
-/* XHCI DbC console */
-
 static void
 xhci_debug_reg_read(struct xhci_softc *sc)
 {
 	struct xhci_debug_reg *r;
-	uint32_t offset;
-	
-#if 0
-	if (sc->sc_udbc == NULL)
-		return;
-#endif
-	offset = sc->sc_udbc.xhci_xecp_offset;
-	if (offset == 0)
+
+	if (sc->sc_dbc_off == 0)
 		return;
 
-	r = &sc->sc_udbc.reg;
+	r = &sc->sc_udbc->reg;
 
-	r->erstsz = XREAD4(sc, capa, offset + XHCI_DCERSTSZ);
-
-	/* LE */
-	r->erstba = XREAD4(sc, capa, offset + XHCI_DCERSTBA);
-	r->erstba |= (uint64_t)XREAD4(sc, capa, offset + XHCI_DCERSTBA + 4) << 32;
-	/* LE */
-	r->erdp = XREAD4(sc, capa, offset + XHCI_DCERDP);
-	r->erdp |= (uint64_t)XREAD4(sc, capa, offset + XHCI_DCERDP + 4) << 32;
-	/* LE */
-	r->cp = XREAD4(sc, capa, offset + XHCI_DCCP);
-	r->cp |= (uint64_t)XREAD4(sc, capa, offset + XHCI_DCCP + 4) << 32;
-
-	r->ddi1 = XREAD4(sc, capa, offset + XHCI_DCDDI1);
-	r->ddi2 = XREAD4(sc, capa, offset + XHCI_DCDDI2);
+	r->erstsz = XREAD4(sc, dbc, XHCI_DCERSTSZ);
+	r->erstba = XREAD44LH(sc, dbc, XHCI_DCERSTBA);
+	r->erdp = XREAD44LH(sc, dbc, XHCI_DCERDP);
+	r->cp = XREAD44LH(sc, dbc, XHCI_DCCP);
+	r->ddi1 = XREAD4(sc, dbc, XHCI_DCDDI1);
+	r->ddi2 = XREAD4(sc, dbc, XHCI_DCDDI2);
 }
 static void
 xhci_debug_reg_restore(struct xhci_softc *sc)
 {
 	struct xhci_debug_reg *r;
-	uint32_t offset;
-	
-	printf("%s: enter\n", __func__);
-#if 0
-	if (sc->sc_udbc == NULL)
-		return;
-#endif
-	offset = sc->sc_udbc.xhci_xecp_offset;
-	if (offset == 0)
+
+	if (sc->sc_dbc_off == 0)
 		return;
 
-	r = &sc->sc_udbc.reg;
-
-	XWRITE4(sc, capa, offset + XHCI_DCERSTSZ, r->erstsz);
-
-	/* LE */
-	XWRITE4(sc, capa, offset + XHCI_DCERSTBA, r->erstba & 0xFFFFFFFF);
-	XWRITE4(sc, capa, offset + XHCI_DCERSTBA + 4, (r->erstba >> 32) & 0xFFFFFFFF);
-	/* LE */
-	XWRITE4(sc, capa, offset + XHCI_DCERDP, r->erdp & 0xFFFFFFFF);
-	XWRITE4(sc, capa, offset + XHCI_DCERDP + 4, (r->erdp >> 32) & 0xFFFFFFFF);
-	/* LE */
-	XWRITE4(sc, capa, offset + XHCI_DCCP, r->cp & 0xFFFFFFFF);
-	XWRITE4(sc, capa, offset + XHCI_DCCP + 4, (r->cp >> 32) & 0xFFFFFFFF);
-
-	XWRITE4(sc, capa, offset + XHCI_DCDDI1, r->ddi1);
-	XWRITE4(sc, capa, offset + XHCI_DCDDI2, r->ddi2);
-	printf("%s: leave\n", __func__);
-}
-
-struct udb_ctx {
-	uint32_t info[16];
-	uint32_t ep_out[16];
-	uint32_t ep_in[16];
-};
-static uint64_t udb_xhci_debug_ring_init(uint64_t, struct xhci_debug_ring *,
-    int, int);
-static void udb_init_ep(uint32_t *, size_t, uint64_t, uint32_t, uint64_t);
-static void udb_init_strings(struct xhci_debug_softc *, uint64_t, uint32_t *);
-
-/* DbC idVendor and idProduct */
-#define	DC_VENDOR	0x1d6b	/* Linux Foundation */
-#define	DC_PRODUCT	0x0011	/* Linux */ 
-#define	DC_PROTOCOL	0x0000	/* GNU GDB = 1 */
-#define	DC_REVISION	0x0010	/* 1.0 */
-
-static int
-xhci_debug_init(struct xhci_softc *sc)
-{
-	struct xhci_debug_softc *dsc;
-	struct xhci_debug_reg *r;
-	uint64_t erdp, out, in;
-	uint64_t pbase;
-	uint32_t temp;
-	uint64_t offset;
-
-	if (sc == NULL)
-		return (-1);
-	dsc = &sc->sc_udbc;
-	if (dsc == NULL)
-		return (-1);
-	offset = dsc->xhci_xecp_offset;
-	if (offset == 0)
-		return (-1);
-	if (dsc->init != 0)
-		return (0);
-	pbase = dsc->base;
-#define	ADDR(x)	(pbase + __offsetof(struct xhci_debug_softc, x))
-
-	/* init ring */
-
-	/* Create an event ring. */
-	erdp = udb_xhci_debug_ring_init(ADDR(udb_ering), &dsc->udb_ering,
-	    0, XHCI_DB_INVAL);
-	if (erdp == 0)
-		return (-1);
-	memset(dsc->udb_erst, 0, sizeof(*dsc->udb_erst));
-	/* htole64? */
-	dsc->udb_erst->qwEvrsTablePtr = htole64(erdp);
-	dsc->udb_erst->dwEvrsTableSize = htole32(UDB_TRB_RING_CAP);
-	printf("%s: ERDP=0x%016llx\n", __func__, (unsigned long long)erdp);
-
-	/* Create an output ring. */
-	out = udb_xhci_debug_ring_init(ADDR(udb_oring), &dsc->udb_oring,
-	    1, XHCI_DB_OUT);
-	if (out == 0)
-		return (-1);
-
-	/* Create an input ring. */
-	in = udb_xhci_debug_ring_init(ADDR(udb_iring), &dsc->udb_iring,
-	    1, XHCI_DB_IN);
-	if (in == 0)
-		return (-1);
-
-	/* Initialize DbC context. */
-	memset(&dsc->ctx, 0, sizeof(dsc->ctx));
-	udb_init_strings(dsc, pbase, dsc->ctx.info);
-
-	temp = XREAD4(sc, capa, offset + XHCI_DCCTRL);
-
-#define	EP_BULK_OUT	2
-#define	EP_BULK_IN	6
-	/* Initialize endppints. */ 
-	udb_init_ep(dsc->ctx.ep_out, sizeof(*dsc->ctx.ep_out),
-	    (uint64_t)XHCI_DCCTRL_MBS_GET(temp), EP_BULK_OUT, out);
-	udb_init_ep(dsc->ctx.ep_in, sizeof(*dsc->ctx.ep_in),
-	    (uint64_t)XHCI_DCCTRL_MBS_GET(temp), EP_BULK_IN, in);
-
-	/* Configure register values. */
-	XWRITE4(sc, capa, offset + XHCI_DCERSTSZ, 1);
-	XWRITE4(sc, capa, offset + XHCI_DCERSTBA, ADDR(udb_erst) & 0xFFFFFFFF);
-	XWRITE4(sc, capa, offset + XHCI_DCERSTBA + 4, (ADDR(udb_erst) >> 32) & 0xFFFFFFFF);
-	XWRITE4(sc, capa, offset + XHCI_DCERDP, erdp & 0xFFFFFFFF);
-	XWRITE4(sc, capa, offset + XHCI_DCERDP + 4, (erdp >> 32) & 0xFFFFFFFF);
-	XWRITE4(sc, capa, offset + XHCI_DCCP, ADDR(ctx) & 0xFFFFFFFF);
-	XWRITE4(sc, capa, offset + XHCI_DCCP + 4, (ADDR(ctx) >> 32) & 0xFFFFFFFF);
-	XWRITE4(sc, capa, offset + XHCI_DCDDI1,
-	    (DC_VENDOR   << 16) | DC_PROTOCOL);
-	XWRITE4(sc, capa, offset + XHCI_DCDDI2,
-	    (DC_REVISION << 16) | DC_PRODUCT);
-
-	usb_pc_cpu_flush(&sc->sc_hw.dbc_pc);
-
-	dsc->udb_owork.enq = 0;
-	dsc->udb_owork.deq = 0;
-	dsc->udb_owork.paddr = ADDR(udb_owork);
-	dsc->udb_owork.paddr += __offsetof(struct xhci_debug_work_ring, buf);
-
-	dsc->init = 1;
-	xhci_debug_reg_read(sc);
-
-	r = &sc->sc_udbc.reg;
-
-	printf("XHCI DbC Initialized:\n"
-	    "  ERSTSZ=%04x\n"
-	    "  ERSTBA=0x%08llx\n"
-	    "  ERDP=0x%08llx\n"
-	    "  CP=0x%08llx\n"
-	    "  DDI1=0x%04x\n"
-	    "  DDI2=0x%04x\n",
-		r->erstsz,
-		(unsigned long long)le64toh(r->erstba),
-		(unsigned long long)le64toh(r->erdp),
-		(unsigned long long)le64toh(r->cp),
-		r->ddi1,
-		r->ddi2);
-
-	return (0);
-}
-
-static uint64_t
-udb_xhci_debug_ring_init(uint64_t pbase,
-    struct xhci_debug_ring *ring, int producer, int doorbell)
-{
-	uint64_t addr = 0;
-
-	memset(ring->trb, 0, UDB_TRB_RING_CAP * sizeof(ring->trb[0]));
-
-	ring->enq = 0;
-	ring->deq = 0;
-	ring->cyc = 1;
-	ring->doorbell = (uint8_t)doorbell;
-
-	/* Place a link TRB at the tail if producer == 1. */
-	if (producer) {
-		struct xhci_trb *trb = &ring->trb[UDB_TRB_RING_CAP - 1];
-
-		trb->dwTrb3 |= XHCI_TRB_3_TYPE_SET(XHCI_TRB_TYPE_LINK);
-		trb->dwTrb3 |= XHCI_TRB_3_TC_BIT;
-		/* Fields for link TRBs (section 6.4.4.1) */
-		trb->qwTrb0 = pbase;
-		trb->qwTrb0 += __offsetof(struct xhci_debug_ring, trb);
-		addr = trb->qwTrb0;
-	}
-	return (addr);
-}
-
-/*
- * Initializes the endpoint as specified in sections 7.6.3.2 and 7.6.9.2.
- * Each endpoint is Bulk, so the MaxPStreams, LSA, HID, CErr, FE,
- * Interval, Mult, and Max ESIT Payload fields are all 0.   
- *
- * Max packet size: 1024
- * Max burst size: debug mbs (from db_reg->ctrl register)
- * EP type: 2 for OUT bulk, 6 for IN bulk   
- * TR dequeue ptr: physical base address of transfer ring
- * Avg TRB length: software defined (see 4.14.1.1 for suggested defaults)
- */
-static void
-udb_init_ep(uint32_t *ep, size_t len, uint64_t mbs, uint32_t type,
-    uint64_t ring_paddr)
-{
-	memset(ep, 0, len);
-
-	ep[1] = (1024 << 16) | ((uint32_t)mbs << 8) | (type << 3);
-	ep[2] = (ring_paddr & 0xFFFFFFFF) | 1;
-	ep[3] = ring_paddr >> 32;
-	ep[4] = 3 * 1024;
-}
-
-struct usb_strdesc {
-	uint8_t bLength;
-	uint8_t bDescriptorType;
-	uint8_t chars[62];	/* UTF-16LE */
-};
-#define USB_DESC_TYPE_STRING	3
-
-/* Initialize the DbC info with USB string descriptor addresses. */
-void
-udb_init_strings(struct xhci_debug_softc *dsc, uint64_t pbase, uint32_t *info)
-{
-	struct usb_strdesc udb_strdesc[] = {
-		{
-		  .bLength = 2 + 4,
-		  .bDescriptorType = USB_DESC_TYPE_STRING,
-		  .chars = { 9, 0, 4, 0 },	/* 0x0409 = English */
-		},
-		{
-		  .bLength = 2 + 36,
-		  .bDescriptorType = USB_DESC_TYPE_STRING,
-		  .chars = {
-		    'F', 0, 'r', 0, 'e', 0, 'e', 0, 'B', 0, 'S', 0, 'D', 0,
-		    ' ', 0,
-		    'F', 0, 'o', 0, 'u', 0, 'n', 0, 'd', 0, 'a', 0, 't', 0,
-		    'i', 0, 'o', 0, 'n', 0,
-		  }
-		},
-		{
-		  .bLength = 2 + 50,
-		  .bDescriptorType = USB_DESC_TYPE_STRING,
-		  .chars = {
-		    'F', 0, 'r', 0, 'e', 0, 'e', 0, 'B', 0, 'S', 0, 'D', 0,
-		    ' ', 0,
-		    'U', 0, 'S', 0, 'B', 0, ' ', 0, 'D', 0, 'b', 0, 'C', 0,
-		    '.', 0, 'G', 0, 'P', 0, ' ', 0, 'D', 0, 'e', 0, 'v', 0,
-		    'i', 0, 'c', 0, 'e', 0,
-		  }
-		},
-		{
-		  .bLength = 2 + 2,
-		  .bDescriptorType = USB_DESC_TYPE_STRING,
-		  .chars = { '0', 0 }
-		}
-	};
-	uint64_t *sda;
-	memcpy(dsc->udb_str, udb_strdesc, sizeof(udb_strdesc));
-
-	sda = (uint64_t *)(void *)&info[0];
-	sda[0] = ADDR(udb_str);
-	sda[1] = sda[0] + 64;
-	sda[2] = sda[0] + 64 + 64;
-	sda[3] = sda[0] + 64 + 64 + 64;
-	info[8] = (4 << 24) | (52 << 16) | (38 << 8) | 6;
-}
-
-static void
-xhci_debug_enable(struct xhci_softc *sc)
-{
-	uint32_t offset;
-	uint32_t temp;
-#if 0
-	int error;
-#endif
-	
-	printf("%s: enter\n", __func__);
-#if 0
-	if (sc->sc_udbc == NULL)
-		return;
-#endif
-	offset = sc->sc_udbc.xhci_xecp_offset;
-	if (offset == 0)
-		return;
-
-#if 0
-	error = xhci_debug_init(sc);
-	if (error)
-		return;
-	usb_pc_cpu_flush(&sc->sc_hw.dbc_pc);
-#endif
-
-	temp = XREAD4(sc, capa, offset + XHCI_DCCTRL);
-	XWRITE4(sc, capa, offset + XHCI_DCCTRL, temp | (1 << 31));
-	temp = XREAD4(sc, capa, offset + XHCI_DCPORTSC);
-	XWRITE4(sc, capa, offset + XHCI_DCPORTSC, temp | (1 << 2));
-	printf("%s: leave\n", __func__);
-}
-
-/* udbcons */
-
-static int64_t udb_push_work(struct xhci_debug_work_ring *, const char *, int64_t);
-static void udb_pop_events(struct xhci_softc *);
-static void udb_flush(struct xhci_softc *);
-
-static int
-udbcons_getc(struct udbcons_priv *cons) {
-	return (-1);
-}
-static void
-udbcons_putc(struct udbcons_priv *cons, int ch) {
-	struct xhci_softc *sc;
-	uint64_t i;
-
-	return;
-
-	sc = cons->xhci;
-#if 0
-	if (sc->sc_udbc == NULL)
-		return;
-#endif
-
-	u_char c = (0xff & ch);
-
-	i = udb_push_work(&sc->sc_udbc.udb_owork, &c, 1);
-	usb_pc_cpu_flush(&sc->sc_hw.dbc_pc);
-	if (i == 0)
-		return;
-	if (c == '\n')
-		udb_flush(sc);
-}
-static struct udbcons_ops udbcons0_ops = {
-	.putc = udbcons_putc,
-	.getc = udbcons_getc,
-};
-
-static tsw_outwakeup_t xhci_debug_tty_outwakeup;
-
-static struct ttydevsw xhci_debug_ttydevsw = {
-	.tsw_flags	= TF_NOPREFIX,
-	.tsw_outwakeup	= xhci_debug_tty_outwakeup,
-};
-
-static void xhci_debug_timeout(void *);
-
-static int
-udbcons_init(struct xhci_softc *sc, device_t dev)
-{
-	struct udbcons_priv *cons;
-#if 0
-	device_printf(dev, "%s: enter\n", __func__);
-#endif
-
-	cons = &udbcons0;
-	cons->dev = dev;
-	cons->xhci = sc;
-	cons->ops = &udbcons0_ops;
-
-	device_printf(dev, "call tty_alloc\n");
-	cons->tp = tty_alloc(&xhci_debug_ttydevsw, cons);
-	cons->polltime = 1;
-
-	device_printf(dev, "call tty_makedev\n");
-	tty_makedev(cons->tp, NULL, "%s", UDBCONS_NAME);
-	tty_init_console(cons->tp, 0);
-
-	device_printf(dev, "call callout_init\n");
-	callout_init(&cons->callout, 1);
-	callout_reset(&cons->callout, cons->polltime,
-	    xhci_debug_timeout, cons->tp);
-
-#if 0
-	device_printf(dev, "%s: leave\n", __func__);
-#endif
-	return (0);
-}
-
-static cn_probe_t xhci_debug_cnprobe;
-static cn_init_t xhci_debug_cninit;
-static cn_term_t xhci_debug_cnterm;
-static cn_getc_t xhci_debug_cngetc;
-static cn_putc_t xhci_debug_cnputc;
-static cn_grab_t xhci_debug_cngrab;
-static cn_ungrab_t xhci_debug_cnungrab;
-
-const struct consdev_ops xhci_debug_cnops = {
-	.cn_probe	= xhci_debug_cnprobe,
-	.cn_init	= xhci_debug_cninit,
-	.cn_term	= xhci_debug_cnterm,
-	.cn_getc	= xhci_debug_cngetc,
-	.cn_putc	= xhci_debug_cnputc,
-	.cn_grab	= xhci_debug_cngrab,
-	.cn_ungrab	= xhci_debug_cnungrab,
-};
-
-CONSOLE_DRIVER(xhci_debug);
-
-#define MAX_BURST_LEN	1
-static void
-xhci_debug_tty_outwakeup(struct tty *tp)
-{
-	struct udbcons_priv *cons;
-	u_char buf[MAX_BURST_LEN];
-	int len;
-	int i;
-
-	cons = tty_softc(tp);
-	for (;;) {
-		len = ttydisc_getc(tp, buf, sizeof(buf));
-		if (len == 0)
-			break;
-		KASSERT(len == 1, ("tty error"));
-
-		for (i = 0; i < len; i++)
-			udbcons_putc(cons, buf[i]);
-	}
-}
-
-static void
-xhci_debug_timeout(void *v)
-{
-	struct udbcons_priv *cons;
-	struct tty *tp;
-	int ch;
-
-	tp = v;
-	cons = tty_softc(tp);
-
-	tty_lock(tp);
-	while ((ch = xhci_debug_cngetc(NULL)) != -1)
-		ttydisc_rint(tp, ch, 0);
-	ttydisc_rint_done(tp);
-	tty_unlock(tp);
-
-#if 0
-	if (cons->xhci != NULL)
-		device_printf(cons->dev, "%s called\n", __func__);
-#endif
-
-	callout_reset(&cons->callout, cons->polltime, xhci_debug_timeout, tp);
-}
-
-static void
-xhci_debug_cnprobe(struct consdev *cp)
-{
-
-	cp->cn_pri = (boothowto & RB_SERIAL) ? CN_REMOTE : CN_NORMAL;
-	sprintf(cp->cn_name, "%s", UDBCONS_NAME);
-}
-
-static void
-xhci_debug_cninit(struct consdev *cp)
-{
-
-}
-
-static void
-xhci_debug_cnterm(struct consdev *cp)
-{
-}
-
-/* empty */
-static void
-xhci_debug_cngrab(struct consdev *cp)
-{
-}
-
-/* empty */
-static void
-xhci_debug_cnungrab(struct consdev *cp)
-{
-}
-
-static int
-xhci_debug_cngetc(struct consdev *cp)
-{
-	int ch;
-
-	ch = udbcons_getc(&udbcons0);
-	if (ch > 0 && ch < 0xff) {
-#if defined(KDB)
-		kdb_alt_break(ch, &udbcons0.alt_break_state);
-#endif
-		return (ch);
-	}
-	return (-1);
-}
-
-static void
-xhci_debug_cnputc(struct consdev *cp, int ch)
-{
-	udbcons_putc(&udbcons0, ch);
-}
-
-/* DbC TRB handling */
-
-static void push_trb(struct xhci_debug_ring *, uint64_t, uint64_t);
-static int xhci_debug_work_ring_full(const struct xhci_debug_work_ring *);
-static uint64_t xhci_debug_work_ring_size(const struct xhci_debug_work_ring *);
-static int xhci_debug_ring_full(const struct xhci_debug_ring *);
-static void flush_range(void *, uint32_t);
-
-/*
- * Commit the pending transfer TRBs to the DbC.  This notifies
- * the DbC of any previously-queued data on the work ring and
- * rings the doorbell.
- */
-void
-udb_flush(struct xhci_softc *sc)
-{
-	struct xhci_debug_ring *oring;
-	struct xhci_debug_work_ring *work;
-	uint32_t temp;
-	uint32_t doorbell;
-	uint32_t offset;
-
-#if 0
-	if (sc->sc_udbc == NULL)
-		return;
-#endif
-	offset = sc->sc_udbc.xhci_xecp_offset;
-	if (offset == 0)
-		return;
- 	oring = &sc->sc_udbc.udb_oring;
- 	work = &sc->sc_udbc.udb_owork;
-
-	udb_pop_events(sc);
-
-	temp = XREAD4(sc, capa, offset + XHCI_DCCTRL);
-
-	if (XHCI_DCCTRL_DCR_GET(temp) == 0) {
-		printf("%s: DbC not configured\n", __func__);
-		return;
-	}
-	if (XHCI_DCCTRL_DRC_GET(temp)) {
-		XWRITE4(sc, capa, offset + XHCI_DCCTRL,
-		    temp | XHCI_DCCTRL_DRC);
-
-		/* Enable port */
-		temp = XREAD4(sc, capa, offset + XHCI_DCPORTSC);
-		XWRITE4(sc, capa, offset + XHCI_DCPORTSC, temp | XHCI_PS_PED);
-	}
-	if (xhci_debug_ring_full(oring))	/* TRB queue is full */
-		return;
-	if (work->enq == work->deq)	/* Work queue is empty */
-		return;
-
-	if (work->enq > work->deq) {
-		/* Push TRBs on work queue to TRB queue */
-		push_trb(oring, work->paddr + work->deq, work->enq - work->deq);
-		usb_pc_cpu_flush(&sc->sc_hw.dbc_pc);
-		work->deq = work->enq;
-	} else {
-		push_trb(oring, work->paddr + work->deq, UDB_WORK_RING_CAP - work->deq);
-		usb_pc_cpu_flush(&sc->sc_hw.dbc_pc);
-		work->deq = 0;
-		if (work->enq > 0 && !xhci_debug_ring_full(oring)) {
-			push_trb(oring, work->paddr, work->enq);
-			usb_pc_cpu_flush(&sc->sc_hw.dbc_pc);
-			work->deq = work->enq;
-		}
-	}
-
-	/* Ring the doorbell */
-	temp = XREAD4(sc, capa, offset + XHCI_DCDB);
-	doorbell = (temp & 0xffff00ff) | (oring->doorbell << 8);
-	XWRITE4(sc, capa, offset + XHCI_DCDB, doorbell);
-}
-
-/* XXX: OUT transfer only */
-#define	XHCI_DCPORTSC_ACK_MASK  \
-	(XHCI_DCPORTSC_CSC | XHCI_DCPORTSC_PRC | \
-	 XHCI_DCPORTSC_PLC | XHCI_DCPORTSC_CEC)
-
-static void
-udb_pop_events(struct xhci_softc *sc)
-{
-	const int trb_shift = 4;
-	struct xhci_debug_ring *er;
-	struct xhci_debug_ring *tr;
-	struct xhci_trb *event;
-	uint32_t temp;
-	uint64_t erdp;
-	uint32_t offset;
-
-#if 0
-	if (sc->sc_udbc == NULL)
-		return;
-#endif
-	offset = sc->sc_udbc.xhci_xecp_offset;
-	if (offset == 0)
-		return;
-
- 	er = &sc->sc_udbc.udb_ering;
- 	tr = &sc->sc_udbc.udb_oring;
- 	event = &er->trb[er->deq];
-
-	erdp = XREAD4(sc, capa, offset + XHCI_DCERDP);
-	erdp |= (uint64_t)XREAD4(sc, capa, offset + XHCI_DCERDP + 4) << 32;
-
-	while ((event->dwTrb3 & XHCI_TRB_3_CYCLE_BIT) == er->cyc) {
-		switch (XHCI_TRB_3_TYPE_GET(event->dwTrb3)) {
-		case XHCI_TRB_EVENT_TRANSFER:
-			if (XHCI_TRB_2_ERROR_GET(event->dwTrb2) != XHCI_TRB_ERROR_SUCCESS) {
-				printf("transfer error: %u\n",
-				    XHCI_TRB_2_ERROR_GET(event->dwTrb2));
-            			break;
-        		}
-			tr->deq =
-			    (event->qwTrb0 & UDB_TRB_RING_MASK) >> trb_shift;
-			break;
-		case XHCI_TRB_EVENT_PORT_STS_CHANGE:
-			temp = XREAD4(sc, capa, offset + XHCI_DCPORTSC);
-			XWRITE4(sc, capa, offset + XHCI_DCPORTSC,
-			    temp & XHCI_DCPORTSC_ACK_MASK);
-			break;
-		default:
-			break;
-		}
-		er->cyc = (er->deq == UDB_TRB_RING_CAP - 1) ? er->cyc ^ 1 : er->cyc;
-		er->deq = (er->deq + 1) & (UDB_TRB_RING_CAP - 1);
-		event = &er->trb[er->deq];
-	}
-
-	erdp &= ~UDB_TRB_RING_MASK;
-	erdp |= (er->deq << trb_shift);
-	XWRITE4(sc, capa, offset + XHCI_DCERDP, erdp & 0xFFFFFFFF);
-	XWRITE4(sc, capa, offset + XHCI_DCERDP + 4, (erdp >> 32) & 0xFFFFFFFF);
-}
-
-static void
-push_trb(struct xhci_debug_ring *ring, uint64_t addr, uint64_t len)
-{
-	struct xhci_trb trb;
-
-	if (ring->enq == UDB_TRB_RING_CAP - 1) {
-		/*
-		 * Make sure the xHC processes the link TRB in order
-		 * for wrap-around to work properly by setting the TRB's
-		 * cycle bit, just like with normal TRBs.
-		 */
-		struct xhci_trb *link = &ring->trb[ring->enq];
-
-		link->dwTrb3 &= ~XHCI_TRB_3_CYCLE_BIT;
-		link->dwTrb3 |= ring->cyc;
-		ring->enq = 0;
-		ring->cyc ^= 1;
-	}
-	trb.qwTrb0 = 0;
-	trb.dwTrb2 = 0;
-	trb.dwTrb3 = 0;
-
-	trb.dwTrb3 |= XHCI_TRB_3_TYPE_SET(XHCI_TRB_TYPE_NORMAL);
-	trb.dwTrb3 &= ~XHCI_TRB_3_CYCLE_BIT;
-	trb.dwTrb3 |= ring->cyc;
-
-	trb.qwTrb0 = addr;
-	trb.dwTrb2 = XHCI_TRB_2_BYTES_SET(trb.dwTrb2 | (uint32_t)len);
-	trb.dwTrb3 |= XHCI_TRB_3_IOC_BIT;
-
-	ring->trb[ring->enq++] = trb;
-
-	flush_range(&ring->trb[ring->enq - 1], sizeof(trb));
-}
-
-static int
-xhci_debug_work_ring_full(const struct xhci_debug_work_ring *ring)
-{
-
-	return ((ring->enq + 1) & (UDB_WORK_RING_CAP - 1)) == ring->deq;
-}
-
-static uint64_t
-xhci_debug_work_ring_size(const struct xhci_debug_work_ring *ring)
-{
-
-	return (ring->enq >= ring->deq)
-	    ? (ring->enq - ring->deq)
-	    : (UDB_WORK_RING_CAP - ring->deq + ring->enq);
-}
-
-static int64_t
-udb_push_work(struct xhci_debug_work_ring *ring, const char *buf, int64_t len)
-{
-	int64_t i = 0;
-	uint32_t start = ring->enq;
-	uint32_t end = 0;
-
-	while (!xhci_debug_work_ring_full(ring) && i < len) {
-		ring->buf[ring->enq] = buf[i++];
-		ring->enq = (ring->enq + 1) & (UDB_WORK_RING_CAP - 1);
-	}
-
-	end = ring->enq;
-
-	if (end > start)
-		flush_range(&ring->buf[start], end - start);
-	else if (i > 0) {
-		flush_range(&ring->buf[start], UDB_WORK_RING_CAP - start);
-		flush_range(&ring->buf[0], end);
-	}
-	return (i);
-}
-
-static int
-xhci_debug_ring_full(const struct xhci_debug_ring *ring)
-{
-
-	return ((ring->enq + 1) & (UDB_TRB_RING_CAP - 1)) == ring->deq;
-}
-
-static void
-flush_range(void *ptr, uint32_t bytes)
-{
-	uint32_t i;
-
-	const uint32_t clshft = 6;
-	const uint32_t clsize = (1UL << clshft);
-	const uint32_t clmask = clsize - 1;
-
-	uint32_t lines = (bytes >> clshft);
-	lines += (bytes & clmask) != 0;
-
-	/* XXX */
-	return;
-
-#define	CLFLUSH(ptr) \
-	__asm volatile("clflush %0" : "+m"(*(volatile char *)ptr))
-
-	for (i = 0; i < lines; i++)
-		CLFLUSH((void *)((uint64_t)ptr + (i * clsize)));
-#undef	CLFLUSH
+	r = &sc->sc_udbc->reg;
+
+	XWRITE4(sc, dbc, XHCI_DCERSTSZ, r->erstsz);
+
+	XWRITE44LH(sc, dbc, XHCI_DCERSTBA, r->erstba);
+	XWRITE44LH(sc, dbc, XHCI_DCERDP, r->erdp);
+	XWRITE44LH(sc, dbc, XHCI_DCCP, r->cp);
+	XWRITE4(sc, dbc, XHCI_DCDDI1, r->ddi1);
+	XWRITE4(sc, dbc, XHCI_DCDDI2, r->ddi2);
 }

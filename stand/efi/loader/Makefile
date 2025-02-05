@@ -32,8 +32,13 @@ SRCS=	autoload.c \
 	8x16.c 
 
 .if ${LOADER_USBDBC_SUPPORT} != "no"
-CFLAGS+=        -I${SYSDIR}/dev/usb/controller
-SRCS+=		usb_dbc.c
+.PATH:		${SRCTOP}/sys/dev/usb/controller
+SRCS+=		xhci_dbc.c \
+		xhci_dbc_command.c \
+		xhci_dbc_cons.c \
+		xhci_dbc_dma.c \
+		mutex.c \
+		pci.c
 .endif
 
 CFLAGS+=	-I${.CURDIR}/../loader
