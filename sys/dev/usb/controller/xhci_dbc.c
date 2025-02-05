@@ -126,16 +126,16 @@
 	SBUF_PRINTF(sb, ", lasterror=%u", (ring)->lasterror);	\
 	SBUF_PRINTF(sb, ", lastenq=%u", (ring)->lastenq);	\
 	SBUF_PRINTF(sb, ", lastdeq=%u", (ring)->lastdeq);	\
-	SBUF_PRINTF(sb, ", ec_STALL=%lu",			\
-	    (ring)->ec[XHCI_TRB_ERROR_STALL]);			\
-	SBUF_PRINTF(sb, ", ec_TRB=%lu",				\
-	    (ring)->ec[XHCI_TRB_ERROR_TRB]);			\
-	SBUF_PRINTF(sb, ", ec_EVLOCKED=%lu",			\
-	    (ring)->ec[XHCI_TRB_ERROR_EVLOCKED]);		\
-	SBUF_PRINTF(sb, ", ec_CALLED=%lu",			\
-	    (ring)->ec[XHCI_TRB_ERROR_CALLED]);			\
-	SBUF_PRINTF(sb, ", ec_UNKNOWN=%lu",			\
-	    (ring)->ec[XHCI_TRB_ERROR_UNKNOWN]);		\
+	SBUF_PRINTF(sb, ", ec_STALL=%ju",			\
+	    (uintmax_t)((ring)->ec[XHCI_TRB_ERROR_STALL]));	\
+	SBUF_PRINTF(sb, ", ec_TRB=%ju",				\
+	    (uintmax_t)((ring)->ec[XHCI_TRB_ERROR_TRB]));	\
+	SBUF_PRINTF(sb, ", ec_EVLOCKED=%ju",			\
+	    (uintmax_t)((ring)->ec[XHCI_TRB_ERROR_EVLOCKED]));	\
+	SBUF_PRINTF(sb, ", ec_CALLED=%ju",			\
+	    (uintmax_t)((ring)->ec[XHCI_TRB_ERROR_CALLED]));	\
+	SBUF_PRINTF(sb, ", ec_UNKNOWN=%ju",			\
+	    (uintmax_t)((ring)->ec[XHCI_TRB_ERROR_UNKNOWN]));	\
 	SBUF_PRINTF(sb, "\n");					\
 	} while (0)
 
@@ -281,13 +281,13 @@ udb_dump_info(struct xhci_debug_softc *sc)
 	    (uint8_t)XHCI_DCST_PORT_GET(_XREAD4(sc, dbc, XHCI_DCST)));
 
 	printf("    id: 0x%x\t", _XREAD4(sc, dbc, XHCI_DCID));
-	printf("    erstsz: %u, erstba: 0x%lx\n",
+	printf("    erstsz: %u, erstba: 0x%jx\n",
 	    _XREAD4(sc, dbc, XHCI_DCERSTSZ),
-	    _XREAD44LH(sc, dbc, XHCI_DCERSTBA));
+	    (uintmax_t)_XREAD44LH(sc, dbc, XHCI_DCERSTBA));
 
-	printf("    erdp: 0x%lx, cp: 0x%lx\t",
-	    _XREAD44LH(sc, dbc, XHCI_DCERDP),
-	    _XREAD44LH(sc, dbc, XHCI_DCCP));
+	printf("    erdp: 0x%jx, cp: 0x%jx\t",
+	    (uintmax_t)_XREAD44LH(sc, dbc, XHCI_DCERDP),
+	    (uintmax_t)_XREAD44LH(sc, dbc, XHCI_DCCP));
 	printf("    ddi1: 0x%x, ddi2: 0x%x\n",
 	    _XREAD4(sc, dbc, XHCI_DCDDI1),
 	    _XREAD4(sc, dbc, XHCI_DCDDI2));
