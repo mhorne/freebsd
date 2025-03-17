@@ -78,7 +78,9 @@ struct netif_driver *netif_drivers[] = {
 
 extern struct console efi_console;
 extern struct console eficom;
+#if defined(LOADER_USBDBC_SUPPORT)
 extern struct console udb_console;
+#endif
 #if defined(__aarch64__) && __FreeBSD_version < 1500000
 /* Hack for backward compatibility -- but only for a while */
 extern struct console comconsole;
@@ -92,7 +94,9 @@ extern struct console spinconsole;
 struct console *consoles[] = {
 	&efi_console,
 	&eficom,
+#if defined(LOADER_USBDBC_SUPPORT)
 	&udb_console,
+#endif
 #if defined(__aarch64__) && __FreeBSD_version < 1500000
 	&comconsole,
 #endif

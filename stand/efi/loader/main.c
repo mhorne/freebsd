@@ -63,12 +63,14 @@
 #include "efizfs.h"
 #include "framebuffer.h"
 
+#if defined(LOADER_USBDBC_SUPPORT)
 #include "xhci_dbc_cons.h"
 #include "xhci_dbc_pci.h"	/* device_t */
 #include <dev/usb/controller/xhci_private.h>
 #include <dev/usb/controller/xhci_dbc.h>
 #include "xhci_dbc_dma.h"
 #include "xhci_dbc_command.h"
+#endif
 
 #include "platform/acfreebsd.h"
 #include "acconfig.h"
@@ -2023,6 +2025,7 @@ COMMAND_SET(netserver, "netserver", "change or display netserver URI",
     command_netserver);
 #endif
 
+#if defined(LOADER_USBDBC_SUPPORT)
 static int
 command_udb_info(int argc, char *argv[])
 {
@@ -2111,3 +2114,4 @@ command_udb_probe(int argc, char *argv[])
 }
 COMMAND_SET(udb_probe, "udb_probe", "USB DbC probe",
     command_udb_probe);
+#endif /* LOADER_USBDBC_SUPPORT */
