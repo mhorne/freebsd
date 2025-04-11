@@ -56,6 +56,7 @@ enum {
 #define DC_TRB_PER_PAGE (XHCI_PAGE_SIZE / sizeof(struct xhci_trb))
 
 /* Defines the size in bytes of TRB rings as 2^DC_TRB_RING_ORDER * 4096 */
+/* XXX-THJ on amd64 we can only manage the cache in page size chunks so this all breaks */
 #define DC_TRB_RING_ORDER	4
 #define DC_TRB_RING_LEN (DC_TRB_PER_PAGE * (1ULL << DC_TRB_RING_ORDER))
 #define DC_TRB_RING_OFFSET_MASK (DC_TRB_RING_LEN - 1U)
