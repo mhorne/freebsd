@@ -215,7 +215,7 @@ static const char *strstate[] = {
 
 int dbc_debug;
 int dbc_reset;
-int dbc_enable = 1;
+int dbc_enable = 0;
 int dbc_baud = 115200;
 int dbc_gdb;
 uint32_t dbc_pci_rid;
@@ -223,7 +223,7 @@ uint32_t dbc_pci_rid;
 #ifdef _KERNEL
 static SYSCTL_NODE(_hw_usb_xhci, OID_AUTO, dbc, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "USB XHCI DbC");
-SYSCTL_INT(_hw_usb_xhci_dbc, OID_AUTO, enable, CTLFLAG_RWTUN, &dbc_enable, 1,
+SYSCTL_INT(_hw_usb_xhci_dbc, OID_AUTO, enable, CTLFLAG_RWTUN, &dbc_enable, 0,
     "Set to enable XHCI DbC support");
 SYSCTL_INT(_hw_usb_xhci_dbc, OID_AUTO, debug, CTLFLAG_RWTUN, &dbc_debug, 0,
     "Debug level");
@@ -278,6 +278,7 @@ flush_range(void *ptr, uint32_t bytes)
 {
 #ifdef _KERNEL
 # ifdef __amd64__
+	bytes = roundup(bytes, PAGE_SIZE);	//hack, less than pagesize flushes are an error.
 	pmap_flush_cache_range((vm_offset_t)(uintptr_t)ptr,
 	    (vm_offset_t)((uintptr_t)ptr + bytes));
 # elif __i386__
@@ -428,11 +429,19 @@ bool
 xhci_debug_enable(struct xhci_debug_softc *sc)
 {
 	bool ret;
+	uint32_t state;
 
 	if (sc == NULL)
 		return (false);
 	ret = true;
-	if (xhci_debug_update_state(sc) == XHCI_DCPORT_ST_OFF) {
+	state = xhci_debug_update_state(sc);
+	/*
+	 * XXX-THJ: I am not sure about this. It might not be required, when I
+	 * added it, it looked like xhci wwas stuff in disconnected when the
+	 * other side came up.
+	 * I still need to retest with it removed.
+	 */
+	if (state == XHCI_DCPORT_ST_OFF || state == XHCI_DCPORT_ST_DISCONNECTED) {
 		ret = xhci_debug_set_regbit(sc, XHCI_DCCTRL, XHCI_DCCTRL_DCE,
 		    1);
 		if (ret == false)
@@ -452,14 +461,16 @@ xhci_debug_wait_connection(struct xhci_debug_softc *sc, uint32_t timeout)
 		    XHCI_DCPORTSC_PED, 1000);	/* XXX: 1 was not enough */
 		if (ret == false) {
 			device_printf(sc->sc_dev, "No DbC cable detected\n");
-			return (ret); 
+			/* XXX-THJ: if we return here we skip the waiting loop */
+//			return (ret);
 		}
 	}
 	timeout = 10000;
 	device_printf(sc->sc_dev, "waiting for a cable\n");
-	while (xhci_debug_update_state(sc) != XHCI_DCPORT_ST_CONFIGURED) {
+	/* I think this is a better state check, we can move all the way to enabled */
+	while (xhci_debug_update_state(sc) < XHCI_DCPORT_ST_ENABLED) {
 		delay(500);
-		if (timeout-- == 0) {
+		if (--timeout <= 0) {
 			device_printf(sc->sc_dev,
 			    "DbC cable detection timed out\n");
 			break;
@@ -605,7 +616,10 @@ xhci_debug_alloc_softc(device_t dev)
 
 	getenv_quad("hw.usb.xhci.dbc.softc.paddr", &addr);
 	getenv_quad("hw.usb.xhci.dbc.softc.len", &len);
-
+#if 0
+	device_printf(dev, "hw.usb.xhci.dbc.softc.paddr 0x%016lx\n", (uint64_t)addr);
+	device_printf(dev, "hw.usb.xhci.dbc.softc.len 0x%016lx\n", (uint64_t)len);
+#endif
 	if (addr == 0 || len == 0)
 		return (NULL);
 
@@ -939,6 +953,14 @@ end0:
 static void
 xhci_debug_show_ring(struct xhci_debug_ring *ring, int level)
 {
+	/*
+	 * XXX-THJ: the SBUF_NEW_AUTO macro tries to do an unsleepable malloc
+	 * in an interrupt context and we panic. Trimming out this debugging
+	 * lets me use the debugger. I think tidying up the sbuf code (or
+	 * removing it) is a better approach.
+	 */
+	return; /* XXX not reached */
+
 	if (dbc_debug < level)
 		return;
 #ifdef _KERNEL
@@ -1234,8 +1256,12 @@ xhci_debug_transfer_event_handler(struct xhci_debug_softc *sc,
 				    - XHCI_TRB_2_BYTES_GET(dwTrb2);
 
 				/* Advance the enq of work q */
+#if 0
 				flush_range(&ring->work.buf[ring->work.enq],
 				    len);
+#else
+				flush_range(&ring->work.buf[0], PAGE_SIZE);
+#endif
 				ring->work.enq = (ring->work.enq + len)
 				    & DC_WORK_RING_OFFSET_MASK;
 			}
@@ -1499,7 +1525,7 @@ trb_push_locked(struct xhci_debug_softc *sc, struct xhci_debug_ring *ring,
 	DEBUG_PRINTF(1, "%s: enqueue: %s: enq=%d, len=%lu, deq=%d\n", __func__,
 	    label, ring->enq, len, ring->deq);
 	memcpy(&ring->trb[ring->enq], &trb, sizeof(ring->trb[0]));
-	flush_range(&ring->trb[ring->enq], sizeof(ring->trb[0]));
+	flush_range(&ring->trb[0], PAGE_SIZE);
 	ring->enq = (ring->enq + 1) & DC_TRB_RING_OFFSET_MASK;
 
 	xhci_debug_ring_doorbell(sc, ring->doorbell);
@@ -1561,13 +1587,16 @@ work_enqueue(struct xhci_debug_ring *ring, const char *buf, int64_t len)
 	}
 	end = work->enq;
 	DEBUG_PRINTF(1, ": start=%u, end=%u\n", start, end);
-
+#if 0
 	if (start < end)
 		flush_range(&work->buf[start], end - start);
 	else if (0 < i) {
 		flush_range(&work->buf[start], DC_WORK_RING_LEN - start);
 		flush_range(&work->buf[0], end);
 	}
+#else
+		flush_range(&work->buf[0], PAGE_SIZE);
+#endif
 end:
 	mtx_unlock_spin(&ring->mtx);
 	return (i);

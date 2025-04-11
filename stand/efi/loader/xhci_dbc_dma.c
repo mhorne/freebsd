@@ -127,7 +127,7 @@ udb_alloc_softc(size_t len, EFI_HANDLE *h, EFI_PCI_IO_PROTOCOL *pciio)
 	status = pciio->AllocateBuffer(pciio,
 	    AllocateAnyPages,
 	    EfiRuntimeServicesData,
-	    sizeof(*sc) / PAGE_SIZE + 1,
+	    pages,
 	    &addr,
 	    EFI_PCI_IO_ATTRIBUTE_MEMORY_CACHED);
 	if (EFI_ERROR(status)) {
