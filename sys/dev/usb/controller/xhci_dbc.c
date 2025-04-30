@@ -598,13 +598,13 @@ xhci_debug_alloc_softc(device_t dev)
 #if _KERNEL
 	struct xhci_softc *sc_xhci;
 	struct xhci_debug_softc *sc0;
-	quad_t addr, len;
+	quad_t addr = 0, len = 0;
 	uintptr_t rid;
 
 	KASSERT(PMAP_HAS_DMAP, ("direct-map required"));
 
-	getenv_quad("hw.usb.xhci.dbc.softc.paddr", &addr);
-	getenv_quad("hw.usb.xhci.dbc.softc.len", &len);
+	TUNABLE_QUAD_FETCH("hw.usb.xhci.dbc.softc.paddr", &addr);
+	TUNABLE_QUAD_FETCH("hw.usb.xhci.dbc.softc.len", &len);
 
 	if (addr == 0 || len == 0)
 		return (NULL);
