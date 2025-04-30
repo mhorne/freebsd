@@ -280,6 +280,9 @@ __mtx_lock_flags(volatile uintptr_t *c, int opts, const char *file, int line)
 	struct mtx *m;
 	uintptr_t tid, v;
 
+	if (SCHEDULER_STOPPED())
+		return;
+
 	m = mtxlock2mtx(c);
 
 	KASSERT(kdb_active != 0 || SCHEDULER_STOPPED() ||
@@ -341,6 +344,9 @@ __mtx_lock_spin_flags(volatile uintptr_t *c, int opts, const char *file,
 #ifdef SMP
 	uintptr_t tid, v;
 #endif
+
+	if (SCHEDULER_STOPPED())
+		return;
 
 	m = mtxlock2mtx(c);
 
