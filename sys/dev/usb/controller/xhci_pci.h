@@ -93,6 +93,8 @@ xhci_pci_match(device_t self)
 	case 0x32421b21:
 		return ("ASMedia ASM3242 USB 3.2 controller");
 
+	case 0x02ed8086:
+		return ("Intel Comet Lake PCH-LP USB 3.1 controller");
 	case 0x0b278086:
 		return ("Intel Goshen Ridge Thunderbolt 4 USB controller");
 	case 0x0f358086:
@@ -123,6 +125,7 @@ xhci_pci_match(device_t self)
 	case 0x461e8086:
 		return ("Intel Alder Lake-P Thunderbolt 4 USB controller");
 	case 0x51ed8086:
+	case 0x5fed8086:
 		return ("Intel Alder Lake PCH USB 3.2 controller");
 	case 0x5aa88086:
 		return ("Intel Apollo Lake USB 3.0 controller");
