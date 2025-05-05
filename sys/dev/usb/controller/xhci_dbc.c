@@ -278,8 +278,11 @@ flush_range(void *ptr, uint32_t bytes)
 {
 #ifdef _KERNEL
 # ifdef __amd64__
-	pmap_flush_cache_range((vm_offset_t)(uintptr_t)ptr,
-	    (vm_offset_t)((uintptr_t)ptr + bytes));
+	/* XXX/TODO: Handle rounding here? */
+	vm_offset_t start = trunc_page((uintptr_t)ptr);
+	vm_offset_t end = round_page(start + bytes);
+
+	pmap_flush_cache_range(start, end);
 # elif __i386__
 	pmap_invalidate_cache_range((vm_offset_t)(uintptr_t)ptr,
 	    (vm_offset_t)((uintptr_t)ptr + bytes));
@@ -427,19 +430,24 @@ xhci_debug_reset_regbit(struct xhci_debug_softc *sc, int reg, int bit,
 bool
 xhci_debug_enable(struct xhci_debug_softc *sc)
 {
-	bool ret;
+	uint32_t state;
 
 	if (sc == NULL)
 		return (false);
-	ret = true;
-	if (xhci_debug_update_state(sc) == XHCI_DCPORT_ST_OFF) {
-		ret = xhci_debug_set_regbit(sc, XHCI_DCCTRL, XHCI_DCCTRL_DCE,
-		    1);
-		if (ret == false)
+
+	state = xhci_debug_update_state(sc);
+	if (state == XHCI_DCPORT_ST_OFF ||
+	    state == XHCI_DCPORT_ST_DISCONNECTED) {
+		if (!xhci_debug_set_regbit(sc, XHCI_DCCTRL, XHCI_DCCTRL_DCE,
+		    1)) {
 			device_printf(sc->sc_dev, "initialization failed\n");
+			return (false);
+		}
+
 	}
+
 	/* If success, check the cable. */
-	return ((ret == true) ? (xhci_debug_wait_connection(sc, 1)) : ret);
+	return (xhci_debug_wait_connection(sc, 1));
 }
 
 static bool
@@ -939,6 +947,14 @@ end0:
 static void
 xhci_debug_show_ring(struct xhci_debug_ring *ring, int level)
 {
+	/*
+	 * XXX-THJ: the SBUF_NEW_AUTO macro tries to do an unsleepable malloc
+	 * in an interrupt context and we panic. Trimming out this debugging
+	 * lets me use the debugger. I think tidying up the sbuf code (or
+	 * removing it) is a better approach.
+	 */
+	return; /* XXX not reached */
+
 	if (dbc_debug < level)
 		return;
 #ifdef _KERNEL
