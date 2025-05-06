@@ -2488,6 +2488,7 @@ udbcons_dbg_probe(void)
 	if ((sc->sc_flags & XHCI_DEBUG_FLAGS_GDB) == XHCI_DEBUG_FLAGS_GDB)
 		return (1);
 #endif
+	TUNABLE_INT_FETCH("hw.usb.xhci.dbc.gdb", &dbc_gdb);
 	if (dbc_gdb != 0)
 		return (1);
 
