@@ -74,6 +74,12 @@ NOSTDINC= -nostdinc
 
 INCLUDES= ${NOSTDINC} ${INCLMAGIC} -I. -I$S -I$S/contrib/ck/include
 
+INCLUDES+=	-I$S/contrib/libfdt
+.if ${MK_FDT} != "no"
+INCLUDES+=	-I$S/contrib/device-tree/include \
+		-I$S/dts/include
+.endif
+
 CFLAGS=	${COPTFLAGS} ${DEBUG}
 CFLAGS+= ${INCLUDES} -D_KERNEL -DHAVE_KERNEL_OPTION_HEADERS -include opt_global.h
 CFLAGS_PARAM_INLINE_UNIT_GROWTH?=100
