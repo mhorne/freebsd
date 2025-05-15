@@ -43,7 +43,7 @@
 
 #include <dev/clk/clk_fixed.h>
 
-#include <arm/allwinner/aw_machdep.h>
+#include <dt-bindings/clock/sun6i-rtc.h>
 
 #include "clock_if.h"
 
@@ -102,27 +102,27 @@ struct aw_rtc_conf {
 	bool		is_a20;
 };
 
-struct aw_rtc_conf a10_conf = {
+static const struct aw_rtc_conf a10_conf = {
 	.rtc_date = A10_RTC_DATE_REG,
 	.rtc_time = A10_RTC_TIME_REG,
 	.rtc_losc_sta = LOSC_CTRL_REG,
 };
 
-struct aw_rtc_conf a20_conf = {
+static const struct aw_rtc_conf a20_conf = {
 	.rtc_date = A10_RTC_DATE_REG,
 	.rtc_time = A10_RTC_TIME_REG,
 	.rtc_losc_sta = LOSC_CTRL_REG,
 	.is_a20 = true,
 };
 
-struct aw_rtc_conf a31_conf = {
+static const struct aw_rtc_conf a31_conf = {
 	.iosc_freq = 650000,			/* between 600 and 700 Khz */
 	.rtc_date = A31_RTC_DATE_REG,
 	.rtc_time = A31_RTC_TIME_REG,
 	.rtc_losc_sta = A31_LOSC_AUTO_SWT_STA,
 };
 
-struct aw_rtc_conf h3_conf = {
+static const struct aw_rtc_conf h3_conf = {
 	.iosc_freq = 16000000,
 	.rtc_date = A31_RTC_DATE_REG,
 	.rtc_time = A31_RTC_TIME_REG,
@@ -147,13 +147,13 @@ struct aw_rtc_softc {
 };
 
 static struct clk_fixed_def aw_rtc_osc32k = {
-	.clkdef.id = 0,
+	.clkdef.id = CLK_OSC32K,
 	.clkdef.name = "osc32k",
 	.freq = 32768,
 };
 
 static struct clk_fixed_def aw_rtc_iosc = {
-	.clkdef.id = 2,
+	.clkdef.id = CLK_IOSC,
 	.clkdef.name = "iosc",
 };
 
