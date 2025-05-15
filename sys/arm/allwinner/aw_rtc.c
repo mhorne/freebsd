@@ -340,7 +340,7 @@ aw_rtc_settime(device_t dev, struct timespec *ts)
 			device_printf(dev, "could not set time, RTC busy\n");
 			return (EINVAL);
 		}
-		DELAY(1);
+		DELAY(50);
 	}
 	/* reset time register to avoid unexpected date increment */
 	RTC_WRITE(sc, sc->conf->rtc_time, 0);
@@ -357,7 +357,7 @@ aw_rtc_settime(device_t dev, struct timespec *ts)
 			device_printf(dev, "could not set date, RTC busy\n");
 			return (EINVAL);
 		}
-		DELAY(1);
+		DELAY(50);
 	}
 	RTC_WRITE(sc, sc->conf->rtc_date, rdate);
 
@@ -366,7 +366,7 @@ aw_rtc_settime(device_t dev, struct timespec *ts)
 			device_printf(dev, "could not set time, RTC busy\n");
 			return (EINVAL);
 		}
-		DELAY(1);
+		DELAY(50);
 	}
 	RTC_WRITE(sc, sc->conf->rtc_time, rtime);
 
