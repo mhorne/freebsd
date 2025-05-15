@@ -27,8 +27,6 @@ S=	../../..
 .endif
 .include "$S/conf/kern.pre.mk"
 
-INCLUDES+= -I$S/contrib/libfdt
-
 %BEFORE_DEPEND
 
 %OBJS
