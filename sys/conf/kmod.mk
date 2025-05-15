@@ -134,6 +134,12 @@ CFLAGS+=	-include ${.OBJDIR}/opt_global.h
 # set because there are no standard paths for non-headers.
 CFLAGS+=	-I. -I${SYSDIR} -I${SYSDIR}/contrib/ck/include
 
+.if !empty(OPT_FDT)
+CFLAGS+=	-I${SYSDIR}/contrib/libfdt \
+		-I${SYSDIR}/contrib/device-tree/include \
+		-I${SYSDIR}/dts/include
+.endif
+
 CFLAGS.gcc+=	-finline-limit=${INLINE_LIMIT}
 CFLAGS.gcc+=	-fms-extensions
 CFLAGS.gcc+= --param inline-unit-growth=100
