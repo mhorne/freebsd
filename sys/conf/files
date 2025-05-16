@@ -1339,7 +1339,7 @@ dev/bwn/if_bwn_phy_g.c		optional bwn bhnd
 dev/bwn/if_bwn_phy_lp.c		optional bwn bhnd
 dev/bwn/if_bwn_phy_n.c		optional bwn bhnd
 dev/bwn/if_bwn_util.c		optional bwn bhnd
-dev/cadence/if_cgem.c		optional cgem fdt
+dev/cadence/if_cgem.c		optional cgem fdt clk
 dev/cardbus/card_if.m		standard
 dev/cardbus/cardbus.c		optional cardbus
 dev/cardbus/cardbus_cis.c	optional cardbus
@@ -1743,7 +1743,7 @@ dev/gpio/gpioled.c		optional gpioled !fdt
 dev/gpio/gpioled_fdt.c		optional gpioled fdt
 dev/gpio/gpiomdio.c		optional gpiomdio mii_bitbang
 dev/gpio/gpiopower.c		optional gpiopower fdt
-dev/gpio/gpioregulator.c	optional gpioregulator fdt
+dev/gpio/gpioregulator.c	optional gpioregulator fdt regulator
 dev/gpio/gpiospi.c		optional gpiospi
 dev/gpio/gpioths.c		optional gpioths
 dev/gpio/gpio_if.m		optional gpio
@@ -1801,7 +1801,7 @@ dev/iicbus/adc/ad7418.c		optional ad7418
 dev/iicbus/adc/ads111x.c	optional ads111x
 dev/iicbus/adc/pcf8591.c	optional pcf8591
 dev/iicbus/controller/opencores/iicoc.c	optional iicoc
-dev/iicbus/controller/opencores/iicoc_fdt.c	optional iicoc fdt
+dev/iicbus/controller/opencores/iicoc_fdt.c	optional iicoc fdt clk
 dev/iicbus/controller/opencores/iicoc_pci.c	optional iicoc pci
 dev/iicbus/mux/iicmux.c		optional iicmux
 dev/iicbus/mux/iicmux_if.m	optional iicmux
@@ -1826,8 +1826,9 @@ dev/iicbus/sensor/lm75.c	optional lm75
 dev/iicbus/sensor/max44009.c	optional max44009
 dev/iicbus/gpio/pcf8574.c	optional pcf8574
 dev/iicbus/gpio/tca64xx.c	optional tca64xx fdt gpio
-dev/iicbus/pmic/fan53555.c	optional fan53555 fdt | tcs4525 fdt
-dev/iicbus/pmic/silergy/sy8106a.c	optional sy8106a fdt
+dev/iicbus/pmic/fan53555.c	optional fan53555 fdt regulator | \
+	tcs4525 fdt regulator
+dev/iicbus/pmic/silergy/sy8106a.c	optional sy8106a fdt regulator
 dev/iicbus/pmic/silergy/syr827.c	optional syr827 fdt
 dev/igc/if_igc.c		optional igc iflib pci
 dev/igc/igc_api.c		optional igc iflib pci
@@ -3069,7 +3070,7 @@ dev/scc/scc_core.c		optional scc
 dev/scc/scc_dev_quicc.c		optional scc quicc
 dev/scc/scc_dev_z8530.c		optional scc
 dev/sdhci/sdhci.c		optional sdhci
-dev/sdhci/sdhci_fdt.c		optional sdhci fdt regulator clk
+dev/sdhci/sdhci_fdt.c		optional sdhci fdt regulator clk phy
 dev/sdhci/sdhci_fdt_gpio.c	optional sdhci fdt gpio
 dev/sdhci/sdhci_fsl_fdt.c	optional sdhci fdt gpio regulator clk
 dev/sdhci/sdhci_if.m		optional sdhci
