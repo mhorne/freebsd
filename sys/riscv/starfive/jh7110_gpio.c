@@ -78,6 +78,7 @@ static struct resource_spec jh7110_gpio_spec[] = {
 
 #define	JH7110_GPIO_LOCK(_sc)		mtx_lock(&(_sc)->mtx)
 #define	JH7110_GPIO_UNLOCK(_sc)		mtx_unlock(&(_sc)->mtx)
+#define	JH7110_GPIO_ASSERT_LOCKED(_sc)	mtx_assert(&(_sc)->mtx, MA_OWNED);
 
 #define	READ4(sc, reg)			bus_read_4((sc)->res, (reg))
 #define	WRITE4(sc, reg, val)		bus_write_4((sc)->res, (reg), (val))
@@ -126,11 +127,26 @@ jh7110_gpio_pin_get(device_t dev, uint32_t pin, uint32_t *val)
 	return (0);
 }
 
+static void
+jh7110_gpio_pin_set_locked(struct jh7110_gpio_softc *sc, uint32_t pin,
+    uint32_t val)
+{
+	uint32_t reg;
+
+	JH7110_GPIO_ASSERT_LOCKED(sc);
+	MPASS(pin < GPIO_PINS);
+
+	reg = READ4(sc, GP0_DOUT_CFG + GPIO_RW_OFFSET(pin));
+	reg &= ~(DATA_OUT_MASK << GPIO_SHIFT(pin));
+	if (val != 0)
+		reg |= 0x1 << GPIO_SHIFT(pin);
+	WRITE4(sc, GP0_DOUT_CFG + GPIO_RW_OFFSET(pin), reg);
+}
+
 static int
 jh7110_gpio_pin_set(device_t dev, uint32_t pin, uint32_t val)
 {
 	struct jh7110_gpio_softc *sc;
-	uint32_t reg;
 
 	sc = device_get_softc(dev);
 
@@ -138,11 +154,7 @@ jh7110_gpio_pin_set(device_t dev, uint32_t pin, uint32_t val)
 		return (EINVAL);
 
 	JH7110_GPIO_LOCK(sc);
-	reg = READ4(sc, GP0_DOUT_CFG + GPIO_RW_OFFSET(pin));
-	reg &= ~(DATA_OUT_MASK << GPIO_SHIFT(pin));
-	if (val != 0)
-		reg |= 0x1 << GPIO_SHIFT(pin);
-	WRITE4(sc, GP0_DOUT_CFG + GPIO_RW_OFFSET(pin), reg);
+	jh7110_gpio_pin_set_locked(sc, pin, val);
 	JH7110_GPIO_UNLOCK(sc);
 
 	return (0);
@@ -271,6 +283,13 @@ jh7110_gpio_pin_setup_output(struct jh7110_gpio_softc *sc, uint32_t pin,
 	reg = READ4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin));
 	reg &= ~(PAD_INPUT_EN | PAD_PULLUP | PAD_PULLDOWN | PAD_HYST);
 	WRITE4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin), reg);
+
+	/* Handle preset values. */
+	if ((flags & GPIO_PIN_PRESET_LOW) != 0) {
+		jh7110_gpio_pin_set_locked(sc, pin, 0);
+	} else if ((flags & GPIO_PIN_PRESET_HIGH) != 0) {
+		jh7110_gpio_pin_set_locked(sc, pin, 1);
+	}
 
 	/* Update software state. */
 	sc->gpio_pins[pin].gp_flags &= GPIO_PIN_INPUT;
