@@ -23,17 +23,23 @@
 #include <machine/resource.h>
 
 #include <dev/clk/clk.h>
+#include <dev/fdt/fdt_pinctrl.h>
 #include <dev/gpio/gpiobusvar.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include "fdt_pinctrl_if.h"
 #include "gpio_if.h"
 
 #define	GPIO_PINS		64
 #define	GPIO_REGS		2
 
+#define	JH7110_GPIO_DEFAULT_CAPS \
+    (GPIO_PIN_INPUT | GPIO_PIN_OUTPUT | GPIO_PIN_PULLUP | GPIO_PIN_PULLDOWN)
+
 #define	GP0_DOEN_CFG		0x0
 #define	GP0_DOUT_CFG		0x40
+
 #define	GPIOEN			0xdc
 #define	GPIOE_0			0x100
 #define	GPIOE_1			0x104
@@ -385,7 +391,7 @@ jh7110_gpio_attach(device_t dev)
 		reg = READ4(sc, GP0_DOEN_CFG + GPIO_RW_OFFSET(i));
 
 		sc->gpio_pins[i].gp_pin = i;
-		sc->gpio_pins[i].gp_caps = JH7110_DEFAULT_CAPS;
+		sc->gpio_pins[i].gp_caps = JH7110_GPIO_DEFAULT_CAPS;
 		sc->gpio_pins[i].gp_flags =
 		    ((reg & (ENABLE_MASK << GPIO_SHIFT(i))) == 0) ?
 		    GPIO_PIN_OUTPUT : GPIO_PIN_INPUT;
@@ -397,6 +403,12 @@ jh7110_gpio_attach(device_t dev)
 	WRITE4(sc, GPIOE_0, 0);
 	WRITE4(sc, GPIOE_1, 0);
 	WRITE4(sc, GPIOEN, 1);
+
+	/*
+	 * Register as a pinctrl device
+	 */
+	fdt_pinctrl_register(dev, NULL);
+	fdt_pinctrl_configure_tree(dev);
 
 	sc->busdev = gpiobus_add_bus(dev);
 	if (sc->busdev == NULL) {
@@ -413,6 +425,116 @@ static phandle_t
 jh7110_gpio_get_node(device_t bus, device_t dev)
 {
 	return (ofw_bus_get_node(bus));
+}
+
+/* fdt_pinctrl configuration */
+
+static struct jh7110_gpio_pincfg {
+	uint32_t pinmux;
+	uint32_t flags;
+}
+
+static void
+jh7110_gpio_configure_single_pin(struct jh7110_gpio_softc *sc,
+    uint32_t pinmux, uint32_t padcfg, uint32_t padmask)
+{
+	uint32_t din, dout, doen;
+	uint32_t pad;
+	u_int pin;
+
+	pin  = (cfg->pinmux[i] >> & 0x3f;
+	doen = (cfg->pinmux[i] >> 10) & 0x3f;
+	dout = (cfg->pinmux[i] >> 16) & 0xff;
+	din  = (cfg->pinmux[i] >> 24) & 0xff;
+
+	/* Not supported yet. */
+	if (pin >= GPIO_PINS)
+		return;
+
+	padcfg = 0;
+	if ((cfg->flags & PINCFG_FLAG_PULLUP) != 0)
+		padcfg |= PAD_PULLUP;
+	else if ((cfg->flags & PINCFG_FLAG_PULLDOWN) != 0)
+		padcfg |= PAD_PULLDOWN;
+
+	if ((cfg->flags & PINCFG_FLAG_SMT) != 0)
+		padcfg |= PAD_HYST;
+
+	/* Set output enable state. */
+	WRITE4(sc, GP0_DOEN_CFG + GPIO_RW_OFFSET(pin), doen);
+
+
+	/* Update PAD configuration for pin. */
+	pad = READ4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin));
+	pad &= ~padmask;
+	pad |= padcfg;
+	WRITE4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin), pad);
+
+	/* TODO: write registers */
+}
+
+static int
+jh7110_gpio_configure_pins(device_t dev, phandle_t cfgxref)
+{
+	struct jh7110_gpio_softc *sc;
+	struct jh7110_gpio_pincfg cfg;
+	phandle_t node, child;
+	pcell_t *pinmux;
+	uint32_t flags;
+	int ncells;
+	u_int pin;
+
+	sc = device_get_softc(dev);
+	node = OF_node_from_xref(cfgxref);
+
+	/* Process any and all children. */
+	for (child = OF_child(node); child != 0; child = OF_peer(child)) {
+		printf("process child node %u\n", child);
+
+		/* Get pinmux */
+		ncells = OF_getencprop_alloc_multi(child, "pinmux", sizeof(pcell_t),
+		    (void **)&pinmux);
+		if (ncells == -1) {
+			device_printf(dev, "couldn't find 'pinmux' property\n");
+			continue;
+		}
+
+		flags = 0;
+		padcfg = 0;
+		padmask = PAD_INPUT_EN;
+
+		/* Parse input/output */
+		if (OF_hasprop(child, "input-enable")) {
+			flags |= GPIO_PIN_INPUT;
+			padcfg |= PAD_INPUT_EN;
+		} else if (OF_hasprop(child, "input-disable"))
+			flags |= GPIO_PIN_OUTPUT;
+
+		/* Parse bias */
+		if (!OF_hasprop(child, "bias-disable")) {
+			if (OF_hasprop(child, "bias-pull-up")) {
+				flags |= GPIO_PIN_PULLUP;
+				padcfg |= PAD_PULLUP;
+			} else if (OF_hasprop(child, "bias-pull-down")) {
+				flags |= GPIO_PIN_PULLDOWN;
+				padcfg |= PAD_PULLDOWN;
+			}
+		}
+
+		if (OF_hasprop(child
+
+		/* TODO: parse driver strength */
+		/* TODO: parse schmitt (?) */
+
+		for (int i = 0; i < ncells; i++) {
+
+
+
+		}
+		OF_prop_free(pinmux);
+	}
+
+	return (0);
 }
 
 static device_method_t jh7110_gpio_methods[] = {
@@ -434,6 +556,9 @@ static device_method_t jh7110_gpio_methods[] = {
 
 	/* ofw_bus interface */
 	DEVMETHOD(ofw_bus_get_node,	jh7110_gpio_get_node),
+
+        /* fdt_pinctrl interface */
+	DEVMETHOD(fdt_pinctrl_configure, jh7110_gpio_configure_pins),
 
 	DEVMETHOD_END
 };
