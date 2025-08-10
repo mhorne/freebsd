@@ -44,10 +44,13 @@
 #define	PAD_INPUT_EN		(1 << 0)
 #define	PAD_PULLUP		(1 << 3)
 #define	PAD_PULLDOWN		(1 << 4)
+#define	PAD_BIAS_MASK		(PAD_PULLUP | PAD_PULLDOWN)
 #define	PAD_HYST		(1 << 6)
 
 #define	ENABLE_MASK		0x3f
 #define	DATA_OUT_MASK		0x7f
+
+#define	GPOEN_ENABLE		0
 #define	DIROUT_DISABLE		1
 
 struct jh7110_gpio_softc {
@@ -56,6 +59,7 @@ struct jh7110_gpio_softc {
 	struct mtx		mtx;
 	struct resource		*res;
 	clk_t			clk;
+	struct gpio_pin		gpio_pins[GPIO_PINS];
 };
 
 static struct ofw_compat_data compat_data[] = {
@@ -77,6 +81,8 @@ static struct resource_spec jh7110_gpio_spec[] = {
 
 #define	READ4(sc, reg)			bus_read_4((sc)->res, (reg))
 #define	WRITE4(sc, reg, val)		bus_write_4((sc)->res, (reg), (val))
+
+#define	JH7110_DEFAULT_CAPS		(GPIO_PIN_INPUT | GPIO_PIN_OUTPUT)
 
 static device_t
 jh7110_gpio_get_bus(device_t dev)
@@ -170,21 +176,16 @@ jh7110_gpio_pin_toggle(device_t dev, uint32_t pin)
 static int
 jh7110_gpio_pin_getcaps(device_t dev, uint32_t pin, uint32_t *caps)
 {
+	struct jh7110_gpio_softc *sc;
+
+	sc = device_get_softc(dev);
+
 	if (pin >= GPIO_PINS)
 		return (EINVAL);
 
-	*caps = (GPIO_PIN_INPUT | GPIO_PIN_OUTPUT);
-
-	return (0);
-}
-
-static int
-jh7110_gpio_pin_getname(device_t dev, uint32_t pin, char *name)
-{
-	if (pin >= GPIO_PINS)
-		return (EINVAL);
-
-	snprintf(name, GPIOMAXNAME, "GPIO%d", pin);
+	JH7110_GPIO_LOCK(sc);
+	*caps = sc->gpio_pins[pin].gp_caps;
+	JH7110_GPIO_UNLOCK(sc);
 
 	return (0);
 }
@@ -193,46 +194,66 @@ static int
 jh7110_gpio_pin_getflags(device_t dev, uint32_t pin, uint32_t *flags)
 {
 	struct jh7110_gpio_softc *sc;
-	uint32_t reg;
 
 	sc = device_get_softc(dev);
 
 	if (pin >= GPIO_PINS)
 		return (EINVAL);
 
-	/* Reading the direction */
 	JH7110_GPIO_LOCK(sc);
-	reg = READ4(sc, GP0_DOEN_CFG + GPIO_RW_OFFSET(pin));
-	if ((reg & ENABLE_MASK << GPIO_SHIFT(pin)) == 0)
-		*flags |= GPIO_PIN_OUTPUT;
-	else
-		*flags |= GPIO_PIN_INPUT;
+	*flags = sc->gpio_pins[pin].gp_flags;
 	JH7110_GPIO_UNLOCK(sc);
 
 	return (0);
 }
 
 static int
-jh7110_gpio_pin_setflags(device_t dev, uint32_t pin, uint32_t flags)
+jh7110_gpio_pin_getname(device_t dev, uint32_t pin, char *name)
 {
 	struct jh7110_gpio_softc *sc;
-	uint32_t reg;
 
 	sc = device_get_softc(dev);
 
 	if (pin >= GPIO_PINS)
 		return (EINVAL);
 
-	/* Setting the direction, enable or disable output, configuring pads */
-
 	JH7110_GPIO_LOCK(sc);
+	memcpy(name, sc->gpio_pins[pin].gp_name, GPIOMAXNAME);
+	JH7110_GPIO_UNLOCK(sc);
 
-	if ((flags & GPIO_PIN_INPUT) != 0) {
-		reg = READ4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin));
-		reg |= (PAD_INPUT_EN | PAD_HYST);
-		WRITE4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin), reg);
-	}
+	return (0);
+}
 
+static __inline void
+jh7110_gpio_pin_setup_input(struct jh7110_gpio_softc *sc, uint32_t pin,
+    uint32_t flags)
+{
+	uint32_t reg;
+
+	/* Configure PAD first: enable input, SMT trigger, clear bias. */
+	reg = READ4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin));
+	reg &= ~(PAD_BIAS_MASK | PAD_INPUT_EN | PAD_HYST);
+	reg |= (PAD_INPUT_EN | PAD_HYST);
+	WRITE4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin), reg);
+
+	/* Then update DOEN register. */
+	reg = READ4(sc, GP0_DOEN_CFG + GPIO_RW_OFFSET(pin));
+	reg &= ~(ENABLE_MASK << GPIO_SHIFT(pin));
+	reg |= DIROUT_DISABLE << GPIO_SHIFT(pin);
+	WRITE4(sc, GP0_DOEN_CFG + GPIO_RW_OFFSET(pin), reg);
+
+	/* Update software state. */
+	sc->gpio_pins[pin].gp_flags &= GPIO_PIN_OUTPUT;
+	sc->gpio_pins[pin].gp_flags |= GPIO_PIN_INPUT;
+}
+
+static __inline void
+jh7110_gpio_pin_setup_output(struct jh7110_gpio_softc *sc, uint32_t pin,
+    uint32_t flags)
+{
+	uint32_t reg;
+
+	/* First update DOEN register. */
 	reg = READ4(sc, GP0_DOEN_CFG + GPIO_RW_OFFSET(pin));
 	reg &= ~(ENABLE_MASK << GPIO_SHIFT(pin));
 	if ((flags & GPIO_PIN_INPUT) != 0) {
@@ -240,15 +261,38 @@ jh7110_gpio_pin_setflags(device_t dev, uint32_t pin, uint32_t flags)
 	}
 	WRITE4(sc, GP0_DOEN_CFG + GPIO_RW_OFFSET(pin), reg);
 
-	if ((flags & GPIO_PIN_OUTPUT) != 0) {
-		reg = READ4(sc, GP0_DOUT_CFG + GPIO_RW_OFFSET(pin));
-		reg &= ~(ENABLE_MASK << GPIO_SHIFT(pin));
-		reg |= 0x1 << GPIO_SHIFT(pin);
-		WRITE4(sc, GP0_DOUT_CFG + GPIO_RW_OFFSET(pin), reg);
+	/* Next, DOUT register. */
+	reg = READ4(sc, GP0_DOUT_CFG + GPIO_RW_OFFSET(pin));
+	reg &= ~(ENABLE_MASK << GPIO_SHIFT(pin));
+	reg |= 0x1 << GPIO_SHIFT(pin);
+	WRITE4(sc, GP0_DOUT_CFG + GPIO_RW_OFFSET(pin), reg);
 
-		reg = READ4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin));
-		reg &= ~(PAD_INPUT_EN | PAD_PULLUP | PAD_PULLDOWN | PAD_HYST);
-		WRITE4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin), reg);
+	/* Finally PAD register */
+	reg = READ4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin));
+	reg &= ~(PAD_INPUT_EN | PAD_PULLUP | PAD_PULLDOWN | PAD_HYST);
+	WRITE4(sc, IOMUX_SYSCFG_288 + PAD_OFFSET(pin), reg);
+
+	/* Update software state. */
+	sc->gpio_pins[pin].gp_flags &= GPIO_PIN_INPUT;
+	sc->gpio_pins[pin].gp_flags |= GPIO_PIN_OUTPUT;
+}
+
+static int
+jh7110_gpio_pin_setflags(device_t dev, uint32_t pin, uint32_t flags)
+{
+	struct jh7110_gpio_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	if (pin >= GPIO_PINS)
+		return (EINVAL);
+
+	JH7110_GPIO_LOCK(sc);
+
+	if ((flags & GPIO_PIN_INPUT) != 0) {
+		jh7110_gpio_pin_setup_input(sc, pin, flags);
+	} else if ((flags & GPIO_PIN_OUTPUT) != 0) {
+		jh7110_gpio_pin_setup_output(sc, pin, flags);
 	}
 
 	JH7110_GPIO_UNLOCK(sc);
@@ -291,6 +335,7 @@ static int
 jh7110_gpio_attach(device_t dev)
 {
 	struct jh7110_gpio_softc *sc;
+	uint32_t reg;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -316,7 +361,20 @@ jh7110_gpio_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	/* Reseting GPIO interrupts */
+	/* Set initial pin software state. */
+	for (int i = 0; i < GPIO_PINS; i++) {
+		reg = READ4(sc, GP0_DOEN_CFG + GPIO_RW_OFFSET(i));
+
+		sc->gpio_pins[i].gp_pin = i;
+		sc->gpio_pins[i].gp_caps = JH7110_DEFAULT_CAPS;
+		sc->gpio_pins[i].gp_flags =
+		    ((reg & (ENABLE_MASK << GPIO_SHIFT(i))) == 0) ?
+		    GPIO_PIN_INPUT : GPIO_PIN_OUTPUT;
+
+		snprintf(sc->gpio_pins[i].gp_name, GPIOMAXNAME, "GPIO %d", i);
+	}
+
+	/* Disable all GPIO interrupts. */
 	WRITE4(sc, GPIOE_0, 0);
 	WRITE4(sc, GPIOE_1, 0);
 	WRITE4(sc, GPIOEN, 1);
