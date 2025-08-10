@@ -19,11 +19,15 @@
 #include <machine/resource.h>
 
 #include <dev/clk/clk.h>
+#include <dev/fdt/fdt_pinctrl.h>
 #include <dev/gpio/gpiobusvar.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include "fdt_pinctrl_if.h"
 #include "gpio_if.h"
+
+#include <contrib/device-tree/src/riscv/starfive/jh7110-pinfunc.h>
 
 #define	PINCTRL_SYS		1
 #define	PINCTRL_AON		2
@@ -41,15 +45,24 @@
 #define	GPIOE_0			0x100
 #define	GPIOE_1			0x104
 #define	GPIOE_AON		0x20
+
+#define	GPI			0x80
+
 #define	GPIO_DIN_LOW		0x118
 #define	GPIO_DIN_HIGH		0x11c
+
+#define	GPI_AON			0x8
 #define	GPIO_DIN_AON		0x2c
+
 #define	IOMUX_SYSCFG_288	0x120
 #define	IOMUX_AONCFG_52		0x34
 
 #define	PAD_INPUT_EN		(1 << 0)
-#define	SHIFT_DRIVESTRENGTH	1
-#define	PAD_DRIVESTRENGTH	(0x3 << SHIFT_DRIVESTRENGTH)
+#define	PAD_DRIVESTRENGTH_MASK	(0x3 << 1)
+#define	 PAD_DRIVESTRENGTH_2	(0x0 << 1)
+#define	 PAD_DRIVESTRENGTH_4	(0x1 << 1)
+#define	 PAD_DRIVESTRENGTH_8	(0x2 << 1)
+#define	 PAD_DRIVESTRENGTH_12	(0x3 << 1)
 #define	PAD_PULLUP		(1 << 3)
 #define	PAD_PULLDOWN		(1 << 4)
 #define	PAD_SLEW		(1 << 5)
@@ -73,6 +86,7 @@ struct jh7110_gpio_softc {
 	uint32_t		iomuxcfg;
 	uint32_t		doutcfg;
 	uint32_t		doencfg;
+	uint32_t		gpicfg;
 };
 
 static struct ofw_compat_data compat_data[] = {
@@ -282,7 +296,7 @@ jh7110_gpio_pin_setflags(device_t dev, uint32_t pin, uint32_t flags)
 	if ((flags & GPIO_PIN_INPUT) != 0) {
 		reg = RD4(sc, sc->iomuxcfg + PAD_OFFSET(pin));
 		reg |= (PAD_INPUT_EN | PAD_HYST);
-		reg &= ~(PAD_DRIVESTRENGTH | PAD_SLEW);
+		reg &= ~(PAD_DRIVESTRENGTH_MASK | PAD_SLEW);
 		if ((flags & GPIO_PIN_PULLUP) != 0)
 			reg |= PAD_PULLUP;
 		else
@@ -402,6 +416,7 @@ jh7110_gpio_attach(device_t dev)
 		sc->iomuxcfg = IOMUX_SYSCFG_288;
 		sc->doutcfg = GP0_DOUT_CFG;
 		sc->doencfg = GP0_DOEN_CFG;
+		sc->gpicfg = 0x80; /* TODO name */
 	} else {
 		WR4(sc, GPIOE_AON, 0);
 		WR4(sc, AON_GPIOEN, 1);
@@ -409,7 +424,14 @@ jh7110_gpio_attach(device_t dev)
 		sc->iomuxcfg = IOMUX_AONCFG_52;
 		sc->doutcfg = AON_DOUT_CFG;
 		sc->doencfg = AON_DOEN_CFG;
+		sc->gpicfg = 0x8; /* TODO name */
 	}
+
+	/*
+	 * Register as a pinctrl device
+	 */
+	fdt_pinctrl_register(dev, NULL);
+	fdt_pinctrl_configure_tree(dev);
 
 	sc->busdev = gpiobus_add_bus(dev);
 	if (sc->busdev == NULL) {
@@ -426,6 +448,174 @@ static phandle_t
 jh7110_gpio_get_node(device_t bus, device_t dev)
 {
 	return (ofw_bus_get_node(bus));
+}
+
+/* fdt_pinctrl configuration */
+
+#define DEBUG
+
+#ifdef DEBUG
+#define	dprintf printf
+#else
+#define dprintf(x, arg...)
+#endif
+
+static void
+jh7110_gpio_configure_pin(struct jh7110_gpio_softc *sc, uint32_t pinmux,
+    uint32_t padcfg)
+{
+	uint32_t dout, doen, reg;
+	u_int din, pin;
+
+	pin  = (pinmux >> 00) & 0x3f;
+	doen = (pinmux >> 10) & 0x3f;
+	dout = (pinmux >> 16) & 0xff;
+	din  = (pinmux >> 24) & 0xff;
+
+	dprintf("%s: pinmux=%x, pin=%u, doen=%x, dout=%x, din=%x, padcfg=%x\n",
+	    __func__, pinmux, pin, doen, dout, din, padcfg);
+
+	/* Not supported (yet?) */
+	if (pin > sc->maxpin)
+		return;
+
+	/* Debugging */
+	uint32_t old_dout;
+
+	/* Set output configuration state for pin. */
+	dprintf("DOUT CFG\n");
+	reg = RD4(sc, sc->doutcfg + GPIO_RW_OFFSET(pin));
+	dprintf("RD4: 0x%x <- 0x%x\n", reg, sc->doutcfg + GPIO_RW_OFFSET(pin));
+	old_dout = (reg >> GPIO_SHIFT(pin)) & DATA_OUT_MASK;
+
+	reg &= ~(DATA_OUT_MASK << GPIO_SHIFT(pin));
+	reg |= dout << GPIO_SHIFT(pin);
+
+	/* TODO... figure this out. */
+	if (old_dout == GPOUT_SYS_UART0_TX) {
+		dprintf("skipping write for UART0...\n");
+	} else {
+		dprintf("WR4: 0x%x -> 0x%x\n", reg, sc->doutcfg + GPIO_RW_OFFSET(pin));
+		WR4(sc, sc->doutcfg + GPIO_RW_OFFSET(pin), reg);
+	}
+
+	/* Set output enable state for pin. */
+	dprintf("DOEN CFG\n");
+	reg = RD4(sc, sc->doencfg + GPIO_RW_OFFSET(pin));
+	dprintf("RD4: 0x%x <- 0x%x\n", reg, sc->doencfg + GPIO_RW_OFFSET(pin));
+	reg &= ~(ENABLE_MASK << GPIO_SHIFT(pin));
+	reg |= doen << GPIO_SHIFT(pin);
+	dprintf("WR4: 0x%x -> 0x%x\n", reg, sc->doencfg + GPIO_RW_OFFSET(pin));
+	WR4(sc, sc->doencfg + GPIO_RW_OFFSET(pin), doen);
+
+	/* TODO: how does this thing work??? */
+	if (din != GPI_NONE) {
+		dprintf("DIN CFG\n");
+		reg = RD4(sc, sc->gpicfg + GPIO_RW_OFFSET(din));
+		dprintf("RD4: 0x%x <- 0x%x\n", reg, sc->gpicfg + GPIO_RW_OFFSET(din));
+		reg &= ~(0x7f << GPIO_SHIFT(din));
+		reg |= ((pin + 2) << GPIO_SHIFT(din));
+		dprintf("WR4: 0x%x -> 0x%x\n", reg, sc->gpicfg + GPIO_RW_OFFSET(din));
+		WR4(sc, sc->gpicfg + GPIO_RW_OFFSET(din), reg);
+	}
+
+	(void)din;
+	(void)dout;
+	(void)doen;
+	(void)reg;
+
+	/* Update PAD configuration for pin. */
+	dprintf("PAD CFG\n");
+	dprintf("WR4: 0x%x -> 0x%x\n", padcfg, sc->iomuxcfg + PAD_OFFSET(pin));
+	WR4(sc, sc->iomuxcfg + PAD_OFFSET(pin), padcfg);
+}
+
+static uint32_t
+parse_padconfig(phandle_t node)
+{
+	uint32_t padcfg = 0;
+	u_int ds, slew;
+
+	/*
+	 * See Bindings/pinctrl/starfive,jh7110-sys-pinctrl.yaml
+	 */
+
+	if (OF_hasprop(node, "input-enable"))
+		padcfg |= PAD_INPUT_EN;
+
+	if (!OF_hasprop(node, "bias-disable")) {
+		if (OF_hasprop(node, "bias-pull-up")) {
+			padcfg |= PAD_PULLUP;
+		} else if (OF_hasprop(node, "bias-pull-down")) {
+			padcfg |= PAD_PULLDOWN;
+		}
+	}
+
+	if (OF_getencprop(node, "drive-strength", &ds, sizeof(ds)) != -1) {
+		switch (ds) {
+		case 12:
+			padcfg |= PAD_DRIVESTRENGTH_12;
+			break;
+		case 8:
+			padcfg |= PAD_DRIVESTRENGTH_8;
+			break;
+		case 4:
+			padcfg |= PAD_DRIVESTRENGTH_4;
+			break;
+		case 2: 
+		default:
+			padcfg |= PAD_DRIVESTRENGTH_2;
+			break;
+		}
+	}
+
+	if (OF_getencprop(node, "slew-rate", &slew, sizeof(slew)) != -1 &&
+	    slew == 1)
+		padcfg |= PAD_SLEW;
+
+	if (OF_hasprop(node, "input-schmitt-enable"))
+		padcfg |= PAD_HYST;
+
+	return (padcfg);
+}
+
+static int
+jh7110_gpio_configure_pins(device_t dev, phandle_t cfgxref)
+{
+	struct jh7110_gpio_softc *sc;
+	phandle_t node, child;
+	pcell_t *pinmux;
+	uint32_t padcfg;
+	int ncells;
+
+	sc = device_get_softc(dev);
+	node = OF_node_from_xref(cfgxref);
+
+	/* Process any and all children. */
+	for (child = OF_child(node); child != 0; child = OF_peer(child)) {
+		/* Get pinmux */
+		ncells = OF_getencprop_alloc_multi(child, "pinmux",
+		    sizeof(pcell_t), (void **)&pinmux);
+		if (ncells == -1) {
+			device_printf(dev, "couldn't find 'pinmux' property\n");
+			continue;
+		}
+
+		printf("process child node %u\n", child);
+
+		/* Pad configuration for all pins described by this node. */
+		padcfg = parse_padconfig(child);
+
+		JH7110_GPIO_LOCK(sc);
+		for (int i = 0; i < ncells; i++) {
+			jh7110_gpio_configure_pin(sc, pinmux[i], padcfg);
+		}
+		JH7110_GPIO_UNLOCK(sc);
+
+		OF_prop_free(pinmux);
+	}
+
+	return (0);
 }
 
 static device_method_t jh7110_gpio_methods[] = {
@@ -447,6 +637,9 @@ static device_method_t jh7110_gpio_methods[] = {
 
 	/* ofw_bus interface */
 	DEVMETHOD(ofw_bus_get_node,	jh7110_gpio_get_node),
+
+        /* fdt_pinctrl interface */
+	DEVMETHOD(fdt_pinctrl_configure, jh7110_gpio_configure_pins),
 
 	DEVMETHOD_END
 };
