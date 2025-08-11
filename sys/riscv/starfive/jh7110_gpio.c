@@ -2,6 +2,10 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2023 Jari Sihvola <jsihv@gmx.com>
+ * Copyright (c) 2025 The FreeBSD Foundation
+ *
+ * Portions of this software was developed by Mitchell Horne
+ * <mhorne@FreeBSD.org> under sponsorship from the FreeBSD Foundation.
  */
 
 #include <sys/param.h>
@@ -33,8 +37,8 @@
 #define	GPIOEN			0xdc
 #define	GPIOE_0			0x100
 #define	GPIOE_1			0x104
-#define	GPIO_DIN_LOW		0x118
-#define	GPIO_DIN_HIGH		0x11c
+#define	GPIOIN_LOW		0x118
+#define	GPIOIN_HIGH		0x11c
 #define	IOMUX_SYSCFG_288	0x120
 
 #define	PAD_INPUT_EN		(1 << 0)
@@ -105,10 +109,10 @@ jh7110_gpio_pin_get(device_t dev, uint32_t pin, uint32_t *val)
 
 	JH7110_GPIO_LOCK(sc);
 	if (pin < GPIO_PINS / GPIO_REGS) {
-		reg = READ4(sc, GPIO_DIN_LOW);
+		reg = READ4(sc, GPIOIN_LOW);
 		*val = (reg >> pin) & 0x1;
 	} else {
-		reg = READ4(sc, GPIO_DIN_HIGH);
+		reg = READ4(sc, GPIOIN_HIGH);
 		*val = (reg >> (pin - GPIO_PINS / GPIO_REGS)) & 0x1;
 	}
 	JH7110_GPIO_UNLOCK(sc);
