@@ -369,7 +369,7 @@ jh7110_gpio_attach(device_t dev)
 		sc->gpio_pins[i].gp_caps = JH7110_DEFAULT_CAPS;
 		sc->gpio_pins[i].gp_flags =
 		    ((reg & (ENABLE_MASK << GPIO_SHIFT(i))) == 0) ?
-		    GPIO_PIN_INPUT : GPIO_PIN_OUTPUT;
+		    GPIO_PIN_OUTPUT : GPIO_PIN_INPUT;
 
 		snprintf(sc->gpio_pins[i].gp_name, GPIOMAXNAME, "GPIO %d", i);
 	}
