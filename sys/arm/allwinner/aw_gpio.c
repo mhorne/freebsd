@@ -363,7 +363,15 @@ static struct resource_spec aw_gpio_res_spec[] = {
 #define	AW_GPIO_UNLOCK(_sc)		mtx_unlock_spin(&(_sc)->sc_mtx)
 #define	AW_GPIO_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->sc_mtx, MA_OWNED)
 
-#define	AW_GPIO_GP_BASE(_sc, _bank)	((_sc)->conf->bank_size * (_bank))
+#define	AW_GPIO_GP_BANK_OFFSET(_sc, _bank)	((_sc)->conf->bank_size * (_bank))
+
+/*
+ * First pinctrl register range at 0x000-0x200. Second range begins at 0x500.
+ */
+#define	AW_GPIO_GP_BASE(_sc, _bank)						\
+	(AW_GPIO_GP_BANK_OFFSET(_sc, _bank) > 0x200 ?				\
+	    AW_GPIO_GP_BANK_OFFSET((_sc), (_bank - 11)) + 0x500 :		\
+	    AW_GPIO_GP_BANK_OFFSET(_sc, _bank))
 
 #define	AW_GPIO_GP_CFG(_sc, _bank, _idx)					\
     (AW_GPIO_GP_BASE(_sc, _bank) + 0x00 + ((_idx) << 2))
