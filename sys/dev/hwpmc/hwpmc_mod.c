@@ -213,7 +213,7 @@ static bool	pmc_can_allocate_row(int ri, enum pmc_mode mode);
 static bool	pmc_can_allocate_rowindex(struct proc *p, unsigned int ri,
     int cpu);
 static bool	pmc_can_attach(struct pmc *pm, struct proc *p);
-static void	pmc_capture_user_callchain(int cpu, int soft,
+static void	pmc_capture_user_callchain(ring_type_t ring,
     struct trapframe *tf);
 static void	pmc_cleanup(void);
 static int	pmc_detach_process(struct proc *p, struct pmc *pm);
@@ -1799,7 +1799,7 @@ static void
 pmc_process_thread_userret(struct thread *td)
 {
 	sched_pin();
-	pmc_capture_user_callchain(curcpu, PMC_UR, td->td_frame);
+	pmc_capture_user_callchain(PMC_UR, td->td_frame);
 	sched_unpin();
 }
 
@@ -2203,8 +2203,7 @@ pmc_hook_handler(struct thread *td, int function, void *arg)
 		KASSERT(td == curthread, ("[pmc,%d] td != curthread",
 		    __LINE__));
 
-		pmc_capture_user_callchain(PCPU_GET(cpuid), PMC_HR,
-		    (struct trapframe *)arg);
+		pmc_capture_user_callchain(PMC_HR, (struct trapframe *)arg);
 
 		KASSERT(td->td_pinned == 1,
 		    ("[pmc,%d] invalid td_pinned value", __LINE__));
@@ -2220,9 +2219,7 @@ pmc_hook_handler(struct thread *td, int function, void *arg)
 		KASSERT(td == curthread, ("[pmc,%d] td != curthread",
 		    __LINE__));
 
-		cpu = PCPU_GET(cpuid);
-		pmc_capture_user_callchain(cpu, PMC_SR,
-		    (struct trapframe *) arg);
+		pmc_capture_user_callchain(PMC_SR, (struct trapframe *) arg);
 
 		KASSERT(td->td_pinned == 1,
 		    ("[pmc,%d] invalid td_pinned value", __LINE__));
@@ -4688,10 +4685,9 @@ pmc_process_interrupt(int ring, struct pmc *pm, struct trapframe *tf)
  * Capture a user call chain. This function will be called from ast()
  * before control returns to userland and before the process gets
  * rescheduled.
- * TODO: remove cpu arg
  */
 static void
-pmc_capture_user_callchain(int cpu, int ring, struct trapframe *tf)
+pmc_capture_user_callchain(ring_type_t ring, struct trapframe *tf)
 {
 	struct pmc *pm;
 	struct pmc_sample *ps;
@@ -4732,9 +4728,9 @@ restart:
 		    ps->ps_pmc->pm_state != PMC_STATE_RUNNING)
 			continue;
 
-		KASSERT(ps->ps_cpu == cpu,
+		KASSERT(ps->ps_cpu == curcpu,
 		    ("[pmc,%d] cpu mismatch ps_cpu=%d pcpu=%d", __LINE__,
-		    ps->ps_cpu, PCPU_GET(cpuid)));
+		    ps->ps_cpu, curcpu));
 
 		pm = ps->ps_pmc;
 		KASSERT(pm->pm_flags & PMC_F_CALLCHAIN,
