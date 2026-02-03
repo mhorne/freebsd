@@ -247,7 +247,7 @@ static void	pmc_process_exit(void *arg, struct proc *p);
 static void	pmc_process_fork(void *arg, struct proc *p1,
     struct proc *p2, int n);
 static void	pmc_process_proccreate(struct proc *p);
-static void	pmc_process_samples(int cpu, ring_type_t soft);
+static void	pmc_process_samples(ring_type_t soft);
 static void	pmc_process_threadcreate(struct thread *td);
 static void	pmc_process_threadexit(struct thread *td);
 static void	pmc_process_thread_add(struct thread *td);
@@ -2137,8 +2137,6 @@ const char *pmc_hooknames[] = {
 static int
 pmc_hook_handler(struct thread *td, int function, void *arg)
 {
-	int cpu;
-
 	PMCDBG4(MOD,PMH,1, "hook td=%p func=%d \"%s\" arg=%p", td, function,
 	    pmc_hooknames[function], arg);
 
@@ -2177,10 +2175,9 @@ pmc_hook_handler(struct thread *td, int function, void *arg)
 		 * lose the interrupt sample.
 		 */
 		DPCPU_SET(pmc_sampled, 0);
-		cpu = PCPU_GET(cpuid);
-		pmc_process_samples(cpu, PMC_HR);
-		pmc_process_samples(cpu, PMC_SR);
-		pmc_process_samples(cpu, PMC_UR);
+		pmc_process_samples(PMC_HR);
+		pmc_process_samples(PMC_SR);
+		pmc_process_samples(PMC_UR);
 		break;
 
 	case PMC_FN_MMAP:
@@ -4798,7 +4795,7 @@ restart:
  * Process saved PC samples.
  */
 static void
-pmc_process_samples(int cpu, ring_type_t ring)
+pmc_process_samples(ring_type_t ring)
 {
 	struct pmc *pm;
 	struct thread *td;
@@ -4808,11 +4805,9 @@ pmc_process_samples(int cpu, ring_type_t ring)
 	struct pmc_samplebuffer *psb;
 	uint64_t delta __diagused;
 	int adjri, n;
+	int cpu;
 
-	KASSERT(PCPU_GET(cpuid) == cpu,
-	    ("[pmc,%d] not on the correct CPU pcpu=%d cpu=%d", __LINE__,
-		PCPU_GET(cpuid), cpu));
-
+	cpu = curcpu;
 	psb = DPCPU_GET(pmc_pcpu).pc_sb[ring];
 	delta = psb->ps_prodidx - psb->ps_considx;
 	MPASS(delta <= pmc_nsamples);
