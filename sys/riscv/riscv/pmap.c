@@ -967,8 +967,9 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 	/*
 	 * TODO: tunable name? FU740 global fence errata?
 	 */
-	TUNABLE_BOOL_FETCH("vm.pmap.global_bit_enabled",
-	    &global_bit_enabled);
+	TUNABLE_BOOL_FETCH("vm.pmap.global_bit_enabled", &global_bit_enabled);
+	if (has_errata_buggy_sfence)
+		global_bit_enabled = false;
 	if (!global_bit_enabled)
 		pte_g = 0;
 
@@ -1089,7 +1090,7 @@ pmap_init(void)
 static __inline void
 pmap_invalidate_all_local(pmap_t pmap)
 {
-	if (pmap == kernel_pmap)
+	if (pmap == kernel_pmap || __predict_false(has_errata_buggy_sfence))
 		sfence_vma();
 	else
 		sfence_vma_asid(0);
@@ -1253,6 +1254,8 @@ DEFINE_IFUNC(, void, pmap_invalidate_range,
 {
 	if (has_svinval)
 		return (pmap_invalidate_range_svinval);
+	if (has_errata_buggy_sfence)
+		return (pmap_invalidate_range_sbi_global);
 	return (pmap_invalidate_range_sbi);
 }
 
@@ -1261,11 +1264,13 @@ DEFINE_IFUNC(, void, pmap_invalidate_page,
 {
 	if (has_svinval)
 		return (pmap_invalidate_page_svinval);
+	if (has_errata_buggy_sfence)
+		return (pmap_invalidate_page_sbi_global);
 	return (pmap_invalidate_page_sbi);
 }
 
 static void
-pmap_invalidate_all_global(pmap_t pmap)
+pmap_invalidate_all_sbi_global(pmap_t pmap)
 {
 	cpuset_t mask;
 
@@ -1282,12 +1287,12 @@ pmap_invalidate_all_global(pmap_t pmap)
 }
 
 static void
-pmap_invalidate_all(pmap_t pmap)
+pmap_invalidate_all_sbi(pmap_t pmap)
 {
 	cpuset_t mask;
 
 	if (pmap == kernel_pmap) {
-		pmap_invalidate_all_global(pmap);
+		pmap_invalidate_all_sbi_global(pmap);
 		return;
 	}
 
@@ -1301,6 +1306,13 @@ pmap_invalidate_all(pmap_t pmap)
 	sfence_vma_asid(0);
 
 	sched_unpin();
+}
+
+DEFINE_IFUNC(, void, pmap_invalidate_all, (pmap_t pmap))
+{
+	if (has_errata_buggy_sfence)
+		return (pmap_invalidate_all_sbi_global);
+	return (pmap_invalidate_all_sbi);
 }
 
 #else /* !SMP */

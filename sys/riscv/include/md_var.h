@@ -49,6 +49,8 @@ extern bool has_svpbmt;
 extern bool has_vector;
 extern bool has_svinval;
 
+extern bool has_errata_buggy_sfence;
+
 struct dumperinfo;
 struct minidumpstate;
 

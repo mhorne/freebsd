@@ -550,10 +550,29 @@ handle_thead_quirks(u_int cpu, struct cpu_desc *desc)
 	thead_setup_cache();
 }
 
+/* TODO: placement? */
+bool __read_frequently has_errata_buggy_sfence = false;
+
+static void
+handle_sifive_quirks(u_int cpu, struct cpu_desc *desc)
+{
+	if (cpu != 0)
+		return;
+
+	switch (marchid) {
+	case MARCHID_SIFIVE_U7:
+		has_errata_buggy_sfence = true;
+		break;
+	}
+}
+
 static void
 handle_cpu_quirks(u_int cpu, struct cpu_desc *desc)
 {
 	switch (mvendorid) {
+	case MVENDORID_SIFIVE:
+		handle_sifive_quirks(cpu, desc);
+		break;
 	case MVENDORID_THEAD:
 		handle_thead_quirks(cpu, desc);
 		break;
