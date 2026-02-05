@@ -762,7 +762,7 @@ pmc_restore_cpu_binding(struct pmc_binding *pb)
 void
 pmc_select_cpu(int cpu)
 {
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
+	KASSERT(cpu >= 0 && cpu <= mp_maxid,
 	    ("[pmc,%d] bad cpu number %d", __LINE__, cpu));
 
 	/* Never move to an inactive CPU. */
@@ -1451,7 +1451,7 @@ pmc_process_csw_in(struct thread *td)
 	PMCDBG5(CSW,SWI,1, "cpu=%d proc=%p (%d, %s) pp=%p", cpu, p,
 	    p->p_pid, p->p_comm, pp);
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
+	KASSERT(cpu >= 0 && cpu <= mp_maxid,
 	    ("[pmc,%d] weird CPU id %d", __LINE__, cpu));
 
 	pc = DPCPU_PTR(pmc_pcpu);
@@ -1617,7 +1617,7 @@ pmc_process_csw_out(struct thread *td)
 	PMCDBG5(CSW,SWO,1, "cpu=%d proc=%p (%d, %s) pp=%p", cpu, p,
 	    p->p_pid, p->p_comm, pp);
 
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
+	KASSERT(cpu >= 0 && cpu <= mp_maxid,
 	    ("[pmc,%d weird CPU id %d", __LINE__, cpu));
 
 	/*
@@ -2652,7 +2652,7 @@ pmc_wait_for_pmc_idle(struct pmc *pm)
 #ifdef INVARIANTS
 	volatile int maxloop;
 
-	maxloop = 100 * pmc_cpu_max();
+	maxloop = 100 * mp_ncpus;
 #endif
 	/*
 	 * Loop (with a forced context switch) till the PMC's runcount
@@ -3183,7 +3183,7 @@ pmc_stop(struct pmc *pm)
 	pmc_save_cpu_binding(&pb);
 
 	cpu = PMC_TO_CPU(pm);
-	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
+	KASSERT(cpu >= 0 && cpu <= mp_maxid,
 	    ("[pmc,%d] illegal cpu=%d", __LINE__, cpu));
 	if (!pmc_cpu_is_active(cpu))
 		return (ENXIO);
@@ -3288,7 +3288,7 @@ pmc_do_op_pmcallocate(struct thread *td, struct pmc_op_pmcallocate *pa)
 		return (EINVAL);
 
 	/* Requested CPU must be valid. */
-	if (cpu != PMC_CPU_ANY && cpu >= pmc_cpu_max())
+	if (cpu != PMC_CPU_ANY && cpu > mp_maxid)
 		return (EINVAL);
 
 	/*
@@ -3889,7 +3889,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 
 		memset(&gci, 0, sizeof(gci));
 		gci.pm_cputype = md->pmd_cputype;
-		gci.pm_ncpu    = pmc_cpu_max();
+		gci.pm_ncpu    = mp_ncpus;
 		gci.pm_npmc    = md->pmd_npmc;
 		gci.pm_nclass  = md->pmd_nclass;
 		pci = gci.pm_classes;
@@ -4020,7 +4020,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 		if ((error = copyin(&gpi->pm_cpu, &cpu, sizeof(cpu))) != 0)
 			break;
 
-		if (cpu >= pmc_cpu_max()) {
+		if (cpu > mp_maxid) {
 			error = EINVAL;
 			break;
 		}
@@ -4117,7 +4117,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 
 		cpu = pma.pm_cpu;
 
-		if (cpu < 0 || cpu >= (int) pmc_cpu_max()) {
+		if (cpu < 0 || cpu > mp_maxid) {
 			error = EINVAL;
 			break;
 		}
@@ -5387,7 +5387,8 @@ pmc_initialize(void)
 	struct pmc_sample *ps;
 	struct pmc_samplebuffer *sb;
 	int c, error, n, ri;
-	u_int maxcpu, domain;
+	int cpu;
+	u_int domain;
 
 	md = NULL;
 	error = 0;
@@ -5488,17 +5489,15 @@ pmc_initialize(void)
 	    ("[pmc,%d] npmc miscomputed: ri=%d, md->npmc=%d", __LINE__,
 	    ri, md->pmd_npmc));
 
-	maxcpu = pmc_cpu_max();
-
 	/* per-cpu 'saved values' for managing process-mode PMCs */
-	pmc_pcpu_saved = malloc(sizeof(pmc_value_t) * maxcpu * md->pmd_npmc,
+	pmc_pcpu_saved = malloc(sizeof(pmc_value_t) * mp_ncpus * md->pmd_npmc,
 	    M_PMC, M_WAITOK);
 
 	/*
 	 * Perform CPU-dependent allocations, including: */
 	/* allocate space for the sample array */
 	/* TODO: finish comment */
-	for (int cpu = 0; cpu < maxcpu; cpu++) {
+	CPU_FOREACH(cpu) {
 		if (!pmc_cpu_is_active(cpu))
 			continue;
 
@@ -5632,7 +5631,7 @@ pmc_smp_init(void)
 
 	/* Call the class-dependent PCPU initialization functions. */
 	pmc_save_cpu_binding(&pb);
-	for (cpu = 0; cpu < pmc_cpu_max(); cpu++) {
+	CPU_FOREACH(cpu) {
 		if (!pmc_cpu_is_active(cpu))
 			continue;
 
@@ -5655,7 +5654,6 @@ pmc_cleanup(void)
 	struct pmc_owner *po, *tmp;
 	struct pmc_ownerhash *ph;
 	struct pmc_processhash *prh __pmcdbg_used;
-	u_int maxcpu;
 	int cpu, c;
 
 	PMCDBG0(MOD,INI,0, "cleanup");
@@ -5738,7 +5736,6 @@ pmc_cleanup(void)
 	    ("[pmc,%d] Global SS count not empty", __LINE__));
 
  	/* do processor and pmc-class dependent cleanup */
-	maxcpu = pmc_cpu_max();
 
 	PMCDBG0(MOD,INI,3, "md cleanup");
 	if (md != NULL) {
@@ -5747,7 +5744,7 @@ pmc_cleanup(void)
 		 * pmc_smp_init().
 		 */
 		pmc_save_cpu_binding(&pb);
-		for (cpu = 0; cpu < maxcpu; cpu++) {
+		CPU_FOREACH(cpu) {
 			if (!pmc_cpu_is_active(cpu))
 				continue;
 
@@ -5770,7 +5767,7 @@ pmc_cleanup(void)
 	}
 
 	/* Free per-CPU descriptors. */
-	for (cpu = 0; cpu < maxcpu; cpu++) {
+	CPU_FOREACH(cpu) {
 		if (!pmc_cpu_is_active(cpu))
 			continue;
 
@@ -5838,7 +5835,8 @@ pmc_load(struct module *module __unused, int cmd, void *arg __unused)
 		if (error != 0)
 			break;
 		PMCDBG2(MOD,INI,1, "syscall=%d maxcpu=%d", pmc_syscall_num,
-		    pmc_cpu_max());
+		    mp_maxid);
+
 		break;
 	case MOD_UNLOAD:
 	case MOD_SHUTDOWN:
