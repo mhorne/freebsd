@@ -201,28 +201,6 @@ pmc_cpu_max(void)
 #endif
 }
 
-#ifdef	INVARIANTS
-
-/*
- * Return the count of CPUs in the `active' state in the system.
- */
-int
-pmc_cpu_max_active(void)
-{
-#ifdef	SMP
-	/*
-	 * When support for CPU hot-plugging is added to the kernel,
-	 * this function would change to return the current number
-	 * of "active" CPUs.
-	 */
-	return (mp_ncpus);
-#else
-	return (1);
-#endif
-}
-
-#endif
-
 /*
  * Cleanup event name:
  * - remove duplicate '_'

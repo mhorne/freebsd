@@ -120,7 +120,7 @@ static int		*pmc_pmcdisp;	 /* PMC row dispositions */
 	KASSERT(pmc_pmcdisp[(R)] <= 0, ("[pmc,%d] row disposition error", \
 		    __LINE__));						  \
 	atomic_add_int(&pmc_pmcdisp[(R)], -1);				  \
-	KASSERT(pmc_pmcdisp[(R)] >= (-pmc_cpu_max_active()),		  \
+	KASSERT(pmc_pmcdisp[(R)] >= (-mp_ncpus),			  \
 		("[pmc,%d] row disposition error", __LINE__));		  \
 } while (0)
 

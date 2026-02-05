@@ -249,10 +249,6 @@ int		pmc_cpu_is_present(int _cpu);
 int		pmc_cpu_is_primary(int _cpu);
 unsigned int	pmc_cpu_max(void);
 
-#ifdef	INVARIANTS
-int		pmc_cpu_max_active(void);
-#endif
-
 /*
  * Soft events functions.
  */
