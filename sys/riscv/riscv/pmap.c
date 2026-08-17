@@ -269,6 +269,13 @@ SYSCTL_INT(_vm_pmap, OID_AUTO, superpages_enabled,
     CTLFLAG_RDTUN, &superpages_enabled, 0,
     "Enable support for transparent superpages");
 
+static __read_frequently pt_entry_t pte_g = PTE_G;
+
+static bool global_bit_enabled = true;
+SYSCTL_BOOL(_vm_pmap, OID_AUTO, global_bit_enabled,
+    CTLFLAG_RDTUN, &global_bit_enabled, 0,
+    "Enable global page bit for kernel mappings");
+
 static SYSCTL_NODE(_vm_pmap, OID_AUTO, l2, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "2MB page mapping counters");
 
@@ -649,7 +656,7 @@ pmap_bootstrap_dmap(pd_entry_t *l1, vm_paddr_t freemempos)
 				/* Link it. */
 				l1slot = pmap_l1_index(va);
 				pmap_store(&l1[l1slot],
-				    L1_PDE((vm_paddr_t)l2, PTE_V));
+				    L1_PDE((vm_paddr_t)l2, PTE_V | pte_g));
 			}
 
 			if (l3 == NULL || pmap_l2_index(va) != l2slot) {
@@ -682,7 +689,7 @@ pmap_bootstrap_dmap(pd_entry_t *l1, vm_paddr_t freemempos)
 				/* Link it. */
 				l1slot = pmap_l1_index(va);
 				pmap_store(&l1[l1slot],
-				    L1_PDE((vm_paddr_t)l2, PTE_V));
+				    L1_PDE((vm_paddr_t)l2, PTE_V | pte_g));
 			}
 
 			/* map l2 pages */
@@ -697,7 +704,8 @@ pmap_bootstrap_dmap(pd_entry_t *l1, vm_paddr_t freemempos)
 		while (pa + L1_SIZE - 1 < endpa) {
 			/* map l1 pages */
 			l1slot = pmap_l1_index(va);
-			pmap_store(&l1[l1slot], L1_PTE(pa, PTE_KERN | memattr));
+			pmap_store(&l1[l1slot], L1_PTE(pa, PTE_KERN | pte_g |
+			    memattr));
 
 			pa += L1_SIZE;
 			va += L1_SIZE;
@@ -713,7 +721,7 @@ l2end:
 				/* Link it. */
 				l1slot = pmap_l1_index(va);
 				pmap_store(&l1[l1slot],
-				    L1_PDE((vm_paddr_t)l2, PTE_V));
+				    L1_PDE((vm_paddr_t)l2, PTE_V | pte_g));
 			}
 
 			/* map l2 pages */
@@ -733,7 +741,7 @@ l3end:
 				/* Link it. */
 				l1slot = pmap_l1_index(va);
 				pmap_store(&l1[l1slot],
-				    L1_PDE((vm_paddr_t)l2, PTE_V));
+				    L1_PDE((vm_paddr_t)l2, PTE_V | pte_g));
 			}
 
 			if (l3 == NULL || pmap_l2_index(va) != l2slot) {
@@ -885,7 +893,7 @@ pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen,
 	slot = pmap_l1_index(KERNBASE);
 	for (i = 0; i < nkernl2; i++, slot++) {
 		pa = (vm_paddr_t)kern_l2 + ptoa(i);
-		pmap_store(&l1[slot], L1_PDE(pa, PTE_V));
+		pmap_store(&l1[slot], L1_PDE(pa, PTE_V | pte_g));
 	}
 
 	/* Connect the L1 table to L0, if in use. */
@@ -907,7 +915,7 @@ pmap_create_pagetables(vm_paddr_t kernstart, vm_size_t kernlen,
 	/* Connect the devmap L2 pages to the L1 table. */
 	slot = pmap_l1_index(DEVMAP_MIN_VADDR);
 	pa = (vm_paddr_t)devmap_l2;
-	pmap_store(&l1[slot], L1_PDE(pa, PTE_V));
+	pmap_store(&l1[slot], L1_PDE(pa, PTE_V | pte_g));
 
 	/* Return the next position of free memory */
 	return (freemempos);
@@ -955,6 +963,14 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 		memattr_bits[VM_MEMATTR_DEVICE] = PTE_THEAD_MA_IO;
 		memattr_mask = PTE_THEAD_MA_MASK;
 	}
+
+	/*
+	 * TODO: tunable name? FU740 global fence errata?
+	 */
+	TUNABLE_BOOL_FETCH("vm.pmap.global_bit_enabled",
+	    &global_bit_enabled);
+	if (!global_bit_enabled)
+		pte_g = 0;
 
 	/* Create a new set of pagetables to run the kernel in. */
 	freemempos = pmap_create_pagetables(kernstart, kernlen, &root_pt_phys);
@@ -2149,7 +2165,7 @@ pmap_growkernel_nopanic(vm_offset_t addr)
 			paddr = VM_PAGE_TO_PHYS(nkpg);
 
 			pn = (paddr / PAGE_SIZE);
-			entry = (PTE_V);
+			entry = (PTE_V | pte_g);
 			entry |= (pn << PTE_PPN0_S);
 			pmap_store(l1, entry);
 			pmap_distribute_l1(kernel_pmap,
@@ -3184,7 +3200,7 @@ pmap_demote_l1(pmap_t pmap, pd_entry_t *l1, vm_offset_t va)
 	 * Create new entries, relying on the fact that only the low bits
 	 * (index) of the physical address are changing.
 	 */
-	newl2 = oldl1;
+	newl2 = oldl1 & ~pte_g;
 	for (int i = 0; i < Ln_ENTRIES; i++)
 		pmap_store(&l2[i], newl2 | (i << PTE_PPN1_S));
 
@@ -3195,7 +3211,7 @@ pmap_demote_l1(pmap_t pmap, pd_entry_t *l1, vm_offset_t va)
 	 * translations are still "correct" for demoted mappings until some
 	 * subset of the demoted range is modified.
 	 */
-	newl1 = ((l2phys / PAGE_SIZE) << PTE_PPN0_S) | PTE_V;
+	newl1 = ((l2phys / PAGE_SIZE) << PTE_PPN0_S) | PTE_V | pte_g;
 	pmap_store(l1, newl1);
 
 	counter_u64_add(pmap_l1_demotions, 1);
