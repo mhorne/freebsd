@@ -457,6 +457,14 @@ jh7110_gpio_get_node(device_t bus, device_t dev)
 
 /* fdt_pinctrl configuration */
 
+#define DEBUG
+
+#ifdef DEBUG
+#define	dprintf printf
+#else
+#define dprintf(x, arg...)
+#endif
+
 static void
 jh7110_gpio_configure_pin(struct jh7110_gpio_softc *sc, uint32_t pinmux,
     uint32_t padcfg)
@@ -480,25 +488,40 @@ jh7110_gpio_configure_pin(struct jh7110_gpio_softc *sc, uint32_t pinmux,
 	}
 
 	/* Set output configuration state for pin. */
+	dprintf("DOUT CFG\n");
 	reg = RD4(sc, sc->doutcfg + GPIO_RW_OFFSET(pin));
+	dprintf("RD4: 0x%x <- 0x%x\n", reg, sc->doutcfg + GPIO_RW_OFFSET(pin));
 	reg &= ~(DATA_OUT_MASK << GPIO_SHIFT(pin));
 	reg |= dout << GPIO_SHIFT(pin);
+	dprintf("WR4: 0x%x -> 0x%x\n", reg, sc->doutcfg + GPIO_RW_OFFSET(pin));
 	WR4(sc, sc->doutcfg + GPIO_RW_OFFSET(pin), reg);
 
 	/* Set output enable state for pin. */
+	dprintf("DOEN CFG\n");
 	reg = RD4(sc, sc->doencfg + GPIO_RW_OFFSET(pin));
+	dprintf("RD4: 0x%x <- 0x%x\n", reg, sc->doencfg + GPIO_RW_OFFSET(pin));
 	reg &= ~(ENABLE_MASK << GPIO_SHIFT(pin));
 	reg |= doen << GPIO_SHIFT(pin);
+	dprintf("WR4: 0x%x -> 0x%x\n", reg, sc->doencfg + GPIO_RW_OFFSET(pin));
 	WR4(sc, sc->doencfg + GPIO_RW_OFFSET(pin), reg);
 
 	if (din <= sc->maxinput) {
+		dprintf("DIN CFG\n");
 		reg = RD4(sc, sc->gpicfg + GPIO_RW_OFFSET(din));
+		dprintf("RD4: 0x%x <- 0x%x\n", reg, sc->gpicfg + GPIO_RW_OFFSET(din));
 		reg &= ~(0x7f << GPIO_SHIFT(din));
 		reg |= ((pin + 2) << GPIO_SHIFT(din));
+		dprintf("WR4: 0x%x -> 0x%x\n", reg, sc->gpicfg + GPIO_RW_OFFSET(din));
 		WR4(sc, sc->gpicfg + GPIO_RW_OFFSET(din), reg);
 	}
 
 	/* Update PAD configuration for pin. */
+	dprintf("PAD CFG\n");
+#ifdef DEBUG
+	reg = RD4(sc, sc->iomuxcfg + PAD_OFFSET(pin));
+	dprintf("RD4: 0x%x <- 0x%x\n", reg, sc->iomuxcfg + PAD_OFFSET(pin));
+#endif
+	dprintf("WR4: 0x%x -> 0x%x\n", padcfg, sc->iomuxcfg + PAD_OFFSET(pin));
 	WR4(sc, sc->iomuxcfg + PAD_OFFSET(pin), padcfg);
 }
 
